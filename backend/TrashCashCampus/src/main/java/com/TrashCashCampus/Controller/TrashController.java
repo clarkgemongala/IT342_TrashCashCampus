@@ -36,4 +36,5 @@ public class TrashController {
     public String testConnection() {
         return trashService.testDatabaseConnection();
     }
+    
 }

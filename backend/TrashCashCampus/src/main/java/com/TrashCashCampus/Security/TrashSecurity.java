@@ -8,14 +8,14 @@ import org.springframework.security.web.SecurityFilterChain;
 @Configuration
 public class TrashSecurity {
 
-    @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        http
-            .csrf().disable() // Disable CSRF if not needed
-            .authorizeRequests()
-                .requestMatchers("/api/trash/register", "/api/trash/login").permitAll() // Allow access to register/login
-                .anyRequest().authenticated(); // Secure other endpoints
+	@Bean
+	public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+	    http
+	        .csrf().disable() // Disable CSRF if not needed
+	        .authorizeRequests()
+	            .requestMatchers("/**").permitAll() // Allow access to all endpoints
+	            .anyRequest().authenticated(); // Secure other endpoints
 
-        return http.build();
-    }
+	    return http.build();
+	}
 }
