@@ -290,7 +290,10 @@ const User = () => {
         <div className="email-form">
           <textarea
             className="email-message"
-            placeholder="Enter login credentials or message here..."
+            placeholder="Enter login credentials or message here...
+
+Email:
+Password:"
             value={emailMessage}
             onChange={handleEmailMessageChange}
             rows={8}
