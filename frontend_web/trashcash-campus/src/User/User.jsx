@@ -5,9 +5,21 @@ import trashcashLogo from '../assets/trashcash-logo.png';
 
 const User = () => {
   const navigate = useNavigate();
-  const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('Newest');
   const [currentPage, setCurrentPage] = useState(1);
+  const [showCredentialModal, setShowCredentialModal] = useState(false);
+  const [showEmailForm, setShowEmailForm] = useState(false);
+  const [selectedEmail, setSelectedEmail] = useState('');
+  const [emailMessage, setEmailMessage] = useState('');
+  
+  // Mock data for credential requests
+  const credentialRequests = [
+    { id: 1, email: 'john.doe@cit.edu', date: '2025-04-08', status: 'Pending' },
+    { id: 2, email: 'jane.smith@cit.edu', date: '2025-04-09', status: 'Pending' },
+    { id: 3, email: 'robert.johnson@cit.edu', date: '2025-04-10', status: 'Pending' },
+    { id: 4, email: 'emily.williams@cit.edu', date: '2025-04-10', status: 'Pending' },
+    { id: 5, email: 'michael.brown@cit.edu', date: '2025-04-11', status: 'Pending' },
+  ];
   
   // Mock data for the users table
   const userData = [
@@ -30,6 +42,36 @@ const User = () => {
 
   const navigateToPage = (page) => {
     setCurrentPage(page);
+  };
+
+  const openCredentialModal = () => {
+    setShowCredentialModal(true);
+  };
+
+  const closeCredentialModal = () => {
+    setShowCredentialModal(false);
+  };
+
+  const openEmailForm = (email) => {
+    setSelectedEmail(email);
+    setShowEmailForm(true);
+  };
+
+  const closeEmailForm = () => {
+    setShowEmailForm(false);
+    setEmailMessage('');
+  };
+
+  const handleEmailMessageChange = (e) => {
+    setEmailMessage(e.target.value);
+  };
+
+  const sendEmail = () => {
+    // Here you would typically integrate with an email API
+    // For now, we'll just simulate the sending process
+    console.log(`Sending email to ${selectedEmail}: ${emailMessage}`);
+    alert(`Credentials sent to ${selectedEmail} successfully!`);
+    closeEmailForm();
   };
 
   return (
@@ -75,7 +117,7 @@ const User = () => {
       <div className="main-content">
         <h1 className="page-title">Users</h1>
         
-        {/* Filters and Search */}
+        {/* Filters and Credential Request Button */}
         <div className="filters-container">
           <div className="filters">
             <div className="filter-dropdown">
@@ -91,16 +133,10 @@ const User = () => {
             </div>
           </div>
           
-          <div className="search-container">
-            <input 
-              type="text" 
-              placeholder="Search" 
-              className="search-input"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-            <span className="search-icon">🔍</span>
-            <button className="filter-toggle">≡</button>
+          <div className="credential-request-container">
+            <button className="credential-request-button" onClick={openCredentialModal}>
+              Credential Requests
+            </button>
           </div>
         </div>
         
@@ -197,6 +233,77 @@ const User = () => {
           </div>
         </div>
       </div>
+
+      {/* Credential Requests Modal */}
+      {showCredentialModal && (
+        <div className="modal-overlay">
+          <div className="credential-modal">
+            <div className="modal-header">
+              <h2>Credential Requests</h2>
+              <button className="close-button" onClick={closeCredentialModal}>×</button>
+            </div>
+            <div className="modal-content">
+              <table className="credential-table">
+                <thead>
+                  <tr>
+                    <th>Email</th>
+                    <th>Date Requested</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {credentialRequests.map((request) => (
+                    <tr key={request.id}>
+                      <td>{request.email}</td>
+                      <td>{request.date}</td>
+                      <td>{request.status}</td>
+                      <td>
+                        <button 
+                          className="send-credential-button"
+                          onClick={() => openEmailForm(request.email)}
+                        >
+                          Send Credentials
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Email Form Modal */}
+      {showEmailForm && (
+        <div className="modal-overlay">
+          <div className="email-form-modal">
+          <div className="modal-header">
+            <h2>Send Credentials</h2>
+          <button className="close-button" onClick={closeEmailForm}>×</button>
+      </div>
+      <div className="modal-content">
+        <div className="email-recipient">
+          <strong>To:</strong> {selectedEmail}
+        </div>
+        <div className="email-form">
+          <textarea
+            className="email-message"
+            placeholder="Enter login credentials or message here..."
+            value={emailMessage}
+            onChange={handleEmailMessageChange}
+            rows={8}
+          />
+          <div className="email-actions">
+            <button className="cancel-button" onClick={closeEmailForm}>Cancel</button>
+            <button className="send-button" onClick={sendEmail}>Send</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
