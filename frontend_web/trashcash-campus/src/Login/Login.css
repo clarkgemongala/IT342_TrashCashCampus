@@ -1,0 +1,300 @@
+.login-container {
+  display: flex;
+  width: 100%;
+  height: 100vh;
+  overflow: hidden; /* Add this to prevent any overflow */
+  position: relative; /* Add this for better positioning */
+}
+
+.login-image-section {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  overflow: hidden;
+  border-radius: 0 30px 30px 0; /* Add rounded edges to the right side */
+  z-index: 2;
+  margin-right: -30px;
+}
+
+/* Style for the video element */
+.background-video {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 1;
+}
+
+/* Overlay for the video to make text more readable */
+.video-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+}
+
+.tagline {
+  font-size: 1.5rem;
+  margin-top: 10px;
+  z-index: 3;
+}
+
+.login-form-section {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f5f5f5;
+}
+
+.login-form-container {
+  width: 80%;
+  max-width: 400px;
+}
+
+.form-header {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.form-logo {
+  width: 180px;
+  height: auto;
+  margin-bottom: 20px;
+}
+
+.form-title {
+  font-size: 1.8rem;
+  font-weight: 600;
+  color: #333;
+  margin: 0;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.form-group {
+  width: 100%;
+}
+
+.input-container {
+  position: relative;
+  width: 100%;
+}
+
+input {
+  width: 100%;
+  padding: 12px 40px 12px 40px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 16px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.input-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #999;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  color: #999;
+}
+
+.login-button {
+  width: 100%;
+  padding: 12px;
+  background-color: #00a86b;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  margin-top: 10px;
+}
+
+.login-button:hover {
+  background-color: #008f5d;
+}
+
+.signup-link {
+  text-align: center;
+  margin-top: 20px;
+  font-size: 14px;
+  color: #666;
+}
+
+.request-link {
+  color: #00a86b;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.request-link:hover {
+  text-decoration: underline;
+}
+
+/* Make it responsive */
+@media (max-width: 768px) {
+  .login-container {
+    flex-direction: column;
+  }
+  
+  .login-image-section {
+    display: none;
+  }
+  
+  .login-form-section {
+    width: 100%;
+    padding: 30px 0;
+  }
+}
+
+.error-message {
+  color: #ff3b30;
+  font-size: 0.8rem;
+  margin-top: 5px;
+  padding-left: 10px;
+}
+
+.input-container {
+  position: relative;
+  width: 100%;
+}
+
+input:invalid {
+  border-color: #ff3b30;
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background-color: white;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 450px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  border-bottom: 1px solid #eaeaea;
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 1.2rem;
+  color: #333;
+}
+
+.modal-body {
+  padding: 20px;
+}
+
+.modal-instruction {
+  margin-bottom: 15px;
+  color: #555;
+}
+
+.close-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.5rem;
+  color: #888;
+}
+
+.close-button:hover {
+  color: #333;
+}
+
+.submit-button {
+  background-color: #4caf50;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 10px 15px;
+  font-size: 1rem;
+  cursor: pointer;
+  width: 100%;
+  margin-top: 15px;
+}
+
+.submit-button:hover {
+  background-color: #3d8b40;
+}
+
+/* Confirmation Styles */
+.confirmation {
+  text-align: center;
+  padding: 25px 20px;
+}
+
+.confirmation-icon {
+  font-size: 3rem;
+  color: #4caf50;
+  margin-bottom: 15px;
+}
+
+.confirmation-message {
+  color: #555;
+  line-height: 1.5;
+  margin-bottom: 20px;
+}
+
+.close-button-centered {
+  background-color: #f0f0f0;
+  border: none;
+  border-radius: 4px;
+  padding: 10px 20px;
+  font-size: 1rem;
+  cursor: pointer;
+  margin: 0 auto;
+  display: block;
+}
+
+.close-button-centered:hover {
+  background-color: #e0e0e0;
+}
