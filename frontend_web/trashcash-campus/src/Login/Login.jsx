@@ -1,9 +1,11 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import './Login.css';
 import trashCashLogo from '../assets/trashcash-logo.png';
 import recyclingVideo from '../assets/recycling-video.mp4';
 
 function Login() {
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -61,9 +63,10 @@ function Login() {
       return;
     }
     
-    // Proceed with login logic
+    // For demo purposes, we'll navigate to dashboard regardless of credentials
+    // In a real app, you would verify credentials with an API call first
     console.log('Form submitted with valid @cit.edu email');
-    // Your login API call would go here
+    navigate('/dashboard'); // Navigate to dashboard on successful login
   };
 
   const handleRequestEmailChange = (e) => {
@@ -122,7 +125,7 @@ function Login() {
         <div className="login-form-container">
           <div className="form-header">
             <img src={trashCashLogo} alt="TrashCash Campus Logo" className="form-logo" />
-            <h1 className="form-title">Login to the Portal</h1>
+            <h1 className="form-title">Admin Portal</h1>
           </div>
           <form className="login-form" onSubmit={handleLoginSubmit}>
             <div className="form-group">
