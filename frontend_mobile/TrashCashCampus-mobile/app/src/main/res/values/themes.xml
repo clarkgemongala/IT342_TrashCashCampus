@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Trashcashcampusmobile" parent="Theme.AppCompat.Light.NoActionBar">
+        <!-- You can add your theme customizations here -->
+    </style>
+</resources>
