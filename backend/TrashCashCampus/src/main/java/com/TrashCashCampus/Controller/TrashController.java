@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/trash")
+@CrossOrigin(origins = "http://localhost:5173")
 public class TrashController {
 
     @Autowired
@@ -23,6 +24,7 @@ public class TrashController {
 
     @PostMapping("/login")
     public String login(@RequestBody TrashEntity user) {
+        System.out.println("Login attempt: " + user.getEmail());
         return trashService.loginUser(user.getEmail(), user.getPassword());
     }
 
