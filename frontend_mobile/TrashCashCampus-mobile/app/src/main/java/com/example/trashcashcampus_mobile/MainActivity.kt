@@ -7,17 +7,22 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.AppCompatButton
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 
 class MainActivity : AppCompatActivity() {
 
     private val TAG = "MainActivity"
+    private lateinit var auth: FirebaseAuth
     private val db = Firebase.firestore
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_login)
+
+        // Initialize Firebase Auth
+        auth = FirebaseAuth.getInstance()
 
         // Handle sign up button click
         findViewById<TextView>(R.id.tvSignUp).setOnClickListener {
@@ -45,55 +50,54 @@ class MainActivity : AppCompatActivity() {
             // Show loading indicator (if you have one)
             // loadingProgressBar.visibility = View.VISIBLE
 
-            // Check credentials against Firestore
-            loginWithFirestore(email, password)
+            // Login with Firebase Authentication
+            signInWithEmailPassword(email, password)
         }
     }
 
-    private fun loginWithFirestore(email: String, password: String) {
-        try {
-            // Query Firestore for user with matching email
-            db.collection("users")
-                .whereEqualTo("email", email)
-                .get()
-                .addOnSuccessListener { documents ->
-                    if (documents.isEmpty) {
-                        // No user found with that email
-                        Toast.makeText(this, "User not found", Toast.LENGTH_SHORT).show()
+    private fun signInWithEmailPassword(email: String, password: String) {
+        auth.signInWithEmailAndPassword(email, password)
+            .addOnCompleteListener(this) { task ->
+                if (task.isSuccessful) {
+                    // Sign in success, check if email is verified
+                    val user = auth.currentUser
+
+                    if (user != null && user.isEmailVerified) {
+                        // Email is verified, proceed to home screen
+                        Log.d(TAG, "Login successful for user: $email")
+
+                        // Save user info to shared preferences
+                        saveUserSession(user.uid, email)
+
+                        Toast.makeText(this, "Login successful", Toast.LENGTH_SHORT).show()
+
+                        // Go to home activity
+                        val intent = Intent(this, HomeActivity::class.java)
+                        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                        startActivity(intent)
+                        finish()
                     } else {
-                        // User found, check password
-                        val userDoc = documents.documents[0]
-                        val storedPassword = userDoc.getString("password")
+                        // Email not verified, show message and log out
+                        Toast.makeText(this,
+                            "Please verify your email before logging in",
+                            Toast.LENGTH_LONG).show()
 
-                        if (storedPassword == password) {
-                            // Password matches - login successful
-                            Log.d(TAG, "Login successful for user: $email")
+                        // Take them to the verification waiting screen
+                        val intent = Intent(this, VerificationWaitingActivity::class.java)
+                        intent.putExtra("USER_EMAIL", email)
+                        startActivity(intent)
 
-                            // Save user info to shared preferences or in-memory for the session
-                            saveUserSession(userDoc.id, email)
-
-                            Toast.makeText(this, "Login successful", Toast.LENGTH_SHORT).show()
-
-                            // Navigate to HomeActivity
-                            val intent = Intent(this, HomeActivity::class.java)
-                            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                            startActivity(intent)
-                            finish() // Close login activity
-                        } else {
-                            // Password doesn't match
-                            Toast.makeText(this, "Incorrect password", Toast.LENGTH_SHORT).show()
-                        }
+                        // Sign out the user
+                        auth.signOut()
                     }
+                } else {
+                    // Sign in failed
+                    Log.w(TAG, "signInWithEmail:failure", task.exception)
+                    Toast.makeText(this,
+                        "Login failed: ${task.exception?.message}",
+                        Toast.LENGTH_SHORT).show()
                 }
-                .addOnFailureListener { e ->
-                    Log.e(TAG, "Error checking credentials in Firestore", e)
-                    Toast.makeText(this, "Login failed: ${e.message}", Toast.LENGTH_SHORT).show()
-                }
-        } catch (e: Exception) {
-            // Handle any exceptions
-            Log.e(TAG, "Error during Firestore login", e)
-            Toast.makeText(this, "Error: ${e.message}", Toast.LENGTH_LONG).show()
-        }
+            }
     }
 
     private fun saveUserSession(userId: String, email: String) {
@@ -109,15 +113,23 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStart() {
         super.onStart()
-        // Check if user is already logged in via shared preferences
-        val prefs = getSharedPreferences("TrashCashCampusPrefs", MODE_PRIVATE)
-        val isLoggedIn = prefs.getBoolean("IS_LOGGED_IN", false)
 
-        if (isLoggedIn) {
-            // User is already logged in, go directly to HomeActivity
+        // Check if user is already logged in via Firebase Auth
+        val currentUser = auth.currentUser
+
+        if (currentUser != null && currentUser.isEmailVerified) {
+            // User is already logged in and email is verified
             val intent = Intent(this, HomeActivity::class.java)
             startActivity(intent)
             finish()
+        } else if (currentUser != null) {
+            // User is logged in but email might not be verified
+            // Sign them out to be safe
+            auth.signOut()
+
+            // Clear shared preferences
+            val prefs = getSharedPreferences("TrashCashCampusPrefs", MODE_PRIVATE)
+            prefs.edit().clear().apply()
         }
     }
 }

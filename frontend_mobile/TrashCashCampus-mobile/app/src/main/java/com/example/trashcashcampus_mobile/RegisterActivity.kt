@@ -15,8 +15,11 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.AppCompatButton
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
+import java.util.Date
 
 class RegisterActivity : AppCompatActivity() {
     private val TAG = "RegisterActivity" // For logging
@@ -30,14 +33,15 @@ class RegisterActivity : AppCompatActivity() {
     private var userBirthday = ""
     private var userPassword = ""
 
-    // List to store verification code EditText fields
-    private lateinit var codeDigits: List<EditText>
+    // Firebase Authentication
+    private lateinit var auth: FirebaseAuth
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         try {
-            // Initialize Firebase - make sure it's already initialized in your Application class
-            // but we'll safely access it here
+            // Initialize Firebase Auth
+            auth = FirebaseAuth.getInstance()
+
             showRegistrationStep(currentStep)
         } catch (e: Exception) {
             Log.e(TAG, "Error in onCreate: ${e.message}", e)
@@ -72,6 +76,12 @@ class RegisterActivity : AppCompatActivity() {
                             return@setOnClickListener
                         }
 
+                        // Check if the email ends with @cit.edu
+                        if (!email.endsWith("@cit.edu")) {
+                            Toast.makeText(this, "Please use your CIT email (@cit.edu)", Toast.LENGTH_SHORT).show()
+                            return@setOnClickListener
+                        }
+
                         try {
                             // Check if email already exists in Firestore
                             val db = Firebase.firestore
@@ -94,7 +104,7 @@ class RegisterActivity : AppCompatActivity() {
                                     Toast.makeText(this, "Network error. Please try again.", Toast.LENGTH_SHORT).show()
                                 }
                         } catch (e: Exception) {
-                            Log.e(TAG, "Firestore error: ${e.message}", e)
+                            Log.e(TAG, "Error accessing Firestore: ${e.message}", e)
                             Toast.makeText(this, "Error connecting to database. Please try again.", Toast.LENGTH_SHORT).show()
                         }
                     }
@@ -235,6 +245,12 @@ class RegisterActivity : AppCompatActivity() {
                         val password = etPassword.text.toString().trim()
                         val confirmPassword = etConfirmPassword.text.toString().trim()
 
+                        val passwordPattern = "^(?=.*[0-9])(?=.*[a-z])(?=.*[A-Z])(?=.*[@#$%^&+=])(?=\\S+$).{8,}$"
+                        if (!password.matches(passwordPattern.toRegex())) {
+                            Toast.makeText(this, "Password must be at least 8 characters with numbers, upper and lower case letters, and special characters", Toast.LENGTH_LONG).show()
+                            return@setOnClickListener
+                        }
+
                         if (password.isEmpty()) {
                             Toast.makeText(this, "Please enter a password", Toast.LENGTH_SHORT).show()
                             return@setOnClickListener
@@ -248,55 +264,8 @@ class RegisterActivity : AppCompatActivity() {
                         // Passwords match, save password
                         userPassword = password
 
-                        // Move to confirmation code screen
-                        currentStep = 6
-                        showRegistrationStep(currentStep)
-
-                        // In a real app, you would send a verification code to the email address
-                        // For demo purposes, we'll simulate sending the code
-                        simulateSendingVerificationCode()
-                    }
-                }
-                6 -> {
-                    // Confirmation code screen
-                    setContentView(R.layout.activity_register_confirm)
-
-                    // Update email in instructions
-                    val tvConfirmationInstructions = findViewById<TextView>(R.id.tvConfirmationInstructions) ?: return
-                    tvConfirmationInstructions.text = "Enter the 6-digit code we sent to $userEmail"
-
-                    // Set up the code digits for auto-focus
-                    try {
-                        setupVerificationCodeFields()
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Error setting up verification code fields: ${e.message}", e)
-                    }
-
-                    // Set up resend code functionality
-                    val tvResendCode = findViewById<TextView>(R.id.tvResendCode) ?: return
-                    tvResendCode.setOnClickListener {
-                        simulateSendingVerificationCode()
-                        Toast.makeText(this, "Code resent to $userEmail", Toast.LENGTH_SHORT).show()
-                    }
-
-                    // Set up confirm button
-                    val btnConfirm = findViewById<AppCompatButton>(R.id.btnConfirm) ?: return
-                    btnConfirm.setOnClickListener {
-                        try {
-                            // Check if all digits are entered
-                            val codeComplete = codeDigits.all { it.text.isNotEmpty() }
-
-                            if (codeComplete) {
-                                // In a real app, you would validate the code against what was sent
-                                // For now, we'll consider it verified and save the user data
-                                saveUserToFirestore()
-                            } else {
-                                Toast.makeText(this, "Please enter the complete 6-digit code", Toast.LENGTH_SHORT).show()
-                            }
-                        } catch (e: Exception) {
-                            Log.e(TAG, "Error processing verification code: ${e.message}", e)
-                            Toast.makeText(this, "Error processing code. Please try again.", Toast.LENGTH_SHORT).show()
-                        }
+                        // Create the user account with Firebase Auth
+                        createUserWithFirebaseAuth()
                     }
                 }
             }
@@ -306,47 +275,93 @@ class RegisterActivity : AppCompatActivity() {
         }
     }
 
-    private fun simulateSendingVerificationCode() {
-        // In a real app, you would generate and send a verification code
-        // This is just a placeholder for demonstration purposes
-        Log.d(TAG, "Simulating sending verification code to $userEmail")
+    private fun createUserWithFirebaseAuth() {
+        val auth = FirebaseAuth.getInstance()
+
+        // Show progress or loading indicator
+        // (You would need to implement this)
+
+        // Create user with email and password
+        auth.createUserWithEmailAndPassword(userEmail, userPassword)
+            .addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    // User account created successfully
+                    val user = auth.currentUser
+
+                    // Send verification email
+                    sendVerificationEmail(user)
+                } else {
+                    // Account creation failed
+                    Log.e(TAG, "Error creating user: ${task.exception?.message}", task.exception)
+                    Toast.makeText(this,
+                        "Registration failed: ${task.exception?.message}",
+                        Toast.LENGTH_SHORT).show()
+                }
+            }
     }
 
-    private fun saveUserToFirestore() {
+    private fun sendVerificationEmail(user: FirebaseUser?) {
+        user?.sendEmailVerification()
+            ?.addOnCompleteListener { task ->
+                if (task.isSuccessful) {
+                    // Email sent successfully
+                    Toast.makeText(this,
+                        "Verification email sent to $userEmail",
+                        Toast.LENGTH_LONG).show()
+
+                    // Store the additional user data in Firestore
+                    saveUserDataToFirestore(user.uid)
+
+                    // Navigate to a verification waiting screen or login screen
+                    navigateToVerificationWaitingScreen()
+                } else {
+                    // Failed to send email
+                    Log.e(TAG, "Error sending verification email: ${task.exception?.message}", task.exception)
+                    Toast.makeText(this,
+                        "Failed to send verification email: ${task.exception?.message}",
+                        Toast.LENGTH_SHORT).show()
+                }
+            }
+    }
+
+    private fun saveUserDataToFirestore(userId: String) {
         try {
-            // Get Firestore instance safely
             val db = Firebase.firestore
 
-            // Create a user map with all the collected data
-            val user = hashMapOf(
+            // Create a user map with the collected data
+            val userData = hashMapOf(
+                "userId" to userId,
                 "email" to userEmail,
                 "fullName" to userName,
                 "birthday" to userBirthday,
                 "gender" to selectedGender,
-                "password" to userPassword,  // Note: In a production app, passwords should be handled securely
+                "isEmailVerified" to false,  // Will update this when verified
                 "createdAt" to com.google.firebase.Timestamp.now()
             )
 
             // Add the user to Firestore
             db.collection("users")
-                .document(userEmail)  // Using email as document ID for easy lookup
-                .set(user)
+                .document(userId)  // Using Firebase Auth UID as document ID
+                .set(userData)
                 .addOnSuccessListener {
-                    Log.d(TAG, "User successfully added to Firestore")
-                    Toast.makeText(this, "Account created successfully!", Toast.LENGTH_LONG).show()
-
-                    // Navigate to main app screen or login
-                    // For this example, we'll just return to login
-                    finish()
+                    Log.d(TAG, "User data successfully saved to Firestore")
                 }
                 .addOnFailureListener { e ->
-                    Log.e(TAG, "Error adding user to Firestore: ${e.message}", e)
-                    Toast.makeText(this, "Error creating account: ${e.message}", Toast.LENGTH_SHORT).show()
+                    Log.e(TAG, "Error saving user data to Firestore: ${e.message}", e)
+                    Toast.makeText(this,
+                        "Your account was created but we couldn't save all your details. Please update your profile later.",
+                        Toast.LENGTH_LONG).show()
                 }
         } catch (e: Exception) {
             Log.e(TAG, "Error accessing Firestore: ${e.message}", e)
-            Toast.makeText(this, "Error connecting to database. Please try again.", Toast.LENGTH_SHORT).show()
         }
+    }
+
+    private fun navigateToVerificationWaitingScreen() {
+        val intent = Intent(this, VerificationWaitingActivity::class.java)
+        intent.putExtra("USER_EMAIL", userEmail)
+        startActivity(intent)
+        finish() // Close the registration activity
     }
 
     private fun setupGenderSpinner() {
@@ -381,46 +396,6 @@ class RegisterActivity : AppCompatActivity() {
             override fun onNothingSelected(parent: AdapterView<*>?) {
                 // Do nothing
             }
-        }
-    }
-
-    private fun setupVerificationCodeFields() {
-        // Get all 6 digit fields - safely
-        codeDigits = listOf(
-            findViewById(R.id.etCodeDigit1) ?: throw NullPointerException("Code digit 1 not found"),
-            findViewById(R.id.etCodeDigit2) ?: throw NullPointerException("Code digit 2 not found"),
-            findViewById(R.id.etCodeDigit3) ?: throw NullPointerException("Code digit 3 not found"),
-            findViewById(R.id.etCodeDigit4) ?: throw NullPointerException("Code digit 4 not found"),
-            findViewById(R.id.etCodeDigit5) ?: throw NullPointerException("Code digit 5 not found"),
-            findViewById(R.id.etCodeDigit6) ?: throw NullPointerException("Code digit 6 not found")
-        )
-
-        // Set focus to first digit
-        codeDigits[0].requestFocus()
-
-        // Add text change listeners to auto-advance focus
-        for (i in codeDigits.indices) {
-            val currentDigit = codeDigits[i]
-
-            currentDigit.addTextChangedListener(object : TextWatcher {
-                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-
-                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
-
-                override fun afterTextChanged(s: Editable?) {
-                    if (s?.length == 1) {
-                        // Move to next digit
-                        if (i < codeDigits.size - 1) {
-                            codeDigits[i + 1].requestFocus()
-                        }
-                    } else if (s?.isEmpty() == true) {
-                        // Move to previous digit when deleted
-                        if (i > 0) {
-                            codeDigits[i - 1].requestFocus()
-                        }
-                    }
-                }
-            })
         }
     }
 }
