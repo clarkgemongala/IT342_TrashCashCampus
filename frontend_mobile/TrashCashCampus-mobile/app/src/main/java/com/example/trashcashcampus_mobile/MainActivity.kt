@@ -90,33 +90,67 @@ class MainActivity : AppCompatActivity() {
                 if (task.isSuccessful) {
                     // Sign in success, check if email is verified
                     val user = auth.currentUser
+                    val userId = user?.uid
 
-                    if (user != null && user.isEmailVerified) {
-                        // Email is verified, proceed to home screen
-                        Log.d(TAG, "Login successful for user: $email")
+                    if (user != null && userId != null) {
+                        // First verify the user still exists in Firestore
+                        db.collection("users").document(userId)
+                            .get()
+                            .addOnSuccessListener { document ->
+                                if (document.exists()) {
+                                    // User exists in database, now check email verification
+                                    if (user.isEmailVerified) {
+                                        // Email is verified, proceed to home screen
+                                        Log.d(TAG, "Login successful for user: $email")
 
-                        // Save user info to shared preferences
-                        saveUserSession(user.uid, email)
+                                        // Save user info to shared preferences
+                                        saveUserSession(userId, email)
 
-                        Toast.makeText(this, "Login successful", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(this, "Login successful", Toast.LENGTH_SHORT).show()
 
-                        // Go to home activity
-                        val intent = Intent(this, HomeActivity::class.java)
-                        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                        startActivity(intent)
-                        finish()
+                                        // Go to home activity
+                                        val intent = Intent(this, HomeActivity::class.java)
+                                        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                                        startActivity(intent)
+                                        finish()
+                                    } else {
+                                        // Email not verified, show message and log out
+                                        Toast.makeText(this,
+                                            "Please verify your email before logging in",
+                                            Toast.LENGTH_LONG).show()
+
+                                        // Take them to the verification waiting screen
+                                        val intent = Intent(this, VerificationWaitingActivity::class.java)
+                                        intent.putExtra("USER_EMAIL", email)
+                                        startActivity(intent)
+
+                                        // Sign out the user
+                                        auth.signOut()
+                                    }
+                                } else {
+                                    // User doesn't exist in database anymore
+                                    Log.w(TAG, "User record not found in Firestore: $userId")
+                                    Toast.makeText(this,
+                                        "Account no longer exists. Please register again.",
+                                        Toast.LENGTH_LONG).show()
+
+                                    // Sign out the user and clear any local data
+                                    auth.signOut()
+                                    clearUserSession()
+                                }
+                            }
+                            .addOnFailureListener { e ->
+                                Log.w(TAG, "Error checking user in database", e)
+                                Toast.makeText(this,
+                                    "Login error: Unable to verify account",
+                                    Toast.LENGTH_SHORT).show()
+
+                                // Sign out to be safe
+                                auth.signOut()
+                            }
                     } else {
-                        // Email not verified, show message and log out
-                        Toast.makeText(this,
-                            "Please verify your email before logging in",
-                            Toast.LENGTH_LONG).show()
-
-                        // Take them to the verification waiting screen
-                        val intent = Intent(this, VerificationWaitingActivity::class.java)
-                        intent.putExtra("USER_EMAIL", email)
-                        startActivity(intent)
-
-                        // Sign out the user
+                        // User is null or userId is null (shouldn't happen normally)
+                        Toast.makeText(this, "Login error: Invalid user data", Toast.LENGTH_SHORT).show()
                         auth.signOut()
                     }
                 } else {
@@ -140,25 +174,49 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun clearUserSession() {
+        val prefs = getSharedPreferences("TrashCashCampusPrefs", MODE_PRIVATE)
+        prefs.edit().clear().apply()
+    }
+
     override fun onStart() {
         super.onStart()
+
+        // Check if user is already logged in via SharedPreferences
+        val prefs = getSharedPreferences("TrashCashCampusPrefs", MODE_PRIVATE)
+        val isLoggedIn = prefs.getBoolean("IS_LOGGED_IN", false)
+        val userId = prefs.getString("USER_ID", null)
 
         // Check if user is already logged in via Firebase Auth
         val currentUser = auth.currentUser
 
-        if (currentUser != null && currentUser.isEmailVerified) {
-            // User is already logged in and email is verified
-            val intent = Intent(this, HomeActivity::class.java)
-            startActivity(intent)
-            finish()
+        if (currentUser != null && isLoggedIn && userId != null) {
+            // Verify the user still exists in the database
+            db.collection("users").document(userId)
+                .get()
+                .addOnSuccessListener { document ->
+                    if (document.exists() && currentUser.isEmailVerified) {
+                        // User exists in database and email is verified
+                        val intent = Intent(this, HomeActivity::class.java)
+                        startActivity(intent)
+                        finish()
+                    } else {
+                        // User no longer exists in database or email not verified
+                        auth.signOut()
+                        clearUserSession()
+                    }
+                }
+                .addOnFailureListener { e ->
+                    // Error checking database
+                    Log.w(TAG, "Error checking user in database", e)
+                    auth.signOut()
+                    clearUserSession()
+                }
         } else if (currentUser != null) {
             // User is logged in but email might not be verified
             // Sign them out to be safe
             auth.signOut()
-
-            // Clear shared preferences
-            val prefs = getSharedPreferences("TrashCashCampusPrefs", MODE_PRIVATE)
-            prefs.edit().clear().apply()
+            clearUserSession()
         }
     }
 }
