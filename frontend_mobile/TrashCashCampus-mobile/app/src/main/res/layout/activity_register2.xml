@@ -194,7 +194,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
             android:background="@drawable/bg_input_field_rounded"
-            android:hint="John doe"
+            android:hint="Firstname Lastname"
             android:inputType="textPersonName"
             android:padding="16dp"
             android:textColor="#757575"

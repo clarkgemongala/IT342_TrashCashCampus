@@ -181,7 +181,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
             android:background="@drawable/bg_input_field_rounded"
-            android:hint="Johndoe@exemple.com"
+            android:hint="example@cit.edu"
             android:inputType="textEmailAddress"
             android:padding="16dp"
             android:textColor="#757575"

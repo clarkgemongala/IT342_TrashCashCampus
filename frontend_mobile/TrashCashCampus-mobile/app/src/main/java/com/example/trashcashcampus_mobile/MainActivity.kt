@@ -1,8 +1,11 @@
 package com.example.trashcashcampus_mobile
 import android.content.Intent
 import android.os.Bundle
+import android.text.method.HideReturnsTransformationMethod
+import android.text.method.PasswordTransformationMethod
 import android.util.Log
 import android.widget.EditText
+import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -16,6 +19,7 @@ class MainActivity : AppCompatActivity() {
     private val TAG = "MainActivity"
     private lateinit var auth: FirebaseAuth
     private val db = Firebase.firestore
+    private var passwordVisible = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -23,6 +27,9 @@ class MainActivity : AppCompatActivity() {
 
         // Initialize Firebase Auth
         auth = FirebaseAuth.getInstance()
+
+        // Setup password visibility toggle
+        setupPasswordVisibilityToggle()
 
         // Handle sign up button click
         findViewById<TextView>(R.id.tvSignUp).setOnClickListener {
@@ -52,6 +59,28 @@ class MainActivity : AppCompatActivity() {
 
             // Login with Firebase Authentication
             signInWithEmailPassword(email, password)
+        }
+    }
+
+    private fun setupPasswordVisibilityToggle() {
+        val passwordToggle = findViewById<ImageView>(R.id.ivPasswordToggle)
+        val passwordEditText = findViewById<EditText>(R.id.etPassword)
+
+        passwordToggle.setOnClickListener {
+            passwordVisible = !passwordVisible
+
+            if (passwordVisible) {
+                // Show password
+                passwordEditText.transformationMethod = HideReturnsTransformationMethod.getInstance()
+                passwordToggle.setImageResource(R.drawable.ic_visibility)
+            } else {
+                // Hide password
+                passwordEditText.transformationMethod = PasswordTransformationMethod.getInstance()
+                passwordToggle.setImageResource(R.drawable.ic_visibility_off)
+            }
+
+            // Move cursor to the end of text
+            passwordEditText.setSelection(passwordEditText.text.length)
         }
     }
 

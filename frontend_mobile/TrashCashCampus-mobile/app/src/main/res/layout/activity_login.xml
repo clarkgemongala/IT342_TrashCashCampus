@@ -56,7 +56,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
             android:background="@drawable/bg_input_field"
-            android:hint="Johndoe@example.com"
+            android:hint="Use your @cit.edu email"
             android:inputType="textEmailAddress"
             android:padding="16dp"
             android:textColor="#757575"
@@ -77,21 +77,46 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@+id/etEmail" />
 
-        <EditText
-            android:id="@+id/etPassword"
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:id="@+id/passwordInputContainer"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
             android:background="@drawable/bg_input_field"
-            android:hint="••••••••"
-            android:inputType="textPassword"
-            android:padding="16dp"
-            android:textColor="#757575"
-            android:textColorHint="#BBBBBB"
-            android:textSize="14sp"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/tvPasswordLabel" />
+            app:layout_constraintTop_toBottomOf="@+id/tvPasswordLabel">
+
+            <EditText
+                android:id="@+id/etPassword"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:background="@null"
+                android:hint="••••••••"
+                android:inputType="textPassword"
+                android:padding="16dp"
+                android:textColor="#757575"
+                android:textColorHint="#BBBBBB"
+                android:textSize="14sp"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintEnd_toStartOf="@+id/ivPasswordToggle"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintTop_toTopOf="parent" />
+
+            <ImageView
+                android:id="@+id/ivPasswordToggle"
+                android:layout_width="48dp"
+                android:layout_height="0dp"
+                android:padding="12dp"
+                android:src="@drawable/ic_visibility_off"
+                android:clickable="true"
+                android:focusable="true"
+                android:contentDescription="Toggle password visibility"
+                app:layout_constraintBottom_toBottomOf="parent"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintTop_toTopOf="parent" />
+
+        </androidx.constraintlayout.widget.ConstraintLayout>
 
         <androidx.appcompat.widget.AppCompatButton
             android:id="@+id/btnLogin"
@@ -106,7 +131,7 @@
             android:textColor="#333333"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/etPassword" />
+            app:layout_constraintTop_toBottomOf="@+id/passwordInputContainer" />
 
         <LinearLayout
             android:id="@+id/llSocialLogin"
