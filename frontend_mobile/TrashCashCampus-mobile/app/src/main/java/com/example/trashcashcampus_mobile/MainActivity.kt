@@ -94,7 +94,7 @@ class MainActivity : AppCompatActivity() {
                     // Sign in failed
                     Log.w(TAG, "signInWithEmail:failure", task.exception)
                     Toast.makeText(this,
-                        "Login failed: ${task.exception?.message}",
+                        "Email or password is incorrect",
                         Toast.LENGTH_SHORT).show()
                 }
             }

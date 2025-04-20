@@ -1,5 +1,6 @@
 package com.example.trashcashcampus_mobile
 
+import android.app.DatePickerDialog
 import android.content.Intent
 import android.os.Bundle
 import android.text.Editable
@@ -10,6 +11,8 @@ import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.EditText
 import android.widget.ImageButton
+import android.widget.ImageView
+import android.widget.RelativeLayout
 import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
@@ -19,7 +22,9 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
+import java.util.Calendar
 import java.util.Date
+import java.util.Locale
 
 class RegisterActivity : AppCompatActivity() {
     private val TAG = "RegisterActivity" // For logging
@@ -155,9 +160,6 @@ class RegisterActivity : AppCompatActivity() {
                         showRegistrationStep(currentStep)
                     }
 
-                    // Find birthday input - safely
-                    val etBirthday = findViewById<EditText>(R.id.etBirthday) ?: return
-
                     // Find the "Log in" text and set click listener to go back to login
                     val tvLogIn = findViewById<TextView>(R.id.tvLogIn) ?: return
                     tvLogIn.setOnClickListener {
@@ -165,13 +167,32 @@ class RegisterActivity : AppCompatActivity() {
                         finish()
                     }
 
+                    // Find the TextView that will display the selected date
+                    val tvSelectedDate = findViewById<TextView>(R.id.tvSelectedDate) ?: return
+
+                    // Find the date picker container
+                    val datePickerContainer = findViewById<RelativeLayout>(R.id.datePickerContainer) ?: return
+
+                    // Set up click listener for the date field to open date picker
+                    datePickerContainer.setOnClickListener {
+                        showDatePickerDialog()
+                    }
+
+                    // Also set the calendar icon to open the date picker
+                    val ivCalendar = findViewById<ImageView>(R.id.ivCalendar) ?: return
+                    ivCalendar.setOnClickListener {
+                        showDatePickerDialog()
+                    }
+
                     // Set continue button for next step
                     val btnContinue = findViewById<AppCompatButton>(R.id.btnContinue) ?: return
                     btnContinue.setOnClickListener {
-                        // Validate and save birthday
-                        val birthday = etBirthday.text.toString().trim()
-                        if (birthday.isEmpty()) {
-                            Toast.makeText(this, "Please enter your birthday", Toast.LENGTH_SHORT).show()
+                        // Get the date from the TextView
+                        val birthday = tvSelectedDate.text.toString().trim()
+
+                        // Validate date
+                        if (birthday.isEmpty() || birthday == "DD/MM/YYYY") {
+                            Toast.makeText(this, "Please select your birthday", Toast.LENGTH_SHORT).show()
                             return@setOnClickListener
                         }
 
@@ -272,6 +293,52 @@ class RegisterActivity : AppCompatActivity() {
         } catch (e: Exception) {
             Log.e(TAG, "Error showing registration step $step: ${e.message}", e)
             Toast.makeText(this, "Something went wrong. Please try again.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // Add this method to show the DatePickerDialog
+    private fun showDatePickerDialog() {
+        try {
+            val calendar = Calendar.getInstance()
+
+            // Get current date values as default
+            val year = calendar.get(Calendar.YEAR)
+            val month = calendar.get(Calendar.MONTH)
+            val day = calendar.get(Calendar.DAY_OF_MONTH)
+
+            // Create DatePickerDialog
+            val datePickerDialog = DatePickerDialog(
+                this,
+                { _, selectedYear, selectedMonth, selectedDay ->
+                    // Format the date as DD/MM/YYYY
+                    val formattedDate = String.format(
+                        Locale.getDefault(),
+                        "%02d/%02d/%04d",
+                        selectedDay,
+                        selectedMonth + 1,
+                        selectedYear
+                    )
+
+                    // Update the TextView with selected date
+                    val tvSelectedDate = findViewById<TextView>(R.id.tvSelectedDate)
+                    tvSelectedDate?.text = formattedDate
+                },
+                year, month, day
+            )
+
+            // Set maximum date to today (so users can't select future dates)
+            datePickerDialog.datePicker.maxDate = System.currentTimeMillis()
+
+            // Set a reasonable minimum date (e.g., 100 years ago)
+            val minCalendar = Calendar.getInstance()
+            minCalendar.add(Calendar.YEAR, -100)
+            datePickerDialog.datePicker.minDate = minCalendar.timeInMillis
+
+            // Show the dialog
+            datePickerDialog.show()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error showing date picker: ${e.message}", e)
+            Toast.makeText(this, "Could not open date picker", Toast.LENGTH_SHORT).show()
         }
     }
 

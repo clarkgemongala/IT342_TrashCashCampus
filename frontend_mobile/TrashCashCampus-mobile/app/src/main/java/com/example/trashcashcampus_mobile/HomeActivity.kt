@@ -7,6 +7,7 @@ import android.widget.ImageButton
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import com.google.firebase.auth.FirebaseAuth
 
 class HomeActivity : AppCompatActivity() {
 
@@ -20,6 +21,9 @@ class HomeActivity : AppCompatActivity() {
         val tvPointsIncrement = findViewById<TextView>(R.id.tvPointsIncrement)
         val tvWeeklyGoal = findViewById<TextView>(R.id.tvWeeklyGoal)
         val tvGoalProgress = findViewById<TextView>(R.id.tvGoalProgress)
+
+        // Remove this line as it's duplicated below
+        // val btnLogout = findViewById<ImageButton>(R.id.btnLogout)
 
         // You would normally get this data from a database or API
         tvUserName.text = "John"
@@ -42,7 +46,7 @@ class HomeActivity : AppCompatActivity() {
             // Open camera for QR scanning
         }
 
-        // Set up logout button - Fixed: using ImageButton instead of Button
+        // Set up logout button
         val btnLogout = findViewById<ImageButton>(R.id.btnLogout)
         btnLogout.setOnClickListener {
             // Clear user session data
@@ -70,7 +74,7 @@ class HomeActivity : AppCompatActivity() {
             apply()
         }
 
-        // If you're using Firebase Auth, you would also sign out here:
-        // FirebaseAuth.getInstance().signOut()
+        // Sign out from Firebase Auth
+        FirebaseAuth.getInstance().signOut()
     }
 }

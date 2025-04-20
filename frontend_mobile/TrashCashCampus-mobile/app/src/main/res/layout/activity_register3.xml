@@ -201,21 +201,41 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@+id/clProgressIndicator" />
 
-        <EditText
-            android:id="@+id/etBirthday"
+        <!-- Changed from EditText to RelativeLayout with TextView for date picker -->
+        <RelativeLayout
+            android:id="@+id/datePickerContainer"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
             android:background="@drawable/bg_input_field_rounded"
-            android:hint="DD/MM/YYYY"
-            android:inputType="date"
             android:padding="16dp"
-            android:textColor="#757575"
-            android:textColorHint="#BBBBBB"
-            android:textSize="14sp"
+            android:clickable="true"
+            android:focusable="true"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/tvBirthdayLabel" />
+            app:layout_constraintTop_toBottomOf="@+id/tvBirthdayLabel">
+
+            <TextView
+                android:id="@+id/tvSelectedDate"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_centerVertical="true"
+                android:layout_toStartOf="@+id/ivCalendar"
+                android:text="DD/MM/YYYY"
+                android:textColor="#757575"
+                android:textSize="14sp"
+                android:clickable="false"
+                android:focusable="false" />
+
+            <ImageView
+                android:id="@+id/ivCalendar"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_alignParentEnd="true"
+                android:layout_centerVertical="true"
+                android:src="@drawable/ic_calendar"
+                android:contentDescription="Calendar" />
+        </RelativeLayout>
 
         <androidx.appcompat.widget.AppCompatButton
             android:id="@+id/btnContinue"
@@ -230,7 +250,7 @@
             android:textColor="#333333"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/etBirthday" />
+            app:layout_constraintTop_toBottomOf="@+id/datePickerContainer" />
 
         <TextView
             android:id="@+id/tvSignUpWith"
