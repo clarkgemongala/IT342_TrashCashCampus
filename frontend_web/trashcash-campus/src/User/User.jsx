@@ -1,10 +1,17 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import { db } from '../firebase';
+import { collection, getDocs, doc, updateDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
+import Navigation from '../components/Navigation';
 import './User.css';
 import trashcashLogo from '../assets/trashcash-logo.png';
 
 const User = () => {
-  const navigate = useNavigate();
+  const { currentUser, isAdmin } = useAuth();
+  const [users, setUsers] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [editingUser, setEditingUser] = useState(null);
   const [sortBy, setSortBy] = useState('Newest');
   const [currentPage, setCurrentPage] = useState(1);
   const [showCredentialModal, setShowCredentialModal] = useState(false);
@@ -36,8 +43,102 @@ const User = () => {
   const totalEntries = 256000;
   const totalPages = 40;
 
+  useEffect(() => {
+    const fetchUsers = async () => {
+      if (!currentUser || !isAdmin) return;
+      
+      try {
+        setLoading(true);
+        const usersRef = collection(db, 'users');
+        const q = query(usersRef, orderBy('email', 'asc'));
+        const querySnapshot = await getDocs(q);
+        
+        const usersList = querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        
+        setUsers(usersList);
+      } catch (error) {
+        console.error('Error fetching users:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchUsers();
+  }, [currentUser, isAdmin]);
+
+  const handleSearch = (e) => {
+    setSearchTerm(e.target.value);
+  };
+
+  const filteredUsers = users.filter(user => {
+    const lowerSearchTerm = searchTerm.toLowerCase();
+    return (
+      user.email?.toLowerCase().includes(lowerSearchTerm) ||
+      user.displayName?.toLowerCase().includes(lowerSearchTerm) ||
+      user.uid?.toLowerCase().includes(lowerSearchTerm)
+    );
+  });
+
+  const handleEditClick = (user) => {
+    setEditingUser({ ...user });
+  };
+
+  const handleEditCancel = () => {
+    setEditingUser(null);
+  };
+
+  const handleEditSave = async () => {
+    if (!editingUser) return;
+    
+    try {
+      const userRef = doc(db, 'users', editingUser.id);
+      await updateDoc(userRef, {
+        role: editingUser.role,
+        totalPoints: Number(editingUser.totalPoints) || 0,
+        ...(editingUser.displayName ? { displayName: editingUser.displayName } : {})
+      });
+      
+      // Update user in the local state
+      setUsers(users.map(user => 
+        user.id === editingUser.id ? { ...user, ...editingUser } : user
+      ));
+      
+      setEditingUser(null);
+    } catch (error) {
+      console.error('Error updating user:', error);
+      alert('Error updating user. Please try again.');
+    }
+  };
+
+  const handleRoleChange = (e) => {
+    setEditingUser({ ...editingUser, role: e.target.value });
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setEditingUser({ ...editingUser, [name]: value });
+  };
+
+  const formatDate = (timestamp) => {
+    if (!timestamp) return 'Unknown';
+    
+    try {
+      const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch (error) {
+      return 'Invalid date';
+    }
+  };
+
   const navigateToDashboard = () => {
-    navigate('/dashboard');
+    // Implement the logic to navigate to the dashboard
   };
 
   const navigateToPage = (page) => {
@@ -75,238 +176,159 @@ const User = () => {
   };
 
   return (
-    <div className="user-container">
-      {/* Left Sidebar */}
-      <div className="sidebar">
-        <div className="logo-container">
-          <img src={trashcashLogo} alt="TrashCash Campus Logo" className="logo" />
-        </div>
-        
-        <nav className="sidebar-nav">
-          <div className="nav-item" onClick={navigateToDashboard}>
-            <span className="nav-icon">🏠</span>
-            <span className="nav-text">Dashboard</span>
-          </div>
-          
-          <div className="nav-item active">
-            <span className="nav-icon">👤</span>
-            <span className="nav-text">Users</span>
-          </div>
-          
-          <div className="nav-item">
-            <span className="nav-icon">🎁</span>
-            <span className="nav-text">Rewards</span>
-          </div>
-          
-          <div className="nav-item">
-            <span className="nav-icon">📊</span>
-            <span className="nav-text">Reports</span>
-          </div>
-        </nav>
-        
-        <div className="user-profile">
-          <div className="avatar">H</div>
-          <div className="user-info">
-            <p className="welcome-text">Welcome</p>
-            <p className="username">Himanshu</p>
-          </div>
-        </div>
-      </div>
+    <div className="user-management-container">
+      <Navigation />
       
-      {/* Main Content */}
-      <div className="main-content">
-        <h1 className="page-title">Users</h1>
+      <main className="user-management-content">
+        <h1 className="user-title">User Management</h1>
         
-        {/* Filters and Credential Request Button */}
-        <div className="filters-container">
-          <div className="filters">
-            <div className="filter-dropdown">
-              <button className="filter-button">
-                Action <span className="dropdown-arrow">▼</span>
-              </button>
-            </div>
-            
-            <div className="filter-dropdown">
-              <button className="filter-button">
-                Date <span className="dropdown-arrow">▼</span>
-              </button>
-            </div>
-          </div>
-          
-          <div className="credential-request-container">
-            <button className="credential-request-button" onClick={openCredentialModal}>
-              Credential Requests
-            </button>
-          </div>
-        </div>
-        
-        {/* Users Table */}
-        <div className="users-table-container">
-          <div className="table-header">
-            <div className="header-tabs">
-              <h2 className="tab active">All Members</h2>
-              <h2 className="tab active-tab">Active Members</h2>
-            </div>
-            
-            <div className="table-controls">
-              <div className="table-search">
-                <span className="search-icon-small">🔍</span>
-                <input 
-                  type="text" 
-                  placeholder="Search" 
-                  className="table-search-input"
+        {loading ? (
+          <div className="loading">Loading users...</div>
+        ) : (
+          <>
+            <div className="user-controls">
+              <div className="search-container">
+                <input
+                  type="text"
+                  placeholder="Search users..."
+                  value={searchTerm}
+                  onChange={handleSearch}
+                  className="search-input"
                 />
               </div>
               
-              <div className="sort-dropdown">
-                Sort by: {sortBy} <span className="dropdown-arrow">▼</span>
-              </div>
-            </div>
-          </div>
-          
-          <table className="users-table">
-            <thead>
-              <tr>
-                <th>Customer Name</th>
-                <th>Course</th>
-                <th>Phone Number</th>
-                <th>Email</th>
-                <th>Country</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {userData.map((user) => (
-                <tr key={user.id}>
-                  <td>{user.name}</td>
-                  <td>{user.course}</td>
-                  <td>{user.phone}</td>
-                  <td>{user.email}</td>
-                  <td>{user.country}</td>
-                  <td>
-                    <span className={`status-badge ${user.status.toLowerCase()}`}>
-                      {user.status}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          
-          {/* Pagination */}
-          <div className="pagination">
-            <div className="pagination-info">
-              Showing data 1 to 8 of {totalEntries} entries
-            </div>
-            
-            <div className="pagination-controls">
-              <button className="pagination-arrow" onClick={() => navigateToPage(Math.max(1, currentPage - 1))}>
-                ◄
-              </button>
-              
-              <button className={`pagination-number ${currentPage === 1 ? 'active' : ''}`} onClick={() => navigateToPage(1)}>
-                1
-              </button>
-              
-              <button className={`pagination-number ${currentPage === 2 ? 'active' : ''}`} onClick={() => navigateToPage(2)}>
-                2
-              </button>
-              
-              <button className={`pagination-number ${currentPage === 3 ? 'active' : ''}`} onClick={() => navigateToPage(3)}>
-                3
-              </button>
-              
-              <button className={`pagination-number ${currentPage === 4 ? 'active' : ''}`} onClick={() => navigateToPage(4)}>
-                4
-              </button>
-              
-              <span className="pagination-ellipsis">...</span>
-              
-              <button className={`pagination-number ${currentPage === totalPages ? 'active' : ''}`} onClick={() => navigateToPage(totalPages)}>
-                {totalPages}
-              </button>
-              
-              <button className="pagination-arrow" onClick={() => navigateToPage(Math.min(totalPages, currentPage + 1))}>
-                ►
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Credential Requests Modal */}
-      {showCredentialModal && (
-        <div className="modal-overlay">
-          <div className="credential-modal">
-            <div className="modal-header">
-              <h2>Credential Requests</h2>
-              <button className="close-button" onClick={closeCredentialModal}>×</button>
-            </div>
-            <div className="modal-content">
-              <table className="credential-table">
-                <thead>
-                  <tr>
-                    <th>Email</th>
-                    <th>Date Requested</th>
-                    <th>Status</th>
-                    <th>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {credentialRequests.map((request) => (
-                    <tr key={request.id}>
-                      <td>{request.email}</td>
-                      <td>{request.date}</td>
-                      <td>{request.status}</td>
-                      <td>
-                        <button 
-                          className="send-credential-button"
-                          onClick={() => openEmailForm(request.email)}
-                        >
-                          Send Credentials
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Email Form Modal */}
-      {showEmailForm && (
-        <div className="modal-overlay">
-          <div className="email-form-modal">
-          <div className="modal-header">
-            <h2>Send Credentials</h2>
-          <button className="close-button" onClick={closeEmailForm}>×</button>
-      </div>
-      <div className="modal-content">
-        <div className="email-recipient">
-          <strong>To:</strong> {selectedEmail}
-        </div>
-        <div className="email-form">
-          <textarea
-            className="email-message"
-            placeholder="Enter login credentials or message here...
-
-Email:
-Password:"
-            value={emailMessage}
-            onChange={handleEmailMessageChange}
-            rows={8}
-          />
-          <div className="email-actions">
-            <button className="cancel-button" onClick={closeEmailForm}>Cancel</button>
-            <button className="send-button" onClick={sendEmail}>Send</button>
+              <div className="user-stats">
+                <div className="stat">
+                  <span className="stat-label">Total Users:</span>
+                  <span className="stat-value">{users.length}</span>
+                </div>
+                <div className="stat">
+                  <span className="stat-label">Admins:</span>
+                  <span className="stat-value">{users.filter(user => user.role === 'admin').length}</span>
+                </div>
+                <div className="stat">
+                  <span className="stat-label">Regular Users:</span>
+                  <span className="stat-value">{users.filter(user => user.role !== 'admin').length}</span>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-      )}
+            
+            <div className="users-table-container">
+              <table className="users-table">
+                <thead>
+                  <tr>
+                    <th>Email</th>
+                    <th>Name</th>
+                    <th>Role</th>
+                    <th>Points</th>
+                    <th>Created</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredUsers.length === 0 ? (
+                    <tr>
+                      <td colSpan="6" className="no-users">No users found</td>
+                    </tr>
+                  ) : (
+                    filteredUsers.map(user => (
+                      <tr key={user.id}>
+                        <td>{user.email}</td>
+                        <td>{user.displayName || '-'}</td>
+                        <td>
+                          <span className={`role-badge ${user.role || 'user'}`}>
+                            {user.role || 'user'}
+                          </span>
+                        </td>
+                        <td>{user.totalPoints || 0}</td>
+                        <td>{formatDate(user.createdAt)}</td>
+                        <td>
+                          <button
+                            className="edit-button"
+                            onClick={() => handleEditClick(user)}
+                          >
+                            Edit
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            
+            {/* Edit User Modal */}
+            {editingUser && (
+              <div className="modal-overlay">
+                <div className="edit-modal">
+                  <h2>Edit User</h2>
+                  
+                  <div className="form-group">
+                    <label>Email:</label>
+                    <input
+                      type="text"
+                      value={editingUser.email}
+                      disabled
+                      className="form-input"
+                    />
+                  </div>
+                  
+                  <div className="form-group">
+                    <label>Display Name:</label>
+                    <input
+                      type="text"
+                      name="displayName"
+                      value={editingUser.displayName || ''}
+                      onChange={handleInputChange}
+                      className="form-input"
+                      placeholder="Display Name"
+                    />
+                  </div>
+                  
+                  <div className="form-group">
+                    <label>Role:</label>
+                    <select
+                      value={editingUser.role || 'user'}
+                      onChange={handleRoleChange}
+                      className="form-select"
+                    >
+                      <option value="user">User</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                  </div>
+                  
+                  <div className="form-group">
+                    <label>Points:</label>
+                    <input
+                      type="number"
+                      name="totalPoints"
+                      value={editingUser.totalPoints || 0}
+                      onChange={handleInputChange}
+                      className="form-input"
+                      min="0"
+                    />
+                  </div>
+                  
+                  <div className="modal-actions">
+                    <button
+                      className="cancel-button"
+                      onClick={handleEditCancel}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      className="save-button"
+                      onClick={handleEditSave}
+                    >
+                      Save Changes
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </main>
     </div>
   );
 };

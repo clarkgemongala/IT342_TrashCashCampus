@@ -1,0 +1,266 @@
+.bins-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: #f5f5f5;
+}
+
+.bins-content {
+  max-width: 1200px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.bins-title {
+  margin-bottom: 2rem;
+  color: #333;
+  font-size: 2rem;
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 200px;
+  font-size: 1.2rem;
+  color: #666;
+}
+
+.bins-layout {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 2rem;
+}
+
+/* Bins list styles */
+.bins-list-container {
+  background-color: white;
+  border-radius: 8px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.bins-list-container h2 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  color: #333;
+  font-size: 1.5rem;
+}
+
+.scan-qr-button {
+  width: 100%;
+  padding: 0.75rem;
+  background-color: #1a5336;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.3s;
+  margin-bottom: 1.5rem;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.scan-qr-button:hover {
+  background-color: #153f29;
+}
+
+.scan-qr-button.large {
+  padding: 1rem;
+  font-size: 1.1rem;
+  max-width: 300px;
+  margin: 1.5rem auto 0;
+}
+
+.bins-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.bin-item {
+  display: flex;
+  align-items: center;
+  padding: 1rem;
+  border-radius: 8px;
+  background-color: #f9f9f9;
+  margin-bottom: 1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.bin-item:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.bin-item.selected {
+  background-color: #e6f4ea;
+  border-left: 4px solid #1a5336;
+}
+
+.bin-icon {
+  font-size: 2rem;
+  margin-right: 1rem;
+  min-width: 40px;
+  text-align: center;
+}
+
+.bin-details {
+  flex: 1;
+}
+
+.bin-details h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1.1rem;
+}
+
+.bin-location {
+  color: #666;
+  font-size: 0.9rem;
+  margin: 0 0 0.5rem;
+}
+
+.waste-types {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.waste-type {
+  font-size: 1.2rem;
+}
+
+.no-bins {
+  padding: 2rem;
+  text-align: center;
+  color: #666;
+}
+
+/* Bin details styles */
+.bin-details-container {
+  background-color: white;
+  border-radius: 8px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.scanner-wrapper h2,
+.selected-bin-details h2,
+.no-bin-selected h2 {
+  margin-top: 0;
+  color: #333;
+  font-size: 1.5rem;
+}
+
+.bin-location-large {
+  color: #666;
+  font-size: 1.1rem;
+  margin-bottom: 1.5rem;
+}
+
+.bin-section {
+  margin-bottom: 2rem;
+}
+
+.bin-section h3 {
+  font-size: 1.2rem;
+  color: #333;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid #eee;
+  padding-bottom: 0.5rem;
+}
+
+.waste-types-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 1rem;
+}
+
+.waste-type-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.3s;
+}
+
+.waste-type-card:hover {
+  transform: scale(1.05);
+}
+
+.waste-type-card:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.waste-icon {
+  font-size: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+.waste-name {
+  font-weight: 500;
+}
+
+.tips-list {
+  padding-left: 1.5rem;
+}
+
+.tip-item {
+  margin-bottom: 0.75rem;
+  color: #333;
+}
+
+.instructions-list {
+  padding-left: 1.5rem;
+}
+
+.instructions-list li {
+  margin-bottom: 0.75rem;
+  color: #333;
+}
+
+.no-bin-selected {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 3rem 1rem;
+}
+
+.placeholder-icon {
+  font-size: 4rem;
+  margin-bottom: 1.5rem;
+  opacity: 0.7;
+}
+
+.no-bin-selected p {
+  max-width: 400px;
+  color: #666;
+  margin-bottom: 1.5rem;
+}
+
+/* Mobile styles */
+@media (max-width: 768px) {
+  .bins-content {
+    padding: 1rem;
+  }
+  
+  .bins-layout {
+    grid-template-columns: 1fr;
+  }
+  
+  .waste-types-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+} 

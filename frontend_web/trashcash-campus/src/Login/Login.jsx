@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import './Login.css';
 import trashCashLogo from '../assets/trashcash-logo.png';
 import recyclingVideo from '../assets/recycling-video.mp4';
+import { auth, googleProvider } from '../firebase';
+import { signInWithEmailAndPassword, signInWithPopup, sendPasswordResetEmail, sendEmailVerification } from 'firebase/auth';
 
 function Login() {
   const navigate = useNavigate();
@@ -10,6 +12,8 @@ function Login() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [emailError, setEmailError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [loading, setLoading] = useState(false);
   
   // Modal states
   const [showModal, setShowModal] = useState(false);
@@ -27,6 +31,7 @@ function Login() {
 
   const handlePasswordChange = (e) => {
     setPassword(e.target.value);
+    if (passwordError) setPasswordError('');
   };
 
   const togglePasswordVisibility = () => {
@@ -53,8 +58,12 @@ function Login() {
     return '';
   };
 
-  const handleLoginSubmit = (e) => {
+  const handleLoginSubmit = async (e) => {
     e.preventDefault();
+    
+    // Reset errors
+    setEmailError('');
+    setPasswordError('');
     
     // Validate email before submission
     const errorMsg = validateEmail(email);
@@ -63,10 +72,85 @@ function Login() {
       return;
     }
     
-    // For demo purposes, we'll navigate to dashboard regardless of credentials
-    // In a real app, you would verify credentials with an API call first
-    console.log('Form submitted with valid @cit.edu email');
-    navigate('/dashboard'); // Navigate to dashboard on successful login
+    // Validate password
+    if (!password.trim()) {
+      setPasswordError('Password is required');
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      // Attempt to sign in with Firebase
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+      
+      // Check if email is verified
+      if (!user.emailVerified) {
+        setEmailError('Please verify your email before logging in. Check your inbox.');
+        // Send verification email again
+        await sendEmailVerification(user);
+        setLoading(false);
+        return;
+      }
+      
+      console.log('Login successful:', user);
+      navigate('/dashboard');
+    } catch (error) {
+      console.error('Login error:', error);
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+        setPasswordError('Invalid email or password');
+      } else if (error.code === 'auth/too-many-requests') {
+        setPasswordError('Too many failed attempts. Please try again later.');
+      } else {
+        setPasswordError('An error occurred. Please try again.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    try {
+      setLoading(true);
+      const result = await signInWithPopup(auth, googleProvider);
+      
+      // Check if the Google account has a cit.edu email
+      const userEmail = result.user.email;
+      if (!userEmail.toLowerCase().endsWith('@cit.edu')) {
+        // Sign out if not a cit.edu email
+        await auth.signOut();
+        setEmailError('Only @cit.edu email addresses are allowed');
+        setLoading(false);
+        return;
+      }
+      
+      navigate('/dashboard');
+    } catch (error) {
+      console.error('Google sign-in error:', error);
+      setEmailError('Error signing in with Google. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    // Validate email
+    const errorMsg = validateEmail(email);
+    if (errorMsg) {
+      setEmailError(errorMsg);
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      await sendPasswordResetEmail(auth, email);
+      alert('Password reset email sent. Check your inbox.');
+    } catch (error) {
+      console.error('Password reset error:', error);
+      setEmailError('Error sending password reset email. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleRequestEmailChange = (e) => {
@@ -138,6 +222,7 @@ function Login() {
                   onBlur={() => setEmailError(validateEmail(email))}
                   placeholder="Email"
                   required
+                  disabled={loading}
                 />
                 <span className="input-icon">✉️</span>
               </div>
@@ -152,18 +237,37 @@ function Login() {
                   onChange={handlePasswordChange}
                   placeholder="Password"
                   required
+                  disabled={loading}
                 />
                 <span className="input-icon">🔒</span>
                 <button
                   type="button"
                   className="password-toggle"
                   onClick={togglePasswordVisibility}
+                  disabled={loading}
                 >
                   👁️
                 </button>
               </div>
+              {passwordError && <div className="error-message">{passwordError}</div>}
             </div>
-            <button type="submit" className="login-button">Login</button>
+            <div className="forgot-password">
+              <a href="#" onClick={(e) => { e.preventDefault(); handleForgotPassword(); }}>Forgot Password?</a>
+            </div>
+            <button type="submit" className="login-button" disabled={loading}>
+              {loading ? 'Logging in...' : 'Login'}
+            </button>
+            <div className="or-divider">
+              <span>OR</span>
+            </div>
+            <button 
+              type="button" 
+              className="google-login-button"
+              onClick={handleGoogleSignIn}
+              disabled={loading}
+            >
+              Sign in with Google
+            </button>
             <div className="signup-link">
               <span>Not a user yet? </span>
               <a href="#" className="request-link" onClick={openRequestModal}>Request Credentials</a>
