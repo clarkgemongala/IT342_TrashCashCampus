@@ -1,222 +1,225 @@
 package com.example.trashcashcampus_mobile
+
 import android.content.Intent
 import android.os.Bundle
-import android.text.method.HideReturnsTransformationMethod
-import android.text.method.PasswordTransformationMethod
+import android.text.Editable
+import android.text.InputType
+import android.text.TextWatcher
 import android.util.Log
+import android.view.View
 import android.widget.EditText
-import android.widget.ImageView
+import android.widget.ImageButton
+import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.AppCompatButton
+import androidx.constraintlayout.widget.ConstraintLayout
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 
 class MainActivity : AppCompatActivity() {
-
     private val TAG = "MainActivity"
+    
+    // UI elements
+    private lateinit var etEmail: EditText
+    private lateinit var etPassword: EditText
+    private lateinit var btnTogglePasswordVisibility: ImageButton
+    private lateinit var btnLogin: AppCompatButton
+    private lateinit var tvRegister: TextView
+    private lateinit var progressBar: ProgressBar
+    private lateinit var loginLayout: ConstraintLayout
+    
+    // Firebase Auth
     private lateinit var auth: FirebaseAuth
-    private val db = Firebase.firestore
-    private var passwordVisible = false
-
+    
+    // Activity Result Launcher for LoginActivity
+    private lateinit var loginActivityResultLauncher: ActivityResultLauncher<Intent>
+    
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_login)
-
-        // Initialize Firebase Auth
-        auth = FirebaseAuth.getInstance()
-
-        // Setup password visibility toggle
-        setupPasswordVisibilityToggle()
-
-        // Handle sign up button click
-        findViewById<TextView>(R.id.tvSignUp).setOnClickListener {
-            try {
-                val intent = Intent(this, RegisterActivity::class.java)
-                startActivity(intent)
-            } catch (e: Exception) {
-                // Log the exception to see what's happening
-                Log.e(TAG, "Error starting RegisterActivity", e)
-                Toast.makeText(this, "Error: ${e.message}", Toast.LENGTH_LONG).show()
-            }
-        }
-
-        // Handle login button click
-        findViewById<AppCompatButton>(R.id.btnLogin).setOnClickListener {
-            val email = findViewById<EditText>(R.id.etEmail).text.toString().trim()
-            val password = findViewById<EditText>(R.id.etPassword).text.toString().trim()
-
-            // Basic validation
-            if (email.isEmpty() || password.isEmpty()) {
-                Toast.makeText(this, "Please enter email and password", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-
-            // Show loading indicator (if you have one)
-            // loadingProgressBar.visibility = View.VISIBLE
-
-            // Login with Firebase Authentication
-            signInWithEmailPassword(email, password)
+        setContentView(R.layout.activity_main)
+        
+        try {
+            // Initialize Firebase Auth
+            auth = FirebaseAuth.getInstance()
+            
+            // Set up the Activity Result Launcher
+            setupActivityResultLauncher()
+            
+            // Initialize UI elements
+            initializeUI()
+            
+            // Set up listeners
+            setupListeners()
+            
+            // Check if user is already logged in
+            checkCurrentUser()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in onCreate: ${e.message}", e)
+            Toast.makeText(this, "Something went wrong. Please try again.", Toast.LENGTH_SHORT).show()
         }
     }
-
-    private fun setupPasswordVisibilityToggle() {
-        val passwordToggle = findViewById<ImageView>(R.id.ivPasswordToggle)
-        val passwordEditText = findViewById<EditText>(R.id.etPassword)
-
-        passwordToggle.setOnClickListener {
-            passwordVisible = !passwordVisible
-
-            if (passwordVisible) {
-                // Show password
-                passwordEditText.transformationMethod = HideReturnsTransformationMethod.getInstance()
-                passwordToggle.setImageResource(R.drawable.ic_visibility)
-            } else {
-                // Hide password
-                passwordEditText.transformationMethod = PasswordTransformationMethod.getInstance()
-                passwordToggle.setImageResource(R.drawable.ic_visibility_off)
-            }
-
-            // Move cursor to the end of text
-            passwordEditText.setSelection(passwordEditText.text.length)
-        }
-    }
-
-    private fun signInWithEmailPassword(email: String, password: String) {
-        auth.signInWithEmailAndPassword(email, password)
-            .addOnCompleteListener(this) { task ->
-                if (task.isSuccessful) {
-                    // Sign in success, check if email is verified
-                    val user = auth.currentUser
-                    val userId = user?.uid
-
-                    if (user != null && userId != null) {
-                        // First verify the user still exists in Firestore
-                        db.collection("users").document(userId)
-                            .get()
-                            .addOnSuccessListener { document ->
-                                if (document.exists()) {
-                                    // User exists in database, now check email verification
-                                    if (user.isEmailVerified) {
-                                        // Email is verified, proceed to home screen
-                                        Log.d(TAG, "Login successful for user: $email")
-
-                                        // Save user info to shared preferences
-                                        saveUserSession(userId, email)
-
-                                        Toast.makeText(this, "Login successful", Toast.LENGTH_SHORT).show()
-
-                                        // Go to home activity
-                                        val intent = Intent(this, HomeActivity::class.java)
-                                        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                                        startActivity(intent)
-                                        finish()
-                                    } else {
-                                        // Email not verified, show message and log out
-                                        Toast.makeText(this,
-                                            "Please verify your email before logging in",
-                                            Toast.LENGTH_LONG).show()
-
-                                        // Take them to the verification waiting screen
-                                        val intent = Intent(this, VerificationWaitingActivity::class.java)
-                                        intent.putExtra("USER_EMAIL", email)
-                                        startActivity(intent)
-
-                                        // Sign out the user
-                                        auth.signOut()
-                                    }
-                                } else {
-                                    // User doesn't exist in database anymore
-                                    Log.w(TAG, "User record not found in Firestore: $userId")
-                                    Toast.makeText(this,
-                                        "Account no longer exists. Please register again.",
-                                        Toast.LENGTH_LONG).show()
-
-                                    // Sign out the user and clear any local data
-                                    auth.signOut()
-                                    clearUserSession()
-                                }
-                            }
-                            .addOnFailureListener { e ->
-                                Log.w(TAG, "Error checking user in database", e)
-                                Toast.makeText(this,
-                                    "Login error: Unable to verify account",
-                                    Toast.LENGTH_SHORT).show()
-
-                                // Sign out to be safe
-                                auth.signOut()
-                            }
-                    } else {
-                        // User is null or userId is null (shouldn't happen normally)
-                        Toast.makeText(this, "Login error: Invalid user data", Toast.LENGTH_SHORT).show()
-                        auth.signOut()
-                    }
+    
+    private fun setupActivityResultLauncher() {
+        loginActivityResultLauncher = registerForActivityResult(
+            ActivityResultContracts.StartActivityForResult()
+        ) { result ->
+            if (result.resultCode == RESULT_OK) {
+                val data = result.data
+                val message = data?.getStringExtra("message") ?: "Unknown error"
+                val success = data?.getBooleanExtra("success", false) ?: false
+                
+                if (success) {
+                    // Login was successful
+                    val userId = data?.getStringExtra("userId")
+                    val email = data?.getStringExtra("email")
+                    
+                    // Navigate to Dashboard or Home screen
+                    navigateToDashboard(userId, email)
                 } else {
-                    // Sign in failed
-                    Log.w(TAG, "signInWithEmail:failure", task.exception)
-                    Toast.makeText(this,
-                        "Email or password is incorrect",
-                        Toast.LENGTH_SHORT).show()
+                    // Login failed, show error message
+                    Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+                    showLoginForm()
                 }
+            } else {
+                // User canceled or something went wrong
+                Toast.makeText(this, "Login canceled or failed", Toast.LENGTH_SHORT).show()
+                showLoginForm()
             }
+        }
     }
-
-    private fun saveUserSession(userId: String, email: String) {
-        // Use SharedPreferences to save user login state
-        val prefs = getSharedPreferences("TrashCashCampusPrefs", MODE_PRIVATE)
-        prefs.edit().apply {
-            putString("USER_ID", userId)
-            putString("USER_EMAIL", email)
-            putBoolean("IS_LOGGED_IN", true)
+    
+    private fun initializeUI() {
+        loginLayout = findViewById(R.id.loginLayout)
+        etEmail = findViewById(R.id.etEmail)
+        etPassword = findViewById(R.id.etPassword)
+        btnTogglePasswordVisibility = findViewById(R.id.btnTogglePasswordVisibility)
+        btnLogin = findViewById(R.id.btnLogin)
+        tvRegister = findViewById(R.id.tvRegister)
+        progressBar = findViewById(R.id.progressBar)
+    }
+    
+    private fun setupListeners() {
+        // Set up password visibility toggle
+        btnTogglePasswordVisibility.setOnClickListener {
+            togglePasswordVisibility()
+        }
+        
+        // Set up login button
+        btnLogin.setOnClickListener {
+            attemptLogin()
+        }
+        
+        // Set up register text view
+        tvRegister.setOnClickListener {
+            val intent = Intent(this, RegisterActivity::class.java)
+            startActivity(intent)
+        }
+        
+        // Add text watchers for error clearing
+        etEmail.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                etEmail.error = null
+            }
+        })
+        
+        etPassword.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                etPassword.error = null
+            }
+        })
+    }
+    
+    private fun checkCurrentUser() {
+        val currentUser = auth.currentUser
+        if (currentUser != null && currentUser.isEmailVerified) {
+            // User is already logged in and verified
+            navigateToDashboard(currentUser.uid, currentUser.email)
+        } else {
+            // No user logged in or not verified, show login form
+            showLoginForm()
+        }
+    }
+    
+    private fun showLoginForm() {
+        progressBar.visibility = View.GONE
+        loginLayout.visibility = View.VISIBLE
+    }
+    
+    private fun togglePasswordVisibility() {
+        if (etPassword.inputType == (InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD)) {
+            // Show password
+            etPassword.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
+            btnTogglePasswordVisibility.setImageResource(R.drawable.ic_visibility)
+        } else {
+            // Hide password
+            etPassword.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+            btnTogglePasswordVisibility.setImageResource(R.drawable.ic_visibility_off)
+        }
+        // Maintain cursor position
+        etPassword.setSelection(etPassword.text.length)
+    }
+    
+    private fun attemptLogin() {
+        val email = etEmail.text.toString().trim()
+        val password = etPassword.text.toString().trim()
+        
+        // Validate inputs
+        if (email.isEmpty()) {
+            etEmail.error = "Please enter your email"
+            etEmail.requestFocus()
+            return
+        }
+        
+        if (!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+            etEmail.error = "Please enter a valid email"
+            etEmail.requestFocus()
+            return
+        }
+        
+        if (password.isEmpty()) {
+            etPassword.error = "Please enter your password"
+            etPassword.requestFocus()
+            return
+        }
+        
+        // Show loading state
+        showLoadingState()
+        
+        // Launch LoginActivity to verify credentials
+        val intent = Intent(this, LoginActivity::class.java)
+        intent.putExtra("email", email)
+        intent.putExtra("password", password)
+        loginActivityResultLauncher.launch(intent)
+    }
+    
+    private fun showLoadingState() {
+        btnLogin.isEnabled = false
+        progressBar.visibility = View.VISIBLE
+        loginLayout.alpha = 0.5f
+    }
+    
+    private fun navigateToDashboard(userId: String?, email: String?) {
+        // Store current user info if needed
+        val sharedPref = getSharedPreferences("TrashCashPrefs", MODE_PRIVATE)
+        with(sharedPref.edit()) {
+            putString("userId", userId)
+            putString("email", email)
             apply()
         }
-    }
-
-    private fun clearUserSession() {
-        val prefs = getSharedPreferences("TrashCashCampusPrefs", MODE_PRIVATE)
-        prefs.edit().clear().apply()
-    }
-
-    override fun onStart() {
-        super.onStart()
-
-        // Check if user is already logged in via SharedPreferences
-        val prefs = getSharedPreferences("TrashCashCampusPrefs", MODE_PRIVATE)
-        val isLoggedIn = prefs.getBoolean("IS_LOGGED_IN", false)
-        val userId = prefs.getString("USER_ID", null)
-
-        // Check if user is already logged in via Firebase Auth
-        val currentUser = auth.currentUser
-
-        if (currentUser != null && isLoggedIn && userId != null) {
-            // Verify the user still exists in the database
-            db.collection("users").document(userId)
-                .get()
-                .addOnSuccessListener { document ->
-                    if (document.exists() && currentUser.isEmailVerified) {
-                        // User exists in database and email is verified
-                        val intent = Intent(this, HomeActivity::class.java)
-                        startActivity(intent)
-                        finish()
-                    } else {
-                        // User no longer exists in database or email not verified
-                        auth.signOut()
-                        clearUserSession()
-                    }
-                }
-                .addOnFailureListener { e ->
-                    // Error checking database
-                    Log.w(TAG, "Error checking user in database", e)
-                    auth.signOut()
-                    clearUserSession()
-                }
-        } else if (currentUser != null) {
-            // User is logged in but email might not be verified
-            // Sign them out to be safe
-            auth.signOut()
-            clearUserSession()
-        }
+        
+        // Navigate to HomeActivity
+        val intent = Intent(this, HomeActivity::class.java)
+        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        startActivity(intent)
+        finish() // Close the login activity
     }
 }

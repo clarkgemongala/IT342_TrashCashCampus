@@ -81,6 +81,7 @@
                 app:layout_constraintEnd_toEndOf="@+id/vCircleBirthday"
                 app:layout_constraintTop_toTopOf="parent" />
 
+            <!-- Connector lines positioned behind the circles -->
             <TextView
                 android:id="@+id/tvGenderStep"
                 android:layout_width="wrap_content"
@@ -88,22 +89,11 @@
                 android:text="Gender"
                 android:textColor="#BBBBBB"
                 android:textSize="14sp"
-                app:layout_constraintStart_toStartOf="@+id/vCircleGender"
                 app:layout_constraintEnd_toEndOf="@+id/vCircleGender"
+                app:layout_constraintHorizontal_bias="1.0"
+                app:layout_constraintStart_toStartOf="@+id/vCircleGender"
                 app:layout_constraintTop_toTopOf="parent" />
 
-            <TextView
-                android:id="@+id/tvPassStep"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Pass"
-                android:textColor="#BBBBBB"
-                android:textSize="14sp"
-                app:layout_constraintStart_toStartOf="@+id/vCirclePass"
-                app:layout_constraintEnd_toEndOf="@+id/vCirclePass"
-                app:layout_constraintTop_toTopOf="parent" />
-
-            <!-- Connector lines positioned behind the circles -->
             <View
                 android:id="@+id/vConnectorLineBackground"
                 android:layout_width="0dp"
@@ -150,17 +140,9 @@
                 android:layout_height="32dp"
                 android:background="@drawable/circle_unselected"
                 app:layout_constraintStart_toEndOf="@+id/vCircleBirthday"
-                app:layout_constraintEnd_toStartOf="@+id/vCirclePass"
-                app:layout_constraintTop_toTopOf="@+id/vCircleEmail" />
-
-            <View
-                android:id="@+id/vCirclePass"
-                android:layout_width="32dp"
-                android:layout_height="32dp"
-                android:background="@drawable/circle_unselected"
-                app:layout_constraintStart_toEndOf="@+id/vCircleGender"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintTop_toTopOf="@+id/vCircleEmail" />
+
         </androidx.constraintlayout.widget.ConstraintLayout>
 
         <TextView
@@ -206,45 +188,6 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@+id/etEmail" />
 
-        <TextView
-            android:id="@+id/tvSignUpWith"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="32dp"
-            android:text="Sign up with"
-            android:textColor="#333333"
-            android:textSize="14sp"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/btnContinue" />
-
-        <LinearLayout
-            android:id="@+id/llSocialLogin"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:gravity="center"
-            android:orientation="horizontal"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/tvSignUpWith">
-
-            <ImageView
-                android:id="@+id/ivGoogleSignup"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
-                android:layout_marginHorizontal="8dp"
-                android:contentDescription="Google Signup"
-                android:src="@drawable/google" />
-
-            <ImageView
-                android:id="@+id/ivGithubSignup"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
-                android:layout_marginHorizontal="8dp"
-                android:contentDescription="GitHub Signup"
-                android:src="@drawable/github" />
-        </LinearLayout>
 
         <LinearLayout
             android:layout_width="wrap_content"
@@ -254,7 +197,7 @@
             android:orientation="horizontal"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@+id/llSocialLogin">
+            app:layout_constraintTop_toBottomOf="@+id/btnContinue">
 
             <TextView
                 android:id="@+id/tvHaveAccount"
