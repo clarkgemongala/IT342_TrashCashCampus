@@ -1,20 +1,13 @@
 package com.TrashCashCampus.Entity;
 
-import jakarta.persistence.*;
-
-@Entity
-@Table(name = "users")
+/**
+ * User entity for Firestore
+ */
 public class TrashEntity {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
+    private String id;
     private String username;
-
-    @Column(unique = true)
     private String email;
-
     private String password;
 
     public TrashEntity() {}
@@ -26,8 +19,12 @@ public class TrashEntity {
     }
 
     // Getters and setters
-    public Long getId() {
+    public String getId() {
         return id;
+    }
+    
+    public void setId(String id) {
+        this.id = id;
     }
 
     public String getUsername() {

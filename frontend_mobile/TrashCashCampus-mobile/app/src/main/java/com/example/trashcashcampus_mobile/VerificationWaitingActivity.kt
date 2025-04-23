@@ -6,22 +6,23 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.AppCompatButton
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.FirebaseUser
+import com.example.trashcashcampus_mobile.utils.ApiClient
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class VerificationWaitingActivity : AppCompatActivity() {
-    private lateinit var auth: FirebaseAuth
     private var userEmail: String = ""
+    private var userId: String = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_verification_waiting)
 
-        // Initialize Firebase Auth
-        auth = FirebaseAuth.getInstance()
-
-        // Get the user email from intent
-        userEmail = intent.getStringExtra("USER_EMAIL") ?: ""
+        // Get the user email and ID from intent
+        userEmail = intent.getStringExtra("email") ?: ""
+        userId = intent.getStringExtra("userId") ?: ""
 
         // Set the email in the UI
         val tvUserEmail = findViewById<TextView>(R.id.tvUserEmail)
@@ -44,18 +45,35 @@ class VerificationWaitingActivity : AppCompatActivity() {
     }
 
     private fun resendVerificationEmail() {
-        val user = auth.currentUser
-        user?.sendEmailVerification()
-            ?.addOnCompleteListener { task ->
-                if (task.isSuccessful) {
-                    Toast.makeText(this,
-                        "Verification email resent to $userEmail",
-                        Toast.LENGTH_LONG).show()
-                } else {
-                    Toast.makeText(this,
-                        "Failed to resend verification email: ${task.exception?.message}",
-                        Toast.LENGTH_SHORT).show()
+        // Use the API client to request password reset (since that's what sends an email)
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val response = ApiClient.requestPasswordReset(this@VerificationWaitingActivity, userEmail)
+                
+                withContext(Dispatchers.Main) {
+                    if (response != null) {
+                        Toast.makeText(
+                            this@VerificationWaitingActivity,
+                            "Verification email resent to $userEmail",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    } else {
+                        Toast.makeText(
+                            this@VerificationWaitingActivity,
+                            "Failed to resend verification email",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(
+                        this@VerificationWaitingActivity,
+                        "Failed to resend verification email: ${e.message}",
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
             }
+        }
     }
 }

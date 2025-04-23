@@ -21,10 +21,13 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.AppCompatButton
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.FirebaseUser
+import com.example.trashcashcampus_mobile.utils.ApiClient
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
@@ -42,14 +45,11 @@ class RegisterActivity : AppCompatActivity() {
     private var userPassword = ""
     private var userConfirmPassword = ""
 
-    // Firebase Authentication
-    private lateinit var auth: FirebaseAuth
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         try {
-            // Initialize Firebase Auth
-            auth = FirebaseAuth.getInstance()
+            // Initialize Firebase Auth is no longer needed
+            // auth = FirebaseAuth.getInstance()
 
             // Restore state if available
             savedInstanceState?.let {
@@ -414,7 +414,7 @@ class RegisterActivity : AppCompatActivity() {
 
             Log.d(TAG, "Finishing registration process")
             // Create the user account with Firebase Auth
-            createUserWithFirebaseAuth()
+            createAccount()
         }
     }
 
@@ -513,124 +513,82 @@ class RegisterActivity : AppCompatActivity() {
         }
     }
 
-    private fun createUserWithFirebaseAuth() {
+    private fun createAccount() {
         try {
-            // Show loading indicator
-            Toast.makeText(this, "Creating account...", Toast.LENGTH_SHORT).show()
+            Log.d(TAG, "Creating account for $userEmail")
             
-            val auth = FirebaseAuth.getInstance()
-
-            // Create user with Firebase Auth
-            auth.createUserWithEmailAndPassword(userEmail, userPassword)
-                .addOnCompleteListener { task ->
-                    if (task.isSuccessful) {
-                        // User account created successfully
-                        val user = auth.currentUser
-                        
-                        // Send verification email
-                        sendVerificationEmail(user)
-                    } else {
-                        // Check specific error cases
-                        when {
-                            // Email already in use
-                            task.exception?.message?.contains("email address is already in use") == true -> {
-                                Toast.makeText(this,
-                                    "This email is already registered. Please use a different email.",
-                                    Toast.LENGTH_LONG).show()
-                                offerEmailChange()
-                            }
-                            // Other registration error
-                            else -> {
-                                Log.e(TAG, "Error creating user: ${task.exception?.message}", task.exception)
-                                Toast.makeText(this,
-                                    "Registration failed: ${task.exception?.message}",
-                                    Toast.LENGTH_SHORT).show()
-                            }
-                        }
-                    }
-                }
+            // Get a reference to the progress overlay
+            val progressOverlay = findViewById<RelativeLayout>(R.id.progressOverlay)
+            
+            // Show progress overlay
+            progressOverlay?.visibility = View.VISIBLE
+            
+            // Instead of creating a Firebase Auth user, use our API
+            registerWithAPI(userEmail, userPassword, userName)
+            
+            // The rest of the logic is now handled inside the registerWithAPI method
+            
         } catch (e: Exception) {
-            Log.e(TAG, "Unexpected error in createUserWithFirebaseAuth: ${e.message}", e)
-            Toast.makeText(this, "Unexpected error during registration. Please try again.", Toast.LENGTH_SHORT).show()
+            Log.e(TAG, "Error creating account: ${e.message}", e)
+            
+            // If there's an exception, hide progress and show error
+            findViewById<RelativeLayout>(R.id.progressOverlay)?.visibility = View.GONE
+            
+            Toast.makeText(
+                this@RegisterActivity,
+                "Error creating account: ${e.message}",
+                Toast.LENGTH_LONG
+            ).show()
         }
     }
 
-    private fun sendVerificationEmail(user: FirebaseUser?) {
-        user?.sendEmailVerification()
-            ?.addOnCompleteListener { task ->
-                if (task.isSuccessful) {
-                    // Email sent successfully
-                    Toast.makeText(this,
-                        "Verification email sent to $userEmail",
-                        Toast.LENGTH_LONG).show()
+    private fun registerWithAPI(email: String, password: String, username: String) {
+        // Show loading state
+        findViewById<RelativeLayout>(R.id.progressOverlay)?.visibility = View.VISIBLE
 
-                    // Store the additional user data in Firestore
-                    if (user.uid.isNotEmpty()) {
-                        saveUserDataToFirestore(user.uid)
+        // Launch a coroutine to make the API call
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                val response = ApiClient.register(this@RegisterActivity, email, password, username)
+                
+                withContext(Dispatchers.Main) {
+                    // Hide loading state
+                    findViewById<RelativeLayout>(R.id.progressOverlay)?.visibility = View.GONE
+                    
+                    if (response != null) {
+                        // Registration successful
+                        val userId = response["userId"] as? String ?: ""
+                        val message = response["message"] as? String ?: "Registration successful"
+                        
+                        // Navigate to verification waiting activity
+                        val intent = Intent(this@RegisterActivity, VerificationWaitingActivity::class.java)
+                        intent.putExtra("userId", userId)
+                        intent.putExtra("email", email)
+                        startActivity(intent)
+                        finish()
                     } else {
-                        Log.e(TAG, "User UID is empty, cannot save user data to Firestore")
-                        Toast.makeText(this, 
-                            "Account created but could not save user details. Please update your profile later.",
-                            Toast.LENGTH_LONG).show()
-                        navigateToVerificationWaitingScreen()
+                        // Registration failed
+                        Toast.makeText(
+                            this@RegisterActivity,
+                            "Registration failed. Please try again.",
+                            Toast.LENGTH_LONG
+                        ).show()
                     }
-                } else {
-                    // Failed to send email
-                    Log.e(TAG, "Error sending verification email: ${task.exception?.message}", task.exception)
-                    Toast.makeText(this,
-                        "Failed to send verification email: ${task.exception?.message}",
-                        Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    // Hide loading state
+                    findViewById<RelativeLayout>(R.id.progressOverlay)?.visibility = View.GONE
+                    
+                    Log.e(TAG, "Error during registration: ${e.message}", e)
+                    Toast.makeText(
+                        this@RegisterActivity,
+                        "Registration failed: ${e.message}",
+                        Toast.LENGTH_LONG
+                    ).show()
                 }
             }
-    }
-
-    private fun saveUserDataToFirestore(userId: String) {
-        try {
-            val db = Firebase.firestore
-
-            // Create a user map with the collected data
-            val userData = hashMapOf(
-                "userId" to userId,
-                "email" to userEmail,
-                "fullName" to userName,
-                "birthday" to userBirthday,
-                "gender" to selectedGender,
-                "isEmailVerified" to false,  // Will update this when verified
-                "createdAt" to com.google.firebase.Timestamp.now()
-            )
-
-            // Add the user to Firestore
-            db.collection("users")
-                .document(userId)  // Using Firebase Auth UID as document ID
-                .set(userData)
-                .addOnSuccessListener {
-                    Log.d(TAG, "User data successfully saved to Firestore")
-                    Toast.makeText(this, 
-                        "Account created successfully! Please verify your email to continue.",
-                        Toast.LENGTH_LONG).show()
-                    navigateToVerificationWaitingScreen()
-                }
-                .addOnFailureListener { e ->
-                    Log.e(TAG, "Error saving user data to Firestore: ${e.message}", e)
-                    Toast.makeText(this,
-                        "Your account was created but we couldn't save all your details. Please update your profile later.",
-                        Toast.LENGTH_LONG).show()
-                    navigateToVerificationWaitingScreen()
-                }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error accessing Firestore: ${e.message}", e)
-            Toast.makeText(this, 
-                "Error saving your data. Please try again later.",
-                Toast.LENGTH_SHORT).show()
-            navigateToVerificationWaitingScreen()
         }
-    }
-
-    private fun navigateToVerificationWaitingScreen() {
-        val intent = Intent(this, VerificationWaitingActivity::class.java)
-        intent.putExtra("USER_EMAIL", userEmail)
-        startActivity(intent)
-        finish() // Close the registration activity
     }
 
     private fun setupGenderSpinner() {
@@ -1029,7 +987,7 @@ class RegisterActivity : AppCompatActivity() {
                     
                     Log.d(TAG, "Finishing registration process")
                     // Create the user account with Firebase Auth
-                    createUserWithFirebaseAuth()
+                    createAccount()
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error in direct handling of step 5: ${e.message}", e)

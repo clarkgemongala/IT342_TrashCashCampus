@@ -5,12 +5,8 @@ import com.TrashCashCampus.Repository.TrashRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.sql.Connection;
-import java.sql.SQLException;
 import java.util.List;
 import java.util.Optional;
-
-import javax.sql.DataSource;
 
 @Service
 public class TrashService {
@@ -19,7 +15,7 @@ public class TrashService {
     private TrashRepository trashRepository;
     
     @Autowired
-    private DataSource dataSource; // Injecting the DataSource
+    private FirebaseService firebaseService; // Using FirebaseService instead of DataSource
 
     // Method to get all users
     public List<TrashEntity> getAllUsers() {
@@ -45,16 +41,12 @@ public class TrashService {
     }
 
     public String testDatabaseConnection() {
-        try (Connection connection = dataSource.getConnection()) {
-            if (connection != null && !connection.isClosed()) {
-                return "Database connection is successful!";
-            } else {
-                return "Database connection failed!";
-            }
-        } catch (SQLException e) {
-            return "Database connection failed: " + e.getMessage();
+        try {
+            // Test Firebase connection by trying to access Firestore
+            firebaseService.getAllDocuments("users");
+            return "Firebase database connection is successful!";
+        } catch (Exception e) {
+            return "Firebase database connection failed: " + e.getMessage();
         }
     }
-    
-    
 }

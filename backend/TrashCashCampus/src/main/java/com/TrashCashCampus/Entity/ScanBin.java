@@ -1,30 +1,19 @@
 package com.TrashCashCampus.Entity;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Lob;
-
 import java.time.LocalDateTime;
 
-@Entity
+/**
+ * ScanBin entity for Firestore
+ */
 public class ScanBin {
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
+    private String id;
     private String qrCode;
     private String wasteType;
-
-    @Lob
     private String imageBase64;
-
     private int pointsEarned;
     private String message;
     private String fact;
-
     private LocalDateTime timestamp;
 
     public ScanBin() {
@@ -33,8 +22,12 @@ public class ScanBin {
 
     // Getters and Setters
 
-    public Long getId() {
+    public String getId() {
         return id;
+    }
+    
+    public void setId(String id) {
+        this.id = id;
     }
 
     public String getQrCode() {

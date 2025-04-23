@@ -4,35 +4,35 @@ import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
-import com.google.firebase.auth.FirebaseAuth
-import com.google.firebase.auth.FirebaseUser
-import com.google.firebase.firestore.ktx.firestore
-import com.google.firebase.ktx.Firebase
+import com.example.trashcashcampus_mobile.utils.ApiClient
+import com.example.trashcashcampus_mobile.utils.LoadingManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
- * This activity acts as a verification handler rather than a UI screen.
- * It receives login credentials from MainActivity, verifies them with Firebase,
- * checks email verification status, and returns results to MainActivity.
+ * This activity handles login through the backend API.
+ * It receives login credentials from MainActivity, verifies them with the backend,
+ * and returns results to MainActivity.
  */
 class LoginActivity : AppCompatActivity() {
     private val tag = "LoginActivity"
     
-    // Firebase Auth
-    private lateinit var auth: FirebaseAuth
-    
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_login)
         
         try {
-            // Initialize Firebase Auth
-            auth = FirebaseAuth.getInstance()
-            
             // Check if we have data passed from MainActivity
             val email = intent.getStringExtra("email") ?: ""
             val password = intent.getStringExtra("password") ?: ""
             
             if (email.isNotEmpty() && password.isNotEmpty()) {
-                // If we have credentials, attempt login directly
+                // Show loading overlay
+                LoadingManager.showLoading(this, "Authenticating...")
+                
+                // If we have credentials, attempt login through the backend API
                 loginUser(email, password)
             } else {
                 // Go back to MainActivity if no credentials were provided
@@ -62,59 +62,45 @@ class LoginActivity : AppCompatActivity() {
             return
         }
         
-        // Attempt login with Firebase
-        auth.signInWithEmailAndPassword(email, password)
-            .addOnCompleteListener(this) { task ->
-                if (task.isSuccessful) {
-                    // Login successful
-                    val user = auth.currentUser
-                    checkEmailVerification(user)
-                } else {
-                    // Login failed
-                    Log.w(tag, "signInWithEmail:failure", task.exception)
-                    returnToMainActivity("Authentication failed: ${task.exception?.message}")
-                }
-            }
-    }
-    
-    private fun checkEmailVerification(user: FirebaseUser?) {
-        if (user != null) {
-            // Check if the user's email is verified
-            if (user.isEmailVerified) {
-                // Update verification status in Firestore if needed
-                updateVerificationStatusInFirestore(user.uid)
+        // Launch a coroutine to make the API call
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                // Attempt login with backend API
+                val loginResponse = ApiClient.login(this@LoginActivity, email, password)
                 
-                // Navigate back to MainActivity with success
-                returnToMainActivityWithSuccess(user)
-            } else {
-                // Email not verified - show message and sign out
-                auth.signOut()
-                returnToMainActivity("You need to verify your email first. Please check your inbox.")
+                withContext(Dispatchers.Main) {
+                    // Hide loading overlay
+                    LoadingManager.hideLoading(this@LoginActivity)
+                    
+                    if (loginResponse != null) {
+                        // Login successful
+                        val userId = loginResponse.userId
+                        val userEmail = loginResponse.email
+                        val token = loginResponse.token
+                        
+                        // Navigate back to MainActivity with success
+                        returnToMainActivityWithSuccess(userId, userEmail, token)
+                    } else {
+                        // Login failed
+                        returnToMainActivity("Authentication failed. Check your credentials.")
+                    }
+                }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    // Hide loading overlay
+                    LoadingManager.hideLoading(this@LoginActivity)
+                    
+                    Log.e(tag, "Error during login: ${e.message}", e)
+                    returnToMainActivity("Authentication failed: ${e.message}")
+                }
             }
-        } else {
-            returnToMainActivity("User account not found")
-        }
-    }
-    
-    private fun updateVerificationStatusInFirestore(userId: String) {
-        try {
-            val db = Firebase.firestore
-            
-            // Update the isEmailVerified field to true
-            db.collection("users").document(userId)
-                .update("isEmailVerified", true)
-                .addOnSuccessListener {
-                    Log.d(tag, "Email verification status updated in Firestore")
-                }
-                .addOnFailureListener { e ->
-                    Log.e(tag, "Error updating email verification status: ${e.message}", e)
-                }
-        } catch (e: Exception) {
-            Log.e(tag, "Error accessing Firestore: ${e.message}", e)
         }
     }
     
     private fun returnToMainActivity(message: String) {
+        // Hide any loading overlay before returning
+        LoadingManager.hideLoading(this)
+        
         val intent = Intent()
         intent.putExtra("message", message)
         intent.putExtra("success", false)
@@ -122,12 +108,16 @@ class LoginActivity : AppCompatActivity() {
         finish()
     }
     
-    private fun returnToMainActivityWithSuccess(user: FirebaseUser) {
+    private fun returnToMainActivityWithSuccess(userId: String, email: String?, token: String?) {
+        // Hide any loading overlay before returning
+        LoadingManager.hideLoading(this)
+        
         val intent = Intent()
         intent.putExtra("message", "Login successful")
         intent.putExtra("success", true)
-        intent.putExtra("userId", user.uid)
-        intent.putExtra("email", user.email)
+        intent.putExtra("userId", userId)
+        intent.putExtra("email", email)
+        intent.putExtra("token", token)
         setResult(RESULT_OK, intent)
         finish()
     }

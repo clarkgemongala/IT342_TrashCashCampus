@@ -1,16 +1,12 @@
 package com.TrashCashCampus.Entity;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-
-@Entity
+/**
+ * Reward entity for Firestore
+ */
 public class Reward {
 
-    @Id
     private String id;
-
     private String name;
-
     private int pointsCost;
 
     public Reward() {}

@@ -13,7 +13,8 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.example.trashcashcampus_mobile.models.ApiClient
 import com.example.trashcashcampus_mobile.models.UserData
-import com.google.firebase.auth.FirebaseAuth
+import com.example.trashcashcampus_mobile.utils.ApiClient as ApiClientUtil
+import com.example.trashcashcampus_mobile.utils.LoadingManager
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.launch
@@ -32,26 +33,34 @@ class HomeActivity : AppCompatActivity() {
     private lateinit var btnScanQR: Button
     private lateinit var progressBarLoading: ProgressBar
     
-    // Firebase
-    private lateinit var auth: FirebaseAuth
+    // Firestore (still needed for user data)
     private val db = Firebase.firestore
     
     // User data
     private var userData: UserData? = null
     private var userId: String? = null
+    private var userEmail: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_homepage)
-
-        // Initialize Firebase Auth
-        auth = FirebaseAuth.getInstance()
         
         // Initialize UI elements
         initializeUI()
         
-        // Get current user ID
-        userId = auth.currentUser?.uid
+        // Get user ID from shared preferences (saved during login)
+        val prefs = getSharedPreferences("TrashCashPrefs", MODE_PRIVATE)
+        userId = prefs.getString("userId", null)
+        userEmail = prefs.getString("email", null)
+        
+        if (userId.isNullOrEmpty()) {
+            Log.e(tag, "No user signed in (userId is null)")
+            navigateToLogin()
+            return
+        }
+        
+        Log.d(tag, "User ID from SharedPrefs: $userId")
+        Log.d(tag, "User Email from SharedPrefs: $userEmail")
         
         // Load user data
         loadUserData()
@@ -79,47 +88,87 @@ class HomeActivity : AppCompatActivity() {
     }
     
     private fun loadUserData() {
-        // First, get the user's name from Firestore
-        val currentUser = auth.currentUser
-        
-        if (currentUser != null) {
-            // Get user details from Firestore
-            db.collection("users").document(currentUser.uid)
-                .get()
-                .addOnSuccessListener { document ->
-                    if (document != null && document.exists()) {
-                        // Extract user data
-                        val userData = document.data
-                        val fullName = userData?.get("fullName") as? String ?: "User"
-                        
-                        // Update UI with user's name
-                        tvUserName.text = fullName
-                        
-                        // Now fetch stats from our API
-                        fetchUserStats(currentUser.uid)
-                    } else {
-                        Log.d(tag, "No such document")
-                        tvUserName.text = currentUser.email?.split("@")?.get(0) ?: "User"
-                        
-                        // Still fetch stats from API
-                        fetchUserStats(currentUser.uid)
-                    }
-                }
-                .addOnFailureListener { exception ->
-                    Log.e(tag, "Error getting user data", exception)
-                    tvUserName.text = currentUser.email?.split("@")?.get(0) ?: "User"
-                    
-                    // Still try to fetch stats from API
-                    fetchUserStats(currentUser.uid)
-                    
-                    // Show error message
-                    Toast.makeText(this, "Failed to load user profile", Toast.LENGTH_SHORT).show()
-                }
+        val uid = userId
+        if (uid != null) {
+            // Try to get user data from backend first
+            loadUserDataFromBackend(uid)
         } else {
-            // No user signed in - should not happen, but handle it anyway
-            Log.e(tag, "No user signed in")
+            // No user ID available - should not happen, but handle it anyway
+            Log.e(tag, "No user ID available")
             navigateToLogin()
         }
+    }
+    
+    private fun loadUserDataFromBackend(uid: String) {
+        LoadingManager.showLoading(this, "Loading profile...")
+        
+        lifecycleScope.launch {
+            try {
+                // Get the user token from shared preferences
+                val prefs = getSharedPreferences("TrashCashPrefs", MODE_PRIVATE)
+                val token = prefs.getString("token", null)
+                
+                // Try to get user profile from backend
+                if (token != null) {
+                    val profileResponse = ApiClientUtil.getProfile(this@HomeActivity, uid, token)
+                    
+                    if (profileResponse != null) {
+                        // Update UI with user's name from backend
+                        tvUserName.text = profileResponse.name ?: userEmail?.split("@")?.get(0) ?: "User"
+                        
+                        // Now fetch stats
+                        fetchUserStats(uid)
+                    } else {
+                        // No profile data, fall back to using email
+                        tvUserName.text = userEmail?.split("@")?.get(0) ?: "User"
+                        fetchUserStats(uid)
+                    }
+                } else {
+                    // No token, fall back to using email
+                    tvUserName.text = userEmail?.split("@")?.get(0) ?: "User"
+                    fetchUserStats(uid)
+                }
+            } catch (e: Exception) {
+                Log.e(tag, "Error loading user profile from backend", e)
+                
+                // Fall back to Firestore
+                fallbackToFirestore(uid)
+            } finally {
+                LoadingManager.hideLoading(this@HomeActivity)
+            }
+        }
+    }
+    
+    private fun fallbackToFirestore(uid: String) {
+        // Fall back to getting user details from Firestore
+        db.collection("users").document(uid)
+            .get()
+            .addOnSuccessListener { document ->
+                if (document != null && document.exists()) {
+                    // Extract user data
+                    val userData = document.data
+                    val fullName = userData?.get("fullName") as? String ?: "User"
+                    
+                    // Update UI with user's name
+                    tvUserName.text = fullName
+                } else {
+                    Log.d(tag, "No such document")
+                    tvUserName.text = userEmail?.split("@")?.get(0) ?: "User"
+                }
+                
+                // Still fetch stats
+                fetchUserStats(uid)
+            }
+            .addOnFailureListener { exception ->
+                Log.e(tag, "Error getting user data from Firestore", exception)
+                tvUserName.text = userEmail?.split("@")?.get(0) ?: "User"
+                
+                // Still try to fetch stats
+                fetchUserStats(uid)
+                
+                // Show error message
+                Toast.makeText(this, "Failed to load user profile", Toast.LENGTH_SHORT).show()
+            }
     }
     
     private fun fetchUserStats(userId: String) {
@@ -220,11 +269,9 @@ class HomeActivity : AppCompatActivity() {
         prefs.edit().apply {
             remove("userId")
             remove("email")
+            remove("token")
             apply()
         }
-
-        // Sign out from Firebase Auth
-        auth.signOut()
     }
     
     override fun onResume() {

@@ -9,7 +9,6 @@ import android.util.Log
 import android.view.View
 import android.widget.EditText
 import android.widget.ImageButton
-import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
@@ -17,9 +16,15 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.AppCompatButton
 import androidx.constraintlayout.widget.ConstraintLayout
+import com.example.trashcashcampus_mobile.utils.ApiClient
+import com.example.trashcashcampus_mobile.utils.LoadingManager
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MainActivity : AppCompatActivity() {
     private val TAG = "MainActivity"
@@ -30,7 +35,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnTogglePasswordVisibility: ImageButton
     private lateinit var btnLogin: AppCompatButton
     private lateinit var tvRegister: TextView
-    private lateinit var progressBar: ProgressBar
     private lateinit var loginLayout: ConstraintLayout
     
     // Firebase Auth
@@ -56,11 +60,37 @@ class MainActivity : AppCompatActivity() {
             // Set up listeners
             setupListeners()
             
+            // Check backend connectivity
+            checkBackendConnection()
+            
             // Check if user is already logged in
             checkCurrentUser()
         } catch (e: Exception) {
             Log.e(TAG, "Error in onCreate: ${e.message}", e)
             Toast.makeText(this, "Something went wrong. Please try again.", Toast.LENGTH_SHORT).show()
+        }
+    }
+    
+    private fun checkBackendConnection() {
+        // Show backend URL in log for debugging
+        Log.d(TAG, "Using backend URL: ${ApiClient.getBackendUrl()}")
+        
+        // Test connection to backend
+        CoroutineScope(Dispatchers.IO).launch {
+            val isConnected = ApiClient.checkBackendConnection(this@MainActivity)
+            
+            withContext(Dispatchers.Main) {
+                if (isConnected) {
+                    Log.d(TAG, "Backend connection successful")
+                } else {
+                    Log.e(TAG, "Backend connection failed")
+                    Toast.makeText(
+                        this@MainActivity,
+                        "Warning: Backend server not available. Login and registration will not work.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
         }
     }
     
@@ -100,7 +130,6 @@ class MainActivity : AppCompatActivity() {
         btnTogglePasswordVisibility = findViewById(R.id.btnTogglePasswordVisibility)
         btnLogin = findViewById(R.id.btnLogin)
         tvRegister = findViewById(R.id.tvRegister)
-        progressBar = findViewById(R.id.progressBar)
     }
     
     private fun setupListeners() {
@@ -150,8 +179,13 @@ class MainActivity : AppCompatActivity() {
     }
     
     private fun showLoginForm() {
-        progressBar.visibility = View.GONE
+        // Hide the loading overlay
+        LoadingManager.hideLoading(this)
+        
+        // Show login form and enable button
         loginLayout.visibility = View.VISIBLE
+        btnLogin.isEnabled = true
+        loginLayout.alpha = 1.0f
     }
     
     private fun togglePasswordVisibility() {
@@ -191,20 +225,52 @@ class MainActivity : AppCompatActivity() {
             return
         }
         
-        // Show loading state
-        showLoadingState()
-        
-        // Launch LoginActivity to verify credentials
-        val intent = Intent(this, LoginActivity::class.java)
-        intent.putExtra("email", email)
-        intent.putExtra("password", password)
-        loginActivityResultLauncher.launch(intent)
+        // First check if backend is available
+        CoroutineScope(Dispatchers.IO).launch {
+            // Show loading state
+            withContext(Dispatchers.Main) {
+                showLoadingState()
+            }
+            
+            // Check if backend is responding
+            val isConnected = ApiClient.checkBackendConnection(this@MainActivity)
+            
+            if (!isConnected) {
+                withContext(Dispatchers.Main) {
+                    // Hide loading overlay
+                    LoadingManager.hideLoading(this@MainActivity)
+                    
+                    // Show error
+                    Toast.makeText(
+                        this@MainActivity,
+                        "Cannot connect to the server. Make sure your backend is running.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                    
+                    // Re-enable login button
+                    btnLogin.isEnabled = true
+                    loginLayout.alpha = 1.0f
+                }
+                return@launch
+            }
+            
+            // Backend is available, proceed with login activity
+            withContext(Dispatchers.Main) {
+                // Launch LoginActivity to verify credentials
+                val intent = Intent(this@MainActivity, LoginActivity::class.java)
+                intent.putExtra("email", email)
+                intent.putExtra("password", password)
+                loginActivityResultLauncher.launch(intent)
+            }
+        }
     }
     
     private fun showLoadingState() {
+        // Disable login button
         btnLogin.isEnabled = false
-        progressBar.visibility = View.VISIBLE
-        loginLayout.alpha = 0.5f
+        
+        // Show loading overlay with custom message
+        LoadingManager.showLoading(this, "Signing in...")
     }
     
     private fun navigateToDashboard(userId: String?, email: String?) {
