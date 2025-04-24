@@ -1,0 +1,117 @@
+/* Admin Management Page Styles */
+.admin-management-container {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 70px);
+  background-color: #f5f5f5;
+}
+
+.admin-management-content {
+  max-width: 1200px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 2rem;
+  box-sizing: border-box;
+}
+
+.admin-management-title {
+  margin-bottom: 2rem;
+  color: #333;
+  font-size: 2rem;
+}
+
+.search-box {
+  width: 100%;
+  max-width: 400px;
+  margin-bottom: 1.5rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 1rem;
+}
+
+.users-table {
+  width: 100%;
+  background-color: white;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  margin-bottom: 2rem;
+}
+
+.users-table th {
+  background-color: #f9f9f9;
+  padding: 1rem;
+  text-align: left;
+  font-weight: 500;
+  color: #333;
+  border-bottom: 1px solid #eee;
+}
+
+.users-table td {
+  padding: 1rem;
+  border-bottom: 1px solid #eee;
+}
+
+.user-role {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.8rem;
+  background-color: #e8f5e9;
+  color: #1a5336;
+}
+
+.admin-role {
+  background-color: #ffecb3;
+  color: #ff8f00;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.make-admin-button,
+.remove-admin-button {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.make-admin-button {
+  background-color: #1a5336;
+  color: white;
+}
+
+.make-admin-button:hover {
+  background-color: #153f29;
+}
+
+.remove-admin-button {
+  background-color: #ffcdd2;
+  color: #c62828;
+}
+
+.remove-admin-button:hover {
+  background-color: #ef9a9a;
+}
+
+@media (max-width: 768px) {
+  .admin-management-content {
+    padding: 1rem;
+  }
+  
+  .users-table {
+    display: block;
+    overflow-x: auto;
+  }
+  
+  .action-buttons {
+    flex-direction: column;
+  }
+} 
