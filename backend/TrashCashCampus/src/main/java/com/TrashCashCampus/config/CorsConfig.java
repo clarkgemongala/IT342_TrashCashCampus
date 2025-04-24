@@ -17,7 +17,7 @@ public class CorsConfig {
                             "http://localhost:5173", // Web frontend
                             "http://10.0.2.2:8080"   // Android emulator accessing localhost
                         )
-                        .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+                        .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD")
                         .allowedHeaders("*")
                         .allowCredentials(true);
             }

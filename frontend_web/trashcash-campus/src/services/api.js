@@ -10,15 +10,17 @@ export const pingBackend = async () => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000); // 5-second timeout
     
-    // Try to connect to the base URL instead of a specific endpoint
-    await fetch(`${BASE_URL}`, {
-      method: 'HEAD', // Use HEAD request for faster response without body
+    // Use a specific API endpoint instead of the base URL
+    const response = await fetch(`${API_URL}/health`, {
+      method: 'GET',
       signal: controller.signal,
-      mode: 'no-cors' // Use no-cors to avoid CORS issues
+      headers: {
+        'Content-Type': 'application/json',
+      }
     });
     
     clearTimeout(timeoutId);
-    return true; // If we reach here without errors, the backend is online
+    return response.ok; // Return true only if the response is ok
   } catch (error) {
     console.error('Backend connection error:', error);
     return false;
@@ -28,37 +30,27 @@ export const pingBackend = async () => {
 // Authentication APIs
 export const login = async (email, password) => {
   try {
-    // Always try to proceed with login even if pingBackend fails
-    // This allows Firebase to be a fallback
-    try {
-      const response = await fetch(`${API_URL}/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-      });
-      
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || 'Login failed');
-      }
-      
-      return await response.json();
-    } catch (fetchError) {
-      // If it's a network error (like the backend being offline)
-      // throw a specific error that can be caught and handled
-      if (fetchError instanceof TypeError && fetchError.message.includes('fetch')) {
-        console.warn('Backend API unavailable, falling back to Firebase');
-        // Create a mock response that allows the Firebase fallback
-        return { 
-          userId: null, 
-          email: email,
-          token: null
-        };
-      }
-      throw fetchError;
+    // First, check if the backend is available
+    const isBackendAvailable = await pingBackend();
+    
+    if (!isBackendAvailable) {
+      throw new Error('Backend service is unavailable');
     }
+    
+    const response = await fetch(`${API_URL}/auth/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email, password }),
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'Login failed');
+    }
+    
+    return await response.json();
   } catch (error) {
     console.error('Login error:', error);
     throw error;

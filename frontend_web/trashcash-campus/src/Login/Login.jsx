@@ -3,14 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import './Login.css';
 import trashCashLogo from '../assets/trashcash-logo.png';
 import recyclingVideo from '../assets/recycling-video.mp4';
-import { auth, googleProvider } from '../firebase';
-import { signInWithEmailAndPassword, signInWithPopup, sendPasswordResetEmail, sendEmailVerification } from 'firebase/auth';
+import { auth } from '../firebase';
+import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 import { login as apiLogin } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 
 function Login() {
   const navigate = useNavigate();
-  const { isBackendOnline, checkBackendStatus } = useAuth();
+  const { isBackendOnline, checkBackendStatus, currentUser } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -24,6 +24,13 @@ function Login() {
   const [requestEmail, setRequestEmail] = useState('');
   const [requestEmailError, setRequestEmailError] = useState('');
   const [showConfirmation, setShowConfirmation] = useState(false);
+  
+  // Redirect if already logged in
+  useEffect(() => {
+    if (currentUser) {
+      navigate('/dashboard');
+    }
+  }, [currentUser, navigate]);
 
   // Check backend status when component mounts
   useEffect(() => {
@@ -101,96 +108,40 @@ function Login() {
       return;
     }
     
+    setLoading(true);
+    
     try {
-      setLoading(true);
-      
-      // Try to authenticate through our backend API
-      try {
-        const userData = await apiLogin(email, password);
-        console.log('Login successful via API:', userData);
-        
-        // If the API returns a token, proceed to dashboard
-        if (userData.token) {
-          // Use setTimeout to ensure state updates complete before navigation
-          setTimeout(() => {
-            navigate('/dashboard');
-          }, 100);
-          return;
-        }
-        
-        // If userData is returned but no token, it's a fallback indicator
-        // Fall through to Firebase authentication
-        console.log('No token received from API, falling back to Firebase');
-      } catch (apiError) {
-        // If it's an API error but not a backend offline error,
-        // show the error message
-        console.warn('API login failed:', apiError);
-        if (apiError.message && !apiError.message.includes('fetch')) {
-          setPasswordError(apiError.message);
-          setLoading(false);
-          return;
-        }
-      }
-      
-      // Fallback to direct Firebase authentication
-      try {
-        const userCredential = await signInWithEmailAndPassword(auth, email, password);
-        const user = userCredential.user;
-        
-        // Check if email is verified
-        if (!user.emailVerified) {
-          setEmailError('Please verify your email before logging in. Check your inbox.');
-          // Send verification email again
-          await sendEmailVerification(user);
-          setLoading(false);
-          return;
-        }
-        
-        console.log('Login successful via Firebase:', user);
-        // Use setTimeout to ensure state updates complete before navigation
-        setTimeout(() => {
-          navigate('/dashboard');
-        }, 100);
-      } catch (firebaseError) {
-        console.error('Firebase login error:', firebaseError);
-        if (firebaseError.code === 'auth/user-not-found' || firebaseError.code === 'auth/wrong-password') {
-          setPasswordError('Invalid email or password');
-        } else if (firebaseError.code === 'auth/too-many-requests') {
-          setPasswordError('Too many failed attempts. Please try again later.');
-        } else {
-          setPasswordError('An error occurred. Please try again.');
-        }
-        setLoading(false);
-      }
-    } catch (error) {
-      console.error('Login error:', error);
-      setPasswordError('An unexpected error occurred. Please try again.');
-      setLoading(false);
-    } finally {
-      // Don't call setLoading(false) here as we navigate away
-      // or have already set it to false in catch blocks
-    }
-  };
-
-  const handleGoogleSignIn = async () => {
-    try {
-      setLoading(true);
-      const result = await signInWithPopup(auth, googleProvider);
-      
-      // Check if the Google account has a cit.edu email
-      const userEmail = result.user.email;
-      if (!userEmail.toLowerCase().endsWith('@cit.edu')) {
-        // Sign out if not a cit.edu email
-        await auth.signOut();
-        setEmailError('Only @cit.edu email addresses are allowed');
+      // Check if backend is online
+      if (!isBackendOnline) {
+        setBackendError('Backend service is unavailable. Please try again later.');
         setLoading(false);
         return;
       }
       
-      navigate('/dashboard');
+      // Use Firebase authentication
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      console.log('Firebase auth successful:', userCredential.user);
+      
+      // API login (no need to wait for it)
+      apiLogin(email, password)
+        .then(userData => {
+          console.log('API login successful:', userData);
+        })
+        .catch(error => {
+          console.warn('API login failed:', error);
+        });
+      
+      // navigation will happen through the useEffect hook that watches currentUser
     } catch (error) {
-      console.error('Google sign-in error:', error);
-      setEmailError('Error signing in with Google. Please try again.');
+      console.error('Login error:', error);
+      
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+        setPasswordError('Invalid email or password');
+      } else if (error.code === 'auth/too-many-requests') {
+        setPasswordError('Too many failed attempts. Please try again later.');
+      } else {
+        setPasswordError('Authentication failed. Please check your credentials.');
+      }
     } finally {
       setLoading(false);
     }
@@ -324,17 +275,6 @@ function Login() {
             </div>
             <button type="submit" className="login-button" disabled={loading}>
               {loading ? 'Logging in...' : 'Login'}
-            </button>
-            <div className="or-divider">
-              <span>OR</span>
-            </div>
-            <button 
-              type="button" 
-              className="google-login-button"
-              onClick={handleGoogleSignIn}
-              disabled={loading}
-            >
-              Sign in with Google
             </button>
             <div className="signup-link">
               <span>Not a user yet? </span>
