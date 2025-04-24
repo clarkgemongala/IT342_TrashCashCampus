@@ -6,6 +6,7 @@ import User from './User/User';
 import Bins from './Bins/Bins';
 import Rewards from './Rewards/Rewards';
 import Analytics from './Analytics/Analytics';
+import AdminManagement from './AdminManagement/AdminManagement';
 import './App.css';
 
 // Protected route component
@@ -43,6 +44,7 @@ function AppRoutes() {
       {/* Admin-only routes */}
       <Route element={<ProtectedRoute adminOnly={true} />}>
         <Route path="/users" element={<User />} />
+        <Route path="/admin-management" element={<AdminManagement />} />
       </Route>
       
       {/* Redirect to login by default */}

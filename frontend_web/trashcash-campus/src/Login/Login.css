@@ -76,10 +76,16 @@
 }
 
 .form-title {
-  font-size: 1.8rem;
-  font-weight: 600;
-  color: #333;
+  font-size: 24px;
   margin: 0;
+  color: #333;
+}
+
+.form-subtitle {
+  font-size: 16px;
+  margin: 5px 0 15px;
+  color: #666;
+  font-weight: normal;
 }
 
 .login-form {
@@ -365,24 +371,11 @@ input:invalid {
 }
 
 .backend-error-message {
-  background-color: #ff5252;
-  color: white;
-  padding: 10px 15px;
+  background-color: #f8d7da;
+  color: #721c24;
+  padding: 10px;
   border-radius: 5px;
-  margin-bottom: 20px;
+  margin-bottom: 15px;
+  font-size: 14px;
   text-align: center;
-  font-weight: 500;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-  animation: fadeIn 0.3s ease-in-out;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }

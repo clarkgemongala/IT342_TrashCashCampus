@@ -30,6 +30,7 @@ const Navigation = () => {
     { path: '/bins', label: 'Find Bins', icon: '🗑️', access: 'all' },
     { path: '/users', label: 'Users', icon: '👥', access: 'admin' },
     { path: '/analytics', label: 'Analytics', icon: '📈', access: 'admin' },
+    { path: '/admin-management', label: 'Admin Management', icon: '⚙️', access: 'admin' },
   ];
 
   // Filter links based on user role

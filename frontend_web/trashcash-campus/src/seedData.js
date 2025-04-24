@@ -1,5 +1,5 @@
 import { db } from './firebase';
-import { collection, addDoc, setDoc, doc, getDocs, query, where } from 'firebase/firestore';
+import { collection, addDoc, setDoc, doc, getDocs, query, where, updateDoc } from 'firebase/firestore';
 
 // Seed data for recycling bins
 const binsData = [
@@ -212,6 +212,9 @@ export const ensureUserDocument = async (user) => {
     const userSnapshot = await getDocs(userQuery);
     
     if (userSnapshot.size === 0) {
+      // Check if this is the designated admin email
+      const isDefaultAdmin = user.email === 'drewadrein.odilao@cit.edu';
+      
       // Create new user document
       await setDoc(userRef, {
         uid: user.uid,
@@ -222,10 +225,23 @@ export const ensureUserDocument = async (user) => {
         totalRecycled: 0,
         isEmailVerified: user.emailVerified,
         createdAt: new Date(),
-        role: 'user' // Default role
+        role: isDefaultAdmin ? 'admin' : 'user' // Set role to admin for the default admin
       });
       
-      console.log('User document created successfully');
+      console.log(`User document created successfully${isDefaultAdmin ? ' (admin)' : ''}`);
+    } else {
+      // If the user exists and it's the default admin email, ensure it has admin role
+      if (user.email === 'drewadrein.odilao@cit.edu') {
+        const userDoc = userSnapshot.docs[0];
+        const userData = userDoc.data();
+        
+        if (userData.role !== 'admin') {
+          await updateDoc(userRef, {
+            role: 'admin'
+          });
+          console.log('Updated existing user to admin role');
+        }
+      }
     }
   } catch (error) {
     console.error('Error ensuring user document:', error);

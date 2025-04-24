@@ -4,9 +4,11 @@ import './Login.css';
 import trashCashLogo from '../assets/trashcash-logo.png';
 import recyclingVideo from '../assets/recycling-video.mp4';
 import { auth } from '../firebase';
-import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
+import { signInWithEmailAndPassword, sendPasswordResetEmail, signOut } from 'firebase/auth';
 import { login as apiLogin } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../firebase';
 
 function Login() {
   const navigate = useNavigate();
@@ -122,6 +124,28 @@ function Login() {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       console.log('Firebase auth successful:', userCredential.user);
       
+      // Get user data from Firestore to check role
+      const userDocRef = doc(db, "users", userCredential.user.uid);
+      const userSnap = await getDoc(userDocRef);
+      
+      // Check if user is admin
+      if (userSnap.exists()) {
+        const userData = userSnap.data();
+        if (userData.role !== 'admin') {
+          // Show notification for non-admin users and sign them out
+          alert('Only administrators can log in to this application');
+          await signOut(auth);
+          setLoading(false);
+          return;
+        }
+      } else {
+        // If user document doesn't exist in Firestore, sign them out
+        alert('User profile not found. Please contact an administrator.');
+        await signOut(auth);
+        setLoading(false);
+        return;
+      }
+      
       // API login (no need to wait for it)
       apiLogin(email, password)
         .then(userData => {
@@ -223,7 +247,8 @@ function Login() {
         <div className="login-form-container">
           <div className="form-header">
             <img src={trashCashLogo} alt="TrashCash Campus Logo" className="form-logo" />
-            <h1 className="form-title">Admin Portal</h1>
+            <h1 className="form-title">TrashCash Admin Portal</h1>
+            <p className="form-subtitle">Login for administrators only</p>
           </div>
           {backendError && (
             <div className="backend-error-message">
