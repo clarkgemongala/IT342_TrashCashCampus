@@ -1,15 +1,14 @@
 const { initializeApp } = require('firebase/app');
 const { getFirestore, collection, query, where, getDocs, doc, updateDoc } = require('firebase/firestore');
 
-// Your Firebase configuration (this should match the one in your main app)
-// Note: Replace these values with your actual Firebase config
+// Firebase configuration from project settings
 const firebaseConfig = {
-  apiKey: "AIzaSyDWt2MjwRaF58A-IcbZRnrxIwHiOvUxyko", 
+  apiKey: "AIzaSyD4KSCSLvJvE6-PZp5EoPH7nGfDpftKTck",
   authDomain: "trashcashcampusmobile.firebaseapp.com",
   projectId: "trashcashcampusmobile",
   storageBucket: "trashcashcampusmobile.appspot.com",
-  messagingSenderId: "1018621189238",
-  appId: "1:1018621189238:web:2e73bf835f114d47add61a"
+  messagingSenderId: "761747053026",
+  appId: "1:761747053026:web:a5885b4a5d381610a101bb"
 };
 
 // Initialize Firebase

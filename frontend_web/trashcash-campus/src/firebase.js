@@ -7,7 +7,7 @@ import { getAnalytics } from "firebase/analytics";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyBAY9VKwIz817C9Lrko8THQNmdo049lHS4",
+  apiKey: "AIzaSyD4KSCSLvJvE6-PZp5EoPH7nGfDpftKTck",
   authDomain: "trashcashcampusmobile.firebaseapp.com",
   projectId: "trashcashcampusmobile",
   storageBucket: "trashcashcampusmobile.appspot.com",
