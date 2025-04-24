@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { db } from '../firebase';
 import { collection, query, where, getDocs, limit, orderBy } from 'firebase/firestore';
 import Navigation from '../components/Navigation';
+import BackendStatus from '../components/BackendStatus';
 import './Dashboard.css';
 
 const Dashboard = () => {
@@ -58,21 +59,37 @@ const Dashboard = () => {
         }
 
         // Fetch recent recycling activities
-        const activitiesRef = collection(db, 'recyclingActivities');
-        const activitiesQuery = query(
-          activitiesRef,
-          where('userId', '==', currentUser.uid),
-          orderBy('timestamp', 'desc'),
-          limit(5)
-        );
-        
-        const activitiesSnapshot = await getDocs(activitiesQuery);
-        const activities = activitiesSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-        
-        setRecentActivities(activities);
+        try {
+          const activitiesRef = collection(db, 'recyclingActivities');
+          
+          // First try with a simple query without ordering to avoid index issues
+          const simpleQuery = query(
+            activitiesRef,
+            where('userId', '==', currentUser.uid),
+            limit(5)
+          );
+          
+          const activitiesSnapshot = await getDocs(simpleQuery);
+          let activities = activitiesSnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          
+          // Sort activities client-side
+          activities.sort((a, b) => {
+            const timeA = a.timestamp ? (a.timestamp.toDate ? a.timestamp.toDate() : new Date(a.timestamp)) : new Date(0);
+            const timeB = b.timestamp ? (b.timestamp.toDate ? b.timestamp.toDate() : new Date(b.timestamp)) : new Date(0);
+            return timeB - timeA; // Descending order
+          });
+          
+          // Limit to 5 activities
+          activities = activities.slice(0, 5);
+          
+          setRecentActivities(activities);
+        } catch (activityError) {
+          console.error('Error fetching activities:', activityError);
+          setRecentActivities([]); // Set empty array on error
+        }
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
       } finally {
@@ -102,7 +119,10 @@ const Dashboard = () => {
       <Navigation />
       
       <main className="dashboard-content">
-        <h1 className="dashboard-title">Dashboard</h1>
+        <div className="dashboard-header">
+          <h1 className="dashboard-title">Dashboard</h1>
+          <BackendStatus />
+        </div>
         
         {loading ? (
           <div className="loading">Loading your recycling data...</div>

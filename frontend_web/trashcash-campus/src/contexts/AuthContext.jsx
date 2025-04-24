@@ -6,6 +6,7 @@ import {
 } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { ensureUserDocument, seedDatabase } from '../seedData';
+import { pingBackend } from '../services/api';
 
 // Create context
 const AuthContext = createContext();
@@ -15,11 +16,51 @@ export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
   const [userRole, setUserRole] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isBackendOnline, setIsBackendOnline] = useState(null);
 
   // Sign out function
   const signOut = () => {
     return firebaseSignOut(auth);
   };
+
+  // Check backend connectivity
+  const checkBackendStatus = async () => {
+    try {
+      const status = await pingBackend();
+      // Only update state if it changed to avoid unnecessary rerenders
+      if (status !== isBackendOnline) {
+        setIsBackendOnline(status);
+      }
+      return status;
+    } catch (error) {
+      console.warn("Error checking backend status:", error);
+      // Only update state if it changed
+      if (isBackendOnline !== false) {
+        setIsBackendOnline(false);
+      }
+      return false;
+    }
+  };
+
+  // Check backend status periodically
+  useEffect(() => {
+    let intervalId;
+    
+    const checkStatus = async () => {
+      await checkBackendStatus();
+    };
+    
+    // Check immediately on mount
+    checkStatus();
+    
+    // Then check every 60 seconds instead of 30
+    // to reduce the frequency of error messages in the console
+    intervalId = setInterval(checkStatus, 60000);
+    
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, []);
 
   // Fetch user data from Firestore
   const fetchUserData = async (user) => {
@@ -98,7 +139,9 @@ export function AuthProvider({ children }) {
     loading,
     signOut,
     isAdmin: userRole === 'admin',
-    isAuthenticated: !!currentUser
+    isAuthenticated: !!currentUser,
+    isBackendOnline,
+    checkBackendStatus
   };
 
   return (

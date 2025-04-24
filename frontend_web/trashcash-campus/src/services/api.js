@@ -2,24 +2,63 @@
 // This replaces direct Firebase connections with backend API calls
 
 const API_URL = "http://localhost:8080/api";
+const BASE_URL = "http://localhost:8080";
+
+// Backend connection check
+export const pingBackend = async () => {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5-second timeout
+    
+    // Try to connect to the base URL instead of a specific endpoint
+    await fetch(`${BASE_URL}`, {
+      method: 'HEAD', // Use HEAD request for faster response without body
+      signal: controller.signal,
+      mode: 'no-cors' // Use no-cors to avoid CORS issues
+    });
+    
+    clearTimeout(timeoutId);
+    return true; // If we reach here without errors, the backend is online
+  } catch (error) {
+    console.error('Backend connection error:', error);
+    return false;
+  }
+};
 
 // Authentication APIs
 export const login = async (email, password) => {
   try {
-    const response = await fetch(`${API_URL}/auth/login`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ email, password }),
-    });
-    
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || 'Login failed');
+    // Always try to proceed with login even if pingBackend fails
+    // This allows Firebase to be a fallback
+    try {
+      const response = await fetch(`${API_URL}/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
+      
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Login failed');
+      }
+      
+      return await response.json();
+    } catch (fetchError) {
+      // If it's a network error (like the backend being offline)
+      // throw a specific error that can be caught and handled
+      if (fetchError instanceof TypeError && fetchError.message.includes('fetch')) {
+        console.warn('Backend API unavailable, falling back to Firebase');
+        // Create a mock response that allows the Firebase fallback
+        return { 
+          userId: null, 
+          email: email,
+          token: null
+        };
+      }
+      throw fetchError;
     }
-    
-    return await response.json();
   } catch (error) {
     console.error('Login error:', error);
     throw error;

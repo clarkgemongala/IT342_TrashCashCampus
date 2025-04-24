@@ -38,7 +38,7 @@ public class FirebaseService {
         try {
             // Use the service account credentials file from resources
             InputStream serviceAccount = getClass().getClassLoader()
-                .getResourceAsStream("trashcashcampusmobile-firebase-adminsdk-fbsvc-97b7ec9a16.json");
+                .getResourceAsStream("trashcashcampusmobile-firebase-adminsdk-fbsvc-b0d5c71153.json");
 
             FirebaseOptions options = FirebaseOptions.builder()
                 .setCredentials(GoogleCredentials.fromStream(serviceAccount))

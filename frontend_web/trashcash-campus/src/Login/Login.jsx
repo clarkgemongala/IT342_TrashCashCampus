@@ -1,25 +1,47 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './Login.css';
 import trashCashLogo from '../assets/trashcash-logo.png';
 import recyclingVideo from '../assets/recycling-video.mp4';
 import { auth, googleProvider } from '../firebase';
 import { signInWithEmailAndPassword, signInWithPopup, sendPasswordResetEmail, sendEmailVerification } from 'firebase/auth';
+import { login as apiLogin } from '../services/api';
+import { useAuth } from '../contexts/AuthContext';
 
 function Login() {
   const navigate = useNavigate();
+  const { isBackendOnline, checkBackendStatus } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [emailError, setEmailError] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [backendError, setBackendError] = useState('');
   
   // Modal states
   const [showModal, setShowModal] = useState(false);
   const [requestEmail, setRequestEmail] = useState('');
   const [requestEmailError, setRequestEmailError] = useState('');
   const [showConfirmation, setShowConfirmation] = useState(false);
+
+  // Check backend status when component mounts
+  useEffect(() => {
+    const checkBackend = async () => {
+      await checkBackendStatus();
+    };
+    
+    checkBackend();
+  }, [checkBackendStatus]);
+  
+  // Set backend error when status changes
+  useEffect(() => {
+    if (isBackendOnline === false) {
+      setBackendError('Backend is offline. Please turn on the backend.');
+    } else {
+      setBackendError('');
+    }
+  }, [isBackendOnline]);
 
   const handleEmailChange = (e) => {
     const value = e.target.value;
@@ -64,6 +86,7 @@ function Login() {
     // Reset errors
     setEmailError('');
     setPasswordError('');
+    setBackendError('');
     
     // Validate email before submission
     const errorMsg = validateEmail(email);
@@ -80,32 +103,72 @@ function Login() {
     
     try {
       setLoading(true);
-      // Attempt to sign in with Firebase
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
       
-      // Check if email is verified
-      if (!user.emailVerified) {
-        setEmailError('Please verify your email before logging in. Check your inbox.');
-        // Send verification email again
-        await sendEmailVerification(user);
-        setLoading(false);
-        return;
+      // Try to authenticate through our backend API
+      try {
+        const userData = await apiLogin(email, password);
+        console.log('Login successful via API:', userData);
+        
+        // If the API returns a token, proceed to dashboard
+        if (userData.token) {
+          // Use setTimeout to ensure state updates complete before navigation
+          setTimeout(() => {
+            navigate('/dashboard');
+          }, 100);
+          return;
+        }
+        
+        // If userData is returned but no token, it's a fallback indicator
+        // Fall through to Firebase authentication
+        console.log('No token received from API, falling back to Firebase');
+      } catch (apiError) {
+        // If it's an API error but not a backend offline error,
+        // show the error message
+        console.warn('API login failed:', apiError);
+        if (apiError.message && !apiError.message.includes('fetch')) {
+          setPasswordError(apiError.message);
+          setLoading(false);
+          return;
+        }
       }
       
-      console.log('Login successful:', user);
-      navigate('/dashboard');
+      // Fallback to direct Firebase authentication
+      try {
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        const user = userCredential.user;
+        
+        // Check if email is verified
+        if (!user.emailVerified) {
+          setEmailError('Please verify your email before logging in. Check your inbox.');
+          // Send verification email again
+          await sendEmailVerification(user);
+          setLoading(false);
+          return;
+        }
+        
+        console.log('Login successful via Firebase:', user);
+        // Use setTimeout to ensure state updates complete before navigation
+        setTimeout(() => {
+          navigate('/dashboard');
+        }, 100);
+      } catch (firebaseError) {
+        console.error('Firebase login error:', firebaseError);
+        if (firebaseError.code === 'auth/user-not-found' || firebaseError.code === 'auth/wrong-password') {
+          setPasswordError('Invalid email or password');
+        } else if (firebaseError.code === 'auth/too-many-requests') {
+          setPasswordError('Too many failed attempts. Please try again later.');
+        } else {
+          setPasswordError('An error occurred. Please try again.');
+        }
+        setLoading(false);
+      }
     } catch (error) {
       console.error('Login error:', error);
-      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
-        setPasswordError('Invalid email or password');
-      } else if (error.code === 'auth/too-many-requests') {
-        setPasswordError('Too many failed attempts. Please try again later.');
-      } else {
-        setPasswordError('An error occurred. Please try again.');
-      }
-    } finally {
+      setPasswordError('An unexpected error occurred. Please try again.');
       setLoading(false);
+    } finally {
+      // Don't call setLoading(false) here as we navigate away
+      // or have already set it to false in catch blocks
     }
   };
 
@@ -211,6 +274,11 @@ function Login() {
             <img src={trashCashLogo} alt="TrashCash Campus Logo" className="form-logo" />
             <h1 className="form-title">Admin Portal</h1>
           </div>
+          {backendError && (
+            <div className="backend-error-message">
+              {backendError}
+            </div>
+          )}
           <form className="login-form" onSubmit={handleLoginSubmit}>
             <div className="form-group">
               <div className="input-container">
