@@ -5,6 +5,8 @@ import { collection, getDocs, doc, updateDoc, deleteDoc, query, orderBy } from '
 import Navigation from '../components/Navigation';
 import './User.css';
 import trashcashLogo from '../assets/trashcash-logo.png';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faPenToSquare } from '@fortawesome/free-solid-svg-icons';
 
 const User = () => {
   const { currentUser, isAdmin } = useAuth();
@@ -246,8 +248,9 @@ const User = () => {
                           <button
                             className="edit-button"
                             onClick={() => handleEditClick(user)}
+                            title="Edit User"
                           >
-                            Edit
+                            <FontAwesomeIcon icon={faPenToSquare} />
                           </button>
                         </td>
                       </tr>
@@ -310,18 +313,44 @@ const User = () => {
                   </div>
                   
                   <div className="modal-actions">
-                    <button
-                      className="cancel-button"
-                      onClick={handleEditCancel}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      className="save-button"
-                      onClick={handleEditSave}
-                    >
-                      Save Changes
-                    </button>
+                    <div className="button-wrapper">
+                      <button
+                        onClick={handleEditCancel}
+                        type="button"
+                        style={{
+                          width: '100%',
+                          height: '50px',
+                          backgroundColor: '#e8e8e8',
+                          color: '#333',
+                          border: 'none',
+                          borderRadius: '4px',
+                          fontSize: '1rem',
+                          fontWeight: '500',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                    <div className="button-wrapper">
+                      <button
+                        onClick={handleEditSave}
+                        type="button"
+                        style={{
+                          width: '100%',
+                          height: '50px',
+                          backgroundColor: '#1a5336',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          fontSize: '1rem',
+                          fontWeight: '500',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Save
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
