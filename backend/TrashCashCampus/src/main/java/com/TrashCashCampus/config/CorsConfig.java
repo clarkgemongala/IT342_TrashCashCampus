@@ -12,6 +12,7 @@ public class CorsConfig {
         return new WebMvcConfigurer() {
             @Override
             public void addCorsMappings(CorsRegistry registry) {
+                // Configure CORS for API endpoints
                 registry.addMapping("/api/**")
                         .allowedOrigins(
                             "http://localhost:5173", // Web frontend

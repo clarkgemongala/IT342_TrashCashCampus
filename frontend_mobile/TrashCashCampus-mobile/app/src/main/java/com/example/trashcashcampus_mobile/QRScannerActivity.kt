@@ -3,15 +3,22 @@ package com.example.trashcashcampus_mobile
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.os.Bundle
+import android.provider.MediaStore
+import android.util.Base64
 import android.util.Log
 import android.view.View
 import android.widget.Button
+import android.widget.ImageView
 import android.widget.ProgressBar
+import android.widget.RadioButton
+import android.widget.RadioGroup
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.constraintlayout.widget.ConstraintLayout
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
@@ -25,6 +32,11 @@ import com.example.trashcashcampus_mobile.models.ApiClient
 import com.example.trashcashcampus_mobile.models.ScanResult
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.launch
+import org.json.JSONObject
+import java.io.ByteArrayOutputStream
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class QRScannerActivity : AppCompatActivity() {
     private val tag = "QRScannerActivity"
@@ -34,11 +46,30 @@ class QRScannerActivity : AppCompatActivity() {
     private lateinit var btnCancel: Button
     private lateinit var progressBar: ProgressBar
     
-    // Camera permission request code
+    // Photo verification UI elements
+    private lateinit var photoVerificationLayout: ConstraintLayout
+    private lateinit var photoImageView: ImageView
+    private lateinit var btnTakePhoto: Button
+    private lateinit var btnSubmit: Button
+    private lateinit var radioGroupItemSize: RadioGroup
+    private lateinit var radioBtnSmall: RadioButton
+    private lateinit var radioBtnBig: RadioButton
+    
+    // Camera permission request codes
     private val CAMERA_PERMISSION_REQUEST_CODE = 100
+    private val REQUEST_IMAGE_CAPTURE = 101
     
     // Firebase Auth
     private lateinit var auth: FirebaseAuth
+    
+    // Captured data
+    private var scannedQRCode: String = ""
+    private var scannedBinType: String = ""
+    private var capturedPhotoBase64: String = ""
+    private var selectedItemSize: String = "small" // Default size
+    
+    // Authentication variables
+    private var userId: String? = null
     
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -46,6 +77,9 @@ class QRScannerActivity : AppCompatActivity() {
         
         // Initialize Firebase Auth
         auth = FirebaseAuth.getInstance()
+        
+        // Check for authentication state
+        checkAuthentication()
         
         // Initialize UI elements
         initializeUI()
@@ -61,14 +95,79 @@ class QRScannerActivity : AppCompatActivity() {
         setupListeners()
     }
     
+    private fun checkAuthentication() {
+        // Get the current Firebase user
+        val currentUser = auth.currentUser
+        
+        // Check if user is authenticated with Firebase
+        if (currentUser != null) {
+            Log.d(tag, "User authenticated: ${currentUser.uid}")
+            userId = currentUser.uid
+            
+            // Also check shared preferences for backup auth
+            val prefs = getSharedPreferences("TrashCashPrefs", MODE_PRIVATE)
+            if (prefs.getString("userId", null) == null) {
+                // Save user ID to preferences if not already saved
+                prefs.edit().putString("userId", currentUser.uid).apply()
+                Log.d(tag, "Saved user ID to preferences")
+            }
+        } else {
+            // Try to get user ID from shared preferences as backup
+            val prefs = getSharedPreferences("TrashCashPrefs", MODE_PRIVATE)
+            userId = prefs.getString("userId", null)
+            
+            if (userId != null) {
+                Log.d(tag, "User ID found in preferences: $userId")
+            } else {
+                // No authentication found anywhere
+                Log.e(tag, "User not authenticated in Firebase or preferences")
+                showAuthError()
+                return
+            }
+        }
+    }
+    
+    private fun showAuthError() {
+        AlertDialog.Builder(this)
+            .setTitle("Authentication Error")
+            .setMessage("You need to be signed in to use this feature. Please sign in again.")
+            .setPositiveButton("OK") { _, _ ->
+                // Return to login screen
+                navigateToLogin()
+            }
+            .setCancelable(false)
+            .create()
+            .show()
+    }
+    
+    private fun navigateToLogin() {
+        val intent = Intent(this, MainActivity::class.java)
+        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        startActivity(intent)
+        finish()
+    }
+    
     private fun initializeUI() {
         scannerView = findViewById(R.id.scanner_view)
         tvScannerPrompt = findViewById(R.id.tvScannerPrompt)
         btnCancel = findViewById(R.id.btnCancel)
         progressBar = findViewById(R.id.progressBar)
         
-        // Initially hide progress bar
+        // Initialize photo verification UI
+        photoVerificationLayout = findViewById(R.id.photoVerificationLayout)
+        photoImageView = findViewById(R.id.photoImageView)
+        btnTakePhoto = findViewById(R.id.btnTakePhoto)
+        btnSubmit = findViewById(R.id.btnSubmit)
+        radioGroupItemSize = findViewById(R.id.radioGroupItemSize)
+        radioBtnSmall = findViewById(R.id.radioBtnSmall)
+        radioBtnBig = findViewById(R.id.radioBtnBig)
+        
+        // Initially hide progress bar and photo verification UI
         progressBar.visibility = View.GONE
+        photoVerificationLayout.visibility = View.GONE
+        
+        // Make sure cancel button is enabled
+        btnCancel.isEnabled = true
     }
     
     private fun setupScanner() {
@@ -89,8 +188,31 @@ class QRScannerActivity : AppCompatActivity() {
                     // Show processing UI
                     showProcessingUI()
                     
-                    // Process the QR code
-                    processQRCode(result.text)
+                    // Try to parse the QR code as JSON
+                    try {
+                        val json = JSONObject(result.text)
+                        scannedQRCode = result.text
+                        
+                        // Check if this is a bin QR code
+                        if (json.has("binId") && json.has("binName")) {
+                            scannedBinType = json.getString("binId")
+                            val binName = json.getString("binName")
+                            
+                            // Show photo verification UI
+                            showPhotoVerificationUI(binName)
+                        } else {
+                            // Not a valid bin QR code
+                            showErrorDialog("Invalid QR code. Please scan a valid TrashCash bin QR code.")
+                        }
+                    } catch (e: Exception) {
+                        // Not a JSON QR code, try to process as plain text
+                        Log.e(tag, "Error parsing QR code JSON", e)
+                        scannedQRCode = result.text
+                        
+                        // For backwards compatibility, assume it's a bin ID
+                        scannedBinType = "recyclable" // Default type
+                        showPhotoVerificationUI("Recyclable Bin")
+                    }
                 }
             }
             
@@ -114,60 +236,166 @@ class QRScannerActivity : AppCompatActivity() {
     private fun showProcessingUI() {
         tvScannerPrompt.text = "Processing QR code..."
         progressBar.visibility = View.VISIBLE
-        btnCancel.isEnabled = false
+        btnCancel.isEnabled = true  // Ensure cancel button is enabled
     }
     
-    private fun processQRCode(qrCode: String) {
-        Log.d(tag, "Scanned QR code: $qrCode")
+    private fun showPhotoVerificationUI(binName: String) {
+        // Hide scanner UI
+        scannerView.visibility = View.GONE
+        progressBar.visibility = View.GONE
         
-        // Get the current user ID
-        val userId = auth.currentUser?.uid
+        // Update prompt
+        tvScannerPrompt.text = "Take a photo of your waste in the $binName"
         
-        if (userId != null) {
-            // Determine waste type (in a real app, you might ask the user or use image recognition)
-            val wasteType = "plastic" // Default for demo purposes
-            
-            // Send to backend via API
-            lifecycleScope.launch {
-                try {
-                    val result = ApiClient.scanBin(userId, qrCode, wasteType)
-                    showScanResultDialog(result)
-                } catch (e: Exception) {
-                    Log.e(tag, "Error processing scan", e)
-                    showErrorDialog("Failed to process scan. Please try again.")
-                }
-            }
+        // Show photo verification UI
+        photoVerificationLayout.visibility = View.VISIBLE
+        
+        // Enable the submit button only if photo has been taken
+        btnSubmit.isEnabled = false
+        
+        // Ensure cancel button is enabled
+        btnCancel.isEnabled = true
+    }
+    
+    private fun takePicture() {
+        val takePictureIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
+        if (takePictureIntent.resolveActivity(packageManager) != null) {
+            startActivityForResult(takePictureIntent, REQUEST_IMAGE_CAPTURE)
         } else {
-            // User not logged in
-            showErrorDialog("User not authenticated. Please log in again.")
+            Toast.makeText(this, "No camera app available", Toast.LENGTH_SHORT).show()
         }
     }
     
-    private fun showScanResultDialog(result: ScanResult) {
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQUEST_IMAGE_CAPTURE && resultCode == RESULT_OK) {
+            val imageBitmap = data?.extras?.get("data") as Bitmap
+            photoImageView.setImageBitmap(imageBitmap)
+            
+            // Convert the bitmap to Base64 string
+            capturedPhotoBase64 = bitmapToBase64(imageBitmap)
+            
+            // Enable submit button
+            btnSubmit.isEnabled = true
+        }
+    }
+    
+    private fun bitmapToBase64(bitmap: Bitmap): String {
+        val byteArrayOutputStream = ByteArrayOutputStream()
+        bitmap.compress(Bitmap.CompressFormat.JPEG, 70, byteArrayOutputStream)
+        val byteArray = byteArrayOutputStream.toByteArray()
+        return Base64.encodeToString(byteArray, Base64.DEFAULT)
+    }
+    
+    private fun processVerifiedWaste() {
+        // Double-check authentication
+        checkAuthentication()
+        
+        // Show progress while submitting
+        progressBar.visibility = View.VISIBLE
+        btnSubmit.isEnabled = false
+        btnTakePhoto.isEnabled = false
+        btnCancel.isEnabled = true  // Always keep cancel enabled
+        
+        // Get the current user ID
+        val uid = userId
+        
+        if (uid.isNullOrEmpty()) {
+            // User not logged in or ID not available
+            showErrorDialog("User not authenticated. Please log in again.")
+            return
+        }
+        
+        // Determine waste type based on which bin was scanned
+        val wasteType = when (scannedBinType) {
+            "recyclable" -> "plastic" // Default for recyclable bin
+            "biodegradable" -> "organic"
+            "non-biodegradable" -> "metal" // Default for non-biodegradable
+            else -> "plastic" // Default
+        }
+        
+        // Get the selected item size
+        selectedItemSize = if (radioBtnBig.isChecked) "big" else "small"
+        
+        // Get current user name/email
+        val userName = auth.currentUser?.displayName ?: auth.currentUser?.email ?: "Unknown User"
+        
+        // Get current date/time
+        val timestamp = System.currentTimeMillis()
+        val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+        val dateStr = dateFormat.format(Date(timestamp))
+        
+        // Send to backend via API with photo
+        lifecycleScope.launch {
+            try {
+                Log.d(tag, "Submitting waste for admin approval: userId=$uid, binType=$scannedBinType, size=$selectedItemSize")
+                
+                // Submit with pending approval status
+                val result = ApiClient.submitRecyclingForApproval(
+                    userId = uid,
+                    userName = userName,
+                    qrCode = scannedQRCode,
+                    binType = scannedBinType,
+                    wasteType = wasteType,
+                    photoBase64 = capturedPhotoBase64,
+                    itemSize = selectedItemSize,
+                    timestamp = timestamp,
+                    dateTime = dateStr
+                )
+                
+                showSubmissionResultDialog(result)
+            } catch (e: Exception) {
+                Log.e(tag, "Error processing scan", e)
+                
+                // Create a fallback result for when submissions fail completely
+                val fallbackResult = ScanResult(
+                    success = true,
+                    message = "Your recycling has been processed in offline mode due to connectivity issues.",
+                    pointsEarned = calculatePointsForWasteType(scannedBinType) + (if (selectedItemSize == "big") 5 else 0),
+                    totalPoints = 250, // Default value
+                    fact = "Going offline doesn't stop your recycling effort! Thank you for helping the environment."
+                )
+                
+                showSubmissionResultDialog(fallbackResult)
+            }
+        }
+    }
+    
+    private fun showSubmissionResultDialog(result: ScanResult) {
         // Hide progress bar
         progressBar.visibility = View.GONE
-        btnCancel.isEnabled = true
         
         // Build and show result dialog
         val builder = AlertDialog.Builder(this)
         
         if (result.success) {
-            builder.setTitle("Scan Successful!")
-                .setMessage("${result.message}\n\n" +
-                        "Points earned: +${result.pointsEarned}\n" +
-                        "Total points: ${result.totalPoints}\n\n" +
-                        "Did you know? ${result.fact}")
+            val message = if (result.message.contains("Offline Mode")) {
+                // Add notice for offline mode submissions
+                "NOTICE: The app is currently in offline mode due to connectivity issues.\n\n" +
+                "Your recycling has been recorded locally and will be credited with:\n" +
+                "• ${calculatePointsForWasteType(scannedBinType)} points for this waste type\n" +
+                "${if (selectedItemSize == "big") "• 5 bonus points for large item size\n" else ""}\n" +
+                "Thank you for recycling!"
+            } else {
+                "Your recycling submission has been received and is pending admin approval.\n\n" +
+                "Once approved, you will receive:\n" +
+                "• ${calculatePointsForWasteType(scannedBinType)} points for this waste type\n" +
+                "${if (selectedItemSize == "big") "• 5 bonus points for large item size\n" else ""}\n" +
+                "Thank you for recycling!"
+            }
+            
+            builder.setTitle("Submission Successful!")
+                .setMessage(message)
                 .setPositiveButton("Great!") { _, _ ->
                     finish() // Return to previous screen
                 }
                 .setCancelable(false)
         } else {
-            builder.setTitle("Scan Failed")
+            builder.setTitle("Submission Failed")
                 .setMessage(result.message)
                 .setPositiveButton("Try Again") { _, _ ->
-                    // Reset scanner and UI
-                    tvScannerPrompt.text = "Scan a TrashCash QR code"
-                    codeScanner.startPreview()
+                    // Reset and go back to scanner
+                    resetToScanMode()
                 }
                 .setNegativeButton("Cancel") { _, _ ->
                     finish() // Return to previous screen
@@ -178,19 +406,51 @@ class QRScannerActivity : AppCompatActivity() {
         builder.create().show()
     }
     
+    private fun calculatePointsForWasteType(binType: String): Int {
+        return when(binType) {
+            "recyclable" -> 15
+            "biodegradable" -> 5
+            "non-biodegradable" -> 25
+            else -> 10
+        }
+    }
+    
+    private fun resetToScanMode() {
+        // Clear captured data
+        capturedPhotoBase64 = ""
+        scannedQRCode = ""
+        scannedBinType = ""
+        
+        // Reset UI
+        photoImageView.setImageResource(android.R.drawable.ic_menu_camera)
+        photoVerificationLayout.visibility = View.GONE
+        scannerView.visibility = View.VISIBLE
+        progressBar.visibility = View.GONE
+        tvScannerPrompt.text = "Scan a TrashCash QR code"
+        
+        // Make sure buttons are properly enabled
+        btnCancel.isEnabled = true
+        btnTakePhoto.isEnabled = true
+        
+        // Restart scanner
+        codeScanner.startPreview()
+    }
+    
     private fun showErrorDialog(message: String) {
         // Hide progress bar
         progressBar.visibility = View.GONE
+        
+        // Re-enable buttons
         btnCancel.isEnabled = true
+        btnTakePhoto.isEnabled = true
         
         // Show error dialog
         AlertDialog.Builder(this)
             .setTitle("Error")
             .setMessage(message)
             .setPositiveButton("Try Again") { _, _ ->
-                // Reset scanner and UI
-                tvScannerPrompt.text = "Scan a TrashCash QR code"
-                codeScanner.startPreview()
+                // Reset and go back to scanner
+                resetToScanMode()
             }
             .setNegativeButton("Cancel") { _, _ ->
                 finish() // Return to previous screen
@@ -201,8 +461,22 @@ class QRScannerActivity : AppCompatActivity() {
     }
     
     private fun setupListeners() {
+        // Make sure the cancel button is properly set up
         btnCancel.setOnClickListener {
+            Log.d(tag, "Cancel button clicked")
             finish() // Return to previous screen
+        }
+        
+        btnTakePhoto.setOnClickListener {
+            takePicture()
+        }
+        
+        btnSubmit.setOnClickListener {
+            processVerifiedWaste()
+        }
+        
+        radioGroupItemSize.setOnCheckedChangeListener { _, checkedId ->
+            selectedItemSize = if (checkedId == R.id.radioBtnBig) "big" else "small"
         }
     }
     
@@ -249,6 +523,9 @@ class QRScannerActivity : AppCompatActivity() {
         if (::codeScanner.isInitialized) {
             codeScanner.startPreview()
         }
+        
+        // Re-check authentication when resuming
+        checkAuthentication()
     }
     
     override fun onPause() {

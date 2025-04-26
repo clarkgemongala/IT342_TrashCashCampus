@@ -111,6 +111,44 @@ public class FirebaseService {
         return docRef.getId();
     }
     
+    /**
+     * Creates a document with a specified ID
+     * 
+     * @param collection The collection to add the document to
+     * @param documentId The document ID to use
+     * @param data The data to store in the document
+     * @return The document ID
+     */
+    public String createDocumentWithId(String collection, String documentId, Map<String, Object> data) throws ExecutionException, InterruptedException {
+        // Log document details for debugging
+        System.out.println("Creating document in collection: " + collection + " with ID: " + documentId);
+        System.out.println("Document has " + data.size() + " fields");
+        
+        // Check if imageBase64 field exists and log its size
+        if (data.containsKey("imageBase64")) {
+            String imageData = (String) data.get("imageBase64");
+            System.out.println("Document contains imageBase64 field with length: " + 
+                (imageData != null ? imageData.length() : 0));
+        } else {
+            System.out.println("Document does NOT contain imageBase64 field");
+        }
+        
+        // Check for other photo-related fields
+        if (data.containsKey("photoRef")) {
+            System.out.println("Document contains photoRef: " + data.get("photoRef"));
+        }
+        if (data.containsKey("photoPreview")) {
+            System.out.println("Document contains photoPreview with length: " + 
+                ((String)data.get("photoPreview")).length());
+        }
+        
+        // Create the document in Firestore
+        DocumentReference docRef = firestore.collection(collection).document(documentId);
+        WriteResult result = docRef.set(data).get();
+        System.out.println("Document created successfully at: " + result.getUpdateTime());
+        return documentId;
+    }
+    
     public String updateDocument(String collection, String documentId, Map<String, Object> data) throws ExecutionException, InterruptedException {
         DocumentReference docRef = firestore.collection(collection).document(documentId);
         WriteResult result = docRef.update(data).get();

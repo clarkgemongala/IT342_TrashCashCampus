@@ -5,7 +5,7 @@ import Dashboard from './Dashboard/Dashboard';
 import User from './User/User';
 import Bins from './Bins/Bins';
 import Rewards from './Rewards/Rewards';
-import Analytics from './Analytics/Analytics';
+
 import AdminManagement from './AdminManagement/AdminManagement';
 import './App.css';
 
@@ -38,7 +38,7 @@ function AppRoutes() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/bins" element={<Bins />} />
         <Route path="/rewards" element={<Rewards />} />
-        <Route path="/analytics" element={<Analytics />} />
+        
       </Route>
       
       {/* Admin-only routes */}

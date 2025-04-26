@@ -87,16 +87,20 @@ export function AuthProvider({ children }) {
     let isMounted = true;
     setLoading(true);
 
-    // Seed the database
+    // Only seed the database in production or with explicit flag
+    // Comment out or modify this section during development to prevent auto-login
+    /* 
     seedDatabase().catch(error => {
       console.error("Error seeding database:", error);
     });
+    */
 
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       try {
         if (user) {
           // Ensure the user has a document in Firestore
-          await ensureUserDocument(user);
+          // Comment the next line to prevent auto-creation of user documents
+          // await ensureUserDocument(user);
           
           const userData = await fetchUserData(user);
           

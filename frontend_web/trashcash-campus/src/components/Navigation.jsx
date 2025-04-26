@@ -60,7 +60,7 @@ const Navigation = () => {
     { path: '/rewards', label: 'Rewards', icon: <FontAwesomeIcon icon={faAward} />, access: 'all' },
     { path: '/bins', label: 'Find Bins', icon: <FontAwesomeIcon icon={faTrashAlt} />, access: 'all' },
     { path: '/users', label: 'Users', icon: <FontAwesomeIcon icon={faUsers} />, access: 'admin' },
-    { path: '/analytics', label: 'Analytics', icon: <FontAwesomeIcon icon={faChartBar} />, access: 'admin' },
+    
     { path: '/admin-management', label: 'Admin Management', icon: <FontAwesomeIcon icon={faUserShield} />, access: 'admin' },
   ];
 
@@ -77,43 +77,45 @@ const Navigation = () => {
           <h1>TrashCash Campus</h1>
         </div>
 
-        {/* Mobile menu button */}
-        <button className="mobile-menu-button" onClick={toggleMobileMenu}>
-          {isMobileMenuOpen ? '✕' : '☰'}
-        </button>
+        <div className="nav-right">
+          {/* Desktop navigation */}
+          <ul className="nav-links desktop-nav">
+            {filteredLinks.map((link) => (
+              <li key={link.path} className={location.pathname === link.path ? 'active' : ''}>
+                <Link to={link.path}>
+                  <span className="nav-icon">{link.icon}</span>
+                  <span className="nav-label">{link.label}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
 
-        {/* Desktop navigation */}
-        <ul className="nav-links desktop-nav">
-          {filteredLinks.map((link) => (
-            <li key={link.path} className={location.pathname === link.path ? 'active' : ''}>
-              <Link to={link.path}>
-                <span className="nav-icon">{link.icon}</span>
-                <span className="nav-label">{link.label}</span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-
-        {/* User section with dropdown */}
-        <div className="user-section" ref={userDropdownRef}>
-          {currentUser && (
-            <>
-              <button className="user-icon-button" onClick={toggleUserDropdown}>
-                <FontAwesomeIcon icon={faUser} />
-              </button>
-              {isUserDropdownOpen && (
-                <div className="user-dropdown">
-                  <div className="user-email">
-                    {currentUser.displayName || currentUser.email}
+          {/* User section with dropdown */}
+          <div className="user-section" ref={userDropdownRef}>
+            {currentUser && (
+              <>
+                <button className="user-icon-button" onClick={toggleUserDropdown}>
+                  <FontAwesomeIcon icon={faUser} />
+                </button>
+                {isUserDropdownOpen && (
+                  <div className="user-dropdown">
+                    <div className="user-email">
+                      {currentUser.displayName || currentUser.email}
+                    </div>
+                    <button className="sign-out-button" onClick={handleSignOut}>
+                      <FontAwesomeIcon icon={faSignOutAlt} className="sign-out-icon" />
+                      <span>Sign Out</span>
+                    </button>
                   </div>
-                  <button className="sign-out-button" onClick={handleSignOut}>
-                    <FontAwesomeIcon icon={faSignOutAlt} className="sign-out-icon" />
-                    <span>Sign Out</span>
-                  </button>
-                </div>
-              )}
-            </>
-          )}
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Mobile menu button */}
+          <button className="mobile-menu-button" onClick={toggleMobileMenu}>
+            {isMobileMenuOpen ? '✕' : '☰'}
+          </button>
         </div>
       </div>
 

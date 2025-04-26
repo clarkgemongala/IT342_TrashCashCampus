@@ -490,3 +490,151 @@ input.input-error:focus {
 .close-button-centered:hover {
   background-color: #153f29;
 }
+
+/* Session notice styles */
+.session-notice {
+  background-color: #e3f2fd;
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  border-left: 4px solid #1976d2;
+  text-align: center;
+}
+
+.session-notice p {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  font-size: 1rem;
+  color: #333;
+}
+
+.session-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+}
+
+.continue-button {
+  padding: 0.75rem 1.25rem;
+  background-color: #1a5336;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.3s;
+}
+
+.continue-button:hover {
+  background-color: #153f29;
+}
+
+.signout-button {
+  padding: 0.75rem 1.25rem;
+  background-color: white;
+  color: #dc3545;
+  border: 1px solid #dc3545;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.3s;
+}
+
+.signout-button:hover {
+  background-color: #dc3545;
+  color: white;
+}
+
+button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.auth-error {
+  background-color: #f8d7da;
+  color: #721c24;
+  padding: 0.75rem;
+  border-radius: 4px;
+  margin-bottom: 1.5rem;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+}
+
+.password-input-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.toggle-password {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+}
+
+.additional-options {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 1rem;
+}
+
+.forgot-password {
+  background: none;
+  border: none;
+  color: #1a5336;
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.forgot-password:hover {
+  color: #153f29;
+}
+
+.credential-request {
+  text-align: center;
+  margin-top: 2rem;
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.request-button {
+  background: none;
+  border: none;
+  color: #1a5336;
+  cursor: pointer;
+  font-weight: 500;
+  text-decoration: underline;
+  padding: 0;
+  font-size: 0.9rem;
+  margin-left: 0.5rem;
+}
+
+.request-button:hover {
+  color: #153f29;
+}
+
+.login-logo {
+  width: 120px;
+  height: auto;
+  margin: 0 auto 1.5rem;
+  display: block;
+}
+
+.login-title {
+  text-align: center;
+  margin-bottom: 1.5rem;
+  color: #333;
+  font-size: 1.5rem;
+  font-weight: 600;
+}

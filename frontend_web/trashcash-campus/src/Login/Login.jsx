@@ -12,7 +12,7 @@ import { db } from '../firebase';
 
 function Login() {
   const navigate = useNavigate();
-  const { isBackendOnline, checkBackendStatus, currentUser } = useAuth();
+  const { isBackendOnline, checkBackendStatus, currentUser, signOut: contextSignOut } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -27,12 +27,31 @@ function Login() {
   const [requestEmailError, setRequestEmailError] = useState('');
   const [showConfirmation, setShowConfirmation] = useState(false);
   
+  // Check for existing session and provide a way to sign out
+  const [existingSession, setExistingSession] = useState(false);
+  
   // Redirect if already logged in
   useEffect(() => {
     if (currentUser) {
-      navigate('/dashboard');
+      // Instead of immediately redirecting, set a flag
+      setExistingSession(true);
+    } else {
+      setExistingSession(false);
     }
-  }, [currentUser, navigate]);
+  }, [currentUser]);
+  
+  // Function to handle signing out from existing session
+  const handleSignOut = async () => {
+    setLoading(true);
+    try {
+      await contextSignOut();
+      setExistingSession(false);
+    } catch (error) {
+      console.error("Error signing out:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Check backend status when component mounts
   useEffect(() => {
@@ -251,92 +270,103 @@ function Login() {
       </div>
       <div className="login-form-section">
         <div className="login-form-container">
-          <div className="form-header">
-            <img src={trashCashLogo} alt="TrashCash Campus Logo" className="form-logo" />
-            <h1 className="form-title">TrashCash Admin Portal</h1>
-            <p className="form-subtitle">Login for administrators only</p>
-          </div>
-          {backendError && (
-            <div className="backend-error-message">
-              <i className="error-icon">⚠️</i>
-              <span>{backendError}</span>
-            </div>
-          )}
-          <form className="login-form" onSubmit={handleLoginSubmit}>
-            <div className="form-group">
-              <label htmlFor="email" className="input-label">Email Address</label>
-              <div className="input-container">
-                <input
-                  type="email"
-                  id="email"
-                  value={email}
-                  onChange={handleEmailChange}
-                  onBlur={() => setEmailError(validateEmail(email))}
-                  placeholder="yourname@cit.edu"
-                  required
+          <img src={trashCashLogo} alt="TrashCash Logo" className="login-logo" />
+          <h2 className="login-title">Admin Login</h2>
+          
+          {/* Display session notice if already logged in */}
+          {existingSession && (
+            <div className="session-notice">
+              <p>You are already logged in.</p>
+              <div className="session-actions">
+                <button 
+                  className="continue-button" 
+                  onClick={() => navigate('/dashboard')}
                   disabled={loading}
-                  className={emailError ? "input-error" : ""}
-                />
-                <svg className="input-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18">
-                  <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-.4 4.25l-7.07 4.42c-.32.2-.74.2-1.06 0L4.4 8.25c-.25-.16-.4-.43-.4-.72 0-.67.73-1.07 1.3-.72L12 11l6.7-4.19c.57-.35 1.3.05 1.3.72 0 .29-.15.56-.4.72z" fill="#666"/>
-                </svg>
-              </div>
-              {emailError && <div className="error-message"><i className="error-icon">⚠️</i> {emailError}</div>}
-            </div>
-            <div className="form-group">
-              <label htmlFor="password" className="input-label">Password</label>
-              <div className="input-container">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  id="password"
-                  value={password}
-                  onChange={handlePasswordChange}
-                  placeholder="Enter your password"
-                  required
-                  disabled={loading}
-                  className={passwordError ? "input-error" : ""}
-                />
-                <svg className="input-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18">
-                  <path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zM9 6c0-1.66 1.34-3 3-3s3 1.34 3 3v2H9V6zm9 14H6V10h12v10zm-6-3c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2z" fill="#666"/>
-                </svg>
-                <button
-                  type="button"
-                  className="password-toggle"
-                  onClick={togglePasswordVisibility}
-                  disabled={loading}
-                  aria-label={showPassword ? "Hide password" : "Show password"}
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18">
-                    {showPassword ? (
-                      <path d="M12 6c3.79 0 7.17 2.13 8.82 5.5-.59 1.22-1.42 2.27-2.41 3.12l1.41 1.41c1.39-1.23 2.49-2.77 3.18-4.53-1.73-4.39-6-7.5-11-7.5-1.27 0-2.49.2-3.64.57l1.65 1.65C10.66 6.09 11.32 6 12 6zm-1.07 1.14L13 9.21c.57.25 1.03.71 1.28 1.28l2.07 2.07c.08-.34.14-.7.14-1.07C16.5 9.01 14.48 7 12 7c-.37 0-.72.05-1.07.14zM2.01 3.87l2.68 2.68C3.06 7.83 1.77 9.53 1 11.5 2.73 15.89 7 19 12 19c1.52 0 2.98-.29 4.32-.82l3.42 3.42 1.41-1.41L3.42 2.45 2.01 3.87zm7.5 7.5l2.61 2.61c-.04.01-.08.02-.12.02-1.38 0-2.5-1.12-2.5-2.5 0-.05.01-.08.01-.13zm-3.4-3.4l1.75 1.75c-.23.55-.36 1.15-.36 1.78 0 2.48 2.02 4.5 4.5 4.5.63 0 1.23-.13 1.77-.36l.98.98c-.88.24-1.8.38-2.75.38-3.79 0-7.17-2.13-8.82-5.5.7-1.43 1.72-2.61 2.93-3.53z" fill="#666"/>
-                    ) : (
-                      <path d="M12 6c-5 0-9.27 3.11-11 7.5 1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zm0 12.5c-3.79 0-7.17-2.13-8.82-5.5 1.65-3.37 5.03-5.5 8.82-5.5s7.17 2.13 8.82 5.5c-1.65 3.37-5.03 5.5-8.82 5.5zm0-9c-1.93 0-3.5 1.57-3.5 3.5s1.57 3.5 3.5 3.5 3.5-1.57 3.5-3.5-1.57-3.5-3.5-3.5zm0 5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z" fill="#666"/>
-                    )}
-                  </svg>
+                  Continue to Dashboard
+                </button>
+                <button 
+                  className="signout-button" 
+                  onClick={handleSignOut}
+                  disabled={loading}
+                >
+                  Sign Out
                 </button>
               </div>
-              {passwordError && <div className="error-message"><i className="error-icon">⚠️</i> {passwordError}</div>}
             </div>
-            <div className="forgot-password">
-              <a href="#" onClick={(e) => { e.preventDefault(); handleForgotPassword(); }}>Forgot Password?</a>
-            </div>
-            <button type="submit" className="login-button" disabled={loading}>
-              {loading ? (
-                <span className="loading-spinner">
-                  <svg className="spinner" viewBox="0 0 50 50">
-                    <circle className="path" cx="25" cy="25" r="20" fill="none" strokeWidth="5"></circle>
-                  </svg>
-                  <span className="loading-text">Logging in...</span>
-                </span>
-              ) : (
-                'Login'
-              )}
-            </button>
-            <div className="signup-link">
-              <span>Not a user yet? </span>
-              <a href="#" className="request-link" onClick={openRequestModal}>Request Credentials</a>
-            </div>
-          </form>
+          )}
+          
+          {!existingSession && (
+            <>
+              {backendError && <div className="auth-error">{backendError}</div>}
+              
+              <form onSubmit={handleLoginSubmit} className="login-form">
+                <div className="form-group">
+                  <label htmlFor="email">Email</label>
+                  <input
+                    type="email"
+                    id="email"
+                    value={email}
+                    onChange={handleEmailChange}
+                    placeholder="Enter your email"
+                    className={emailError ? 'input-error' : ''}
+                  />
+                  {emailError && <div className="error-message">{emailError}</div>}
+                </div>
+                
+                <div className="form-group">
+                  <label htmlFor="password">Password</label>
+                  <div className="password-input-wrapper">
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      id="password"
+                      value={password}
+                      onChange={handlePasswordChange}
+                      placeholder="Enter your password"
+                      className={passwordError ? 'input-error' : ''}
+                    />
+                    <button
+                      type="button"
+                      className="toggle-password"
+                      onClick={togglePasswordVisibility}
+                    >
+                      {showPassword ? '🙈' : '👁️'}
+                    </button>
+                  </div>
+                  {passwordError && <div className="error-message">{passwordError}</div>}
+                </div>
+                
+                <button
+                  type="submit"
+                  className="login-button"
+                  disabled={loading}
+                >
+                  {loading ? 'Logging in...' : 'Login'}
+                </button>
+                
+                <div className="additional-options">
+                  <button
+                    type="button"
+                    className="forgot-password"
+                    onClick={handleForgotPassword}
+                    disabled={loading}
+                  >
+                    Forgot Password?
+                  </button>
+                </div>
+              </form>
+              
+              <div className="credential-request">
+                <p>Don't have credentials yet?</p>
+                <button 
+                  className="request-button"
+                  onClick={openRequestModal}
+                >
+                  Request Access
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
