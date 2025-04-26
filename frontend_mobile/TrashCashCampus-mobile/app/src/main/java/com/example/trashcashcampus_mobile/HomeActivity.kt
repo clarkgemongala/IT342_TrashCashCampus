@@ -53,6 +53,9 @@ class HomeActivity : AppCompatActivity() {
     // Firebase listener
     private var userPointsListener: ListenerRegistration? = null
 
+    // Request codes
+    private val QR_SCANNER_REQUEST_CODE = 1001
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_homepage)
@@ -377,28 +380,85 @@ class HomeActivity : AppCompatActivity() {
             } catch (e: Exception) {
                 Log.e(tag, "Error fetching user stats", e)
                 
-                // Use default data with 0 points in case of error
-                val defaultData = UserData(
-                    totalPoints = 0,
-                    recentPoints = 0,
-                    weeklyGoal = 100,
-                    weeklyProgress = 0
-                )
-                
-                // Update UI with default data
-                updateUIWithUserData(defaultData)
+                // Check if we already have valid userData with points
+                if (userData != null && userData?.totalPoints ?: 0 > 0) {
+                    Log.d(tag, "Using existing userData with ${userData?.totalPoints} points instead of default")
+                    // Keep using existing userData with current points
+                    userData?.let { updateUIWithUserData(it) }
+                } else {
+                    // Fall back to Firestore as our backup
+                    tryGetPointsFromFirestore(userId)
+                }
                 
                 // Hide loading indicator
                 showLoading(false)
-                
-                // Show error message
-                Toast.makeText(
-                    this@HomeActivity,
-                    "Could not connect to server. Using default points.",
-                    Toast.LENGTH_SHORT
-                ).show()
             }
         }
+    }
+    
+    private fun tryGetPointsFromFirestore(userId: String) {
+        Log.d(tag, "Trying to get points directly from Firestore for $userId")
+        
+        db.collection("users").document(userId)
+            .get()
+            .addOnSuccessListener { document ->
+                if (document != null && document.exists()) {
+                    // Extract points from the document
+                    val totalPoints = when (val pointsValue = document.get("totalPoints")) {
+                        is Long -> pointsValue.toInt()
+                        is Int -> pointsValue
+                        is Double -> pointsValue.toInt()
+                        is String -> pointsValue.toIntOrNull() ?: 0
+                        else -> 0
+                    }
+                    
+                    Log.d(tag, "Retrieved points from Firestore: $totalPoints")
+                    
+                    if (totalPoints > 0) {
+                        // Create user data with the retrieved points
+                        val retrievedData = UserData(
+                            totalPoints = totalPoints,
+                            recentPoints = 0,
+                            weeklyGoal = 100,
+                            weeklyProgress = totalPoints.coerceAtMost(100) // Use points as progress up to 100
+                        )
+                        
+                        // Update our stored user data
+                        userData = retrievedData
+                        
+                        // Update UI
+                        updateUIWithUserData(retrievedData)
+                        return@addOnSuccessListener
+                    }
+                }
+                
+                // If we reach here, we couldn't get valid points from Firestore
+                showDefaultPoints()
+            }
+            .addOnFailureListener { e ->
+                Log.e(tag, "Error getting points from Firestore", e)
+                showDefaultPoints()
+            }
+    }
+    
+    private fun showDefaultPoints() {
+        // Only use default data if we have absolutely no other option
+        val defaultData = UserData(
+            totalPoints = 0,
+            recentPoints = 0,
+            weeklyGoal = 100,
+            weeklyProgress = 0
+        )
+        
+        // Update UI with default data
+        updateUIWithUserData(defaultData)
+        
+        // Show error message 
+        Toast.makeText(
+            this@HomeActivity,
+            "Could not connect to server. Using default points.",
+            Toast.LENGTH_SHORT
+        ).show()
     }
     
     private fun updateUIWithUserData(userData: UserData) {
@@ -438,9 +498,9 @@ class HomeActivity : AppCompatActivity() {
         }
 
         btnScanQR.setOnClickListener {
-            // Navigate to QR scanner
+            // Navigate to QR scanner using startActivityForResult
             val intent = Intent(this, QRScannerActivity::class.java)
-            startActivity(intent)
+            startActivityForResult(intent, QR_SCANNER_REQUEST_CODE)
         }
 
         // Set up logout button
@@ -453,6 +513,77 @@ class HomeActivity : AppCompatActivity() {
 
             // Navigate back to login screen
             navigateToLogin()
+        }
+    }
+    
+    // Handle result from QR scanner
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        
+        if (requestCode == QR_SCANNER_REQUEST_CODE) {
+            Log.d(tag, "Returned from QR scanner with result: $resultCode")
+            
+            if (resultCode == RESULT_OK) {
+                // QR scan was successful, refresh points
+                Log.d(tag, "QR scan successful, refreshing points")
+                
+                // Force a refresh of user data, making sure to get fresh Firestore data
+                forceRefreshUserData()
+            }
+        }
+    }
+    
+    private fun forceRefreshUserData() {
+        // Show loading indicator
+        showLoading(true)
+        
+        userId?.let { uid ->
+            // First try to get fresh data from Firestore
+            db.collection("users").document(uid)
+                .get()
+                .addOnSuccessListener { document ->
+                    if (document != null && document.exists()) {
+                        // Extract points from the document
+                        val totalPoints = when (val pointsValue = document.get("totalPoints")) {
+                            is Long -> pointsValue.toInt()
+                            is Int -> pointsValue
+                            is Double -> pointsValue.toInt()
+                            is String -> pointsValue.toIntOrNull() ?: 0
+                            else -> 0
+                        }
+                        
+                        Log.d(tag, "Force refreshed points from Firestore: $totalPoints")
+                        
+                        // Create user data with the retrieved points 
+                        val retrievedData = UserData(
+                            totalPoints = totalPoints,
+                            recentPoints = 0,
+                            weeklyGoal = 100,
+                            weeklyProgress = totalPoints.coerceAtMost(100) // Use points as progress up to 100
+                        )
+                        
+                        // Update our stored user data
+                        userData = retrievedData
+                        
+                        // Update UI with animation
+                        updateUIWithUserData(retrievedData)
+                        showPointsUpdateAnimation()
+                        
+                        // Hide loading indicator
+                        showLoading(false)
+                    } else {
+                        // Fall back to regular API fetch
+                        fetchUserStats(uid)
+                    }
+                }
+                .addOnFailureListener { e ->
+                    Log.e(tag, "Error force refreshing points from Firestore", e)
+                    // Fall back to regular API fetch
+                    fetchUserStats(uid)
+                }
+        } ?: run {
+            // No user ID available
+            showLoading(false)
         }
     }
     
@@ -479,8 +610,10 @@ class HomeActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         
-        // Refresh data when coming back to this screen
-        userId?.let { fetchUserStats(it) }
+        // Make sure our real-time listener is active
+        if (userPointsListener == null) {
+            setupUserPointsListener()
+        }
     }
 
     /**

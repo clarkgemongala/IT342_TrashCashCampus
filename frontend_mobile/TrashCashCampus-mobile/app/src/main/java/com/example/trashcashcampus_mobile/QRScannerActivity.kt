@@ -387,6 +387,8 @@ class QRScannerActivity : AppCompatActivity() {
             builder.setTitle("Submission Successful!")
                 .setMessage(message)
                 .setPositiveButton("Great!") { _, _ ->
+                    // Set result to indicate points should be refreshed
+                    setResult(RESULT_OK)
                     finish() // Return to previous screen
                 }
                 .setCancelable(false)
@@ -398,6 +400,8 @@ class QRScannerActivity : AppCompatActivity() {
                     resetToScanMode()
                 }
                 .setNegativeButton("Cancel") { _, _ ->
+                    // No changes to points, just finish
+                    setResult(RESULT_CANCELED)
                     finish() // Return to previous screen
                 }
                 .setCancelable(false)
@@ -453,6 +457,8 @@ class QRScannerActivity : AppCompatActivity() {
                 resetToScanMode()
             }
             .setNegativeButton("Cancel") { _, _ ->
+                // No changes to points, just finish
+                setResult(RESULT_CANCELED)
                 finish() // Return to previous screen
             }
             .setCancelable(false)
@@ -464,6 +470,8 @@ class QRScannerActivity : AppCompatActivity() {
         // Make sure the cancel button is properly set up
         btnCancel.setOnClickListener {
             Log.d(tag, "Cancel button clicked")
+            // No changes to points, just finish
+            setResult(RESULT_CANCELED)
             finish() // Return to previous screen
         }
         
