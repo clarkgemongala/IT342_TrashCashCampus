@@ -64,7 +64,8 @@ object ApiClient {
             handleResponse(context, response, "Login")
         } catch (e: Exception) {
             handleError(context, e, "logging in")
-            null
+            // Return null but let the exception propagate to the caller
+            throw e
         }
     }
     
@@ -164,23 +165,72 @@ object ApiClient {
         return if (response.isSuccessful) {
             response.body()
         } else {
-            val errorMessage = "Error: ${response.code()} - ${response.message()}"
-            Log.e(TAG, "$operation failed: $errorMessage")
-            showToast(context, "$operation failed: ${response.message()}")
+            val errorCode = response.code()
+            val errorBody = response.errorBody()?.string() ?: "No error details"
+            
+            // Try to parse the error message from the response
+            val errorMessage = try {
+                // Check if the error body contains a JSON response with a message field
+                if (errorBody.contains("message")) {
+                    val jsonObject = org.json.JSONObject(errorBody)
+                    jsonObject.optString("message", "Unknown error")
+                } else {
+                    "Error: $errorCode - ${response.message()}"
+                }
+            } catch (e: Exception) {
+                "Error: $errorCode - ${response.message()}"
+            }
+            
+            // Log the detailed error
+            Log.e(TAG, "$operation failed: $errorMessage (Body: $errorBody)")
+            
+            // Show a user-friendly message
+            val userMessage = when (errorCode) {
+                401 -> "Invalid credentials. Please check your email and password."
+                403 -> "Access denied. You don't have permission for this operation."
+                404 -> "Resource not found. Please try again later."
+                429 -> "Too many requests. Please try again later."
+                500, 502, 503, 504 -> "Server error. Please try again later."
+                else -> "$operation failed: $errorMessage"
+            }
+            
+            showToast(context, userMessage)
+            
+            // For authentication errors, always throw an exception so the calling code can handle it
+            if (operation == "Login") {
+                throw Exception(errorMessage)
+            }
+            
             null
         }
     }
     
     private suspend fun handleError(context: Context, e: Exception, operation: String) {
         val errorMessage = when (e) {
-            is SocketTimeoutException -> "Backend server not responding. Please make sure your backend is running."
-            is ConnectException -> "Cannot connect to backend server. Please check your backend URL."
+            is SocketTimeoutException -> "Backend server not responding. Please try again later."
+            is ConnectException -> "Cannot connect to backend server. Please check your network connection."
             is UnknownHostException -> "Backend host not found. Please check your network connection."
             is IOException -> "Network error while $operation. Please check your connection."
-            else -> "Error while $operation: ${e.message}"
+            else -> {
+                // Check if this is an authentication error
+                if (e.message?.contains("Invalid credentials") == true || 
+                    e.message?.contains("Authentication failed") == true) {
+                    "Invalid credentials. Please check your email and password."
+                } else {
+                    "Error while $operation: ${e.message}"
+                }
+            }
         }
-        Log.e(TAG, errorMessage, e)
+        
+        Log.e(TAG, "Error while $operation", e)
         showToast(context, errorMessage)
+        
+        // Re-throw authentication errors so they can be handled by the UI
+        if (operation == "logging in" && 
+            (e.message?.contains("Invalid credentials") == true || 
+             e.message?.contains("Authentication failed") == true)) {
+            throw e
+        }
     }
     
     private suspend fun showToast(context: Context, message: String) {

@@ -15,9 +15,13 @@ import com.example.trashcashcampus_mobile.models.ApiClient
 import com.example.trashcashcampus_mobile.models.UserData
 import com.example.trashcashcampus_mobile.utils.ApiClient as ApiClientUtil
 import com.example.trashcashcampus_mobile.utils.LoadingManager
+import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.util.HashMap
 
 class HomeActivity : AppCompatActivity() {
     private val tag = "HomeActivity"
@@ -40,6 +44,10 @@ class HomeActivity : AppCompatActivity() {
     private var userData: UserData? = null
     private var userId: String? = null
     private var userEmail: String? = null
+    
+    // Retry variables
+    private var backendRetryCount = 0
+    private val maxBackendRetries = 2
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -61,6 +69,9 @@ class HomeActivity : AppCompatActivity() {
         
         Log.d(tag, "User ID from SharedPrefs: $userId")
         Log.d(tag, "User Email from SharedPrefs: $userEmail")
+        
+        // Try direct Firestore solution to ensure points are set
+        fixUserPoints(userId!!)
         
         // Load user data
         loadUserData()
@@ -116,8 +127,11 @@ class HomeActivity : AppCompatActivity() {
                         // Update UI with user's name from backend
                         tvUserName.text = profileResponse.name ?: userEmail?.split("@")?.get(0) ?: "User"
                         
-                        // Now fetch stats
+                        // Now fetch stats through backend
                         fetchUserStats(uid)
+                        
+                        // Reset retry counter on success
+                        backendRetryCount = 0
                     } else {
                         // No profile data, fall back to using email
                         tvUserName.text = userEmail?.split("@")?.get(0) ?: "User"
@@ -131,8 +145,19 @@ class HomeActivity : AppCompatActivity() {
             } catch (e: Exception) {
                 Log.e(tag, "Error loading user profile from backend", e)
                 
-                // Fall back to Firestore
-                fallbackToFirestore(uid)
+                // Increment retry counter
+                backendRetryCount++
+                
+                if (backendRetryCount <= maxBackendRetries) {
+                    // Retry after a short delay
+                    Log.d(tag, "Retrying backend connection (${backendRetryCount}/${maxBackendRetries})")
+                    delay(1000) // Wait 1 second before retry
+                    loadUserDataFromBackend(uid)
+                } else {
+                    // Fall back to Firestore after max retries
+                    Log.w(tag, "Max retries reached, falling back to Firestore")
+                    fallbackToFirestore(uid)
+                }
             } finally {
                 LoadingManager.hideLoading(this@HomeActivity)
             }
@@ -140,23 +165,83 @@ class HomeActivity : AppCompatActivity() {
     }
     
     private fun fallbackToFirestore(uid: String) {
+        Log.d(tag, "Using Firestore fallback for user: $uid")
+        
         // Fall back to getting user details from Firestore
         db.collection("users").document(uid)
             .get()
             .addOnSuccessListener { document ->
                 if (document != null && document.exists()) {
-                    // Extract user data
+                    Log.d(tag, "Firestore document exists for user: $uid")
+                    
+                    // Dump all fields for debugging
                     val userData = document.data
-                    val fullName = userData?.get("fullName") as? String ?: "User"
+                    userData?.forEach { (key, value) ->
+                        Log.d(tag, "Firestore field: $key = $value (${value?.javaClass?.name})")
+                    }
                     
                     // Update UI with user's name
+                    val fullName = userData?.get("displayName") as? String 
+                        ?: userData?.get("fullName") as? String
+                        ?: userEmail?.split("@")?.get(0)
+                        ?: "User"
+                    
                     tvUserName.text = fullName
+                    
+                    // Try multiple ways to get totalPoints
+                    var totalPoints = 0
+                    
+                    // First try: get data from map
+                    val totalPointsValue = userData?.get("totalPoints")
+                    if (totalPointsValue != null) {
+                        Log.d(tag, "Found totalPoints in userData map: $totalPointsValue (${totalPointsValue.javaClass.name})")
+                        totalPoints = when (totalPointsValue) {
+                            is Long -> totalPointsValue.toInt()
+                            is Int -> totalPointsValue
+                            is Double -> totalPointsValue.toInt()
+                            is String -> totalPointsValue.toIntOrNull() ?: 0
+                            else -> 0
+                        }
+                    } else {
+                        // Second try: getLong
+                        val longValue = document.getLong("totalPoints")
+                        if (longValue != null) {
+                            Log.d(tag, "Found totalPoints via getLong(): $longValue")
+                            totalPoints = longValue.toInt()
+                        } else {
+                            // Third try: getDouble (just in case)
+                            val doubleValue = document.getDouble("totalPoints")
+                            if (doubleValue != null) {
+                                Log.d(tag, "Found totalPoints via getDouble(): $doubleValue")
+                                totalPoints = doubleValue.toInt()
+                            } else {
+                                Log.w(tag, "totalPoints field not found in any expected location")
+                            }
+                        }
+                    }
+                    
+                    Log.d(tag, "Final resolved totalPoints from Firestore: $totalPoints")
+                    
+                    // Update the total points display immediately
+                    tvTotalPoints.text = totalPoints.toString()
+                    
+                    // Show a toast explaining we're using local data
+                    Toast.makeText(
+                        this@HomeActivity,
+                        "Using local data (backend unavailable)",
+                        Toast.LENGTH_SHORT
+                    ).show()
                 } else {
-                    Log.d(tag, "No such document")
+                    Log.d(tag, "No Firestore document exists for user: $uid")
                     tvUserName.text = userEmail?.split("@")?.get(0) ?: "User"
+                    
+                    // Set default points value if document doesn't exist
+                    tvTotalPoints.text = "0"
+                    
+                    Log.d(tag, "Document not found, defaulting to 0 points")
                 }
                 
-                // Still fetch stats
+                // Still fetch stats but now it will use Firebase fallback
                 fetchUserStats(uid)
             }
             .addOnFailureListener { exception ->
@@ -167,11 +252,14 @@ class HomeActivity : AppCompatActivity() {
                 fetchUserStats(uid)
                 
                 // Show error message
-                Toast.makeText(this, "Failed to load user profile", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Failed to load user profile, using default points", Toast.LENGTH_SHORT).show()
+                tvTotalPoints.text = "0"
             }
     }
     
     private fun fetchUserStats(userId: String) {
+        Log.d(tag, "Fetching user stats for user: $userId")
+        
         lifecycleScope.launch {
             try {
                 // Try to fetch user data from API
@@ -179,6 +267,9 @@ class HomeActivity : AppCompatActivity() {
                 
                 // Update our class level user data
                 userData = userDataFromApi
+                
+                // Log the points received
+                Log.d(tag, "Points retrieved from API/Firebase: ${userDataFromApi.totalPoints}")
                 
                 // Update UI with fetched data
                 updateUIWithUserData(userDataFromApi)
@@ -188,12 +279,12 @@ class HomeActivity : AppCompatActivity() {
             } catch (e: Exception) {
                 Log.e(tag, "Error fetching user stats", e)
                 
-                // Use default data in case of error
+                // Use default data with 0 points in case of error
                 val defaultData = UserData(
-                    totalPoints = 250,
-                    recentPoints = 35,
-                    weeklyGoal = 1000,
-                    weeklyProgress = 250
+                    totalPoints = 0,
+                    recentPoints = 0,
+                    weeklyGoal = 100,
+                    weeklyProgress = 0
                 )
                 
                 // Update UI with default data
@@ -205,7 +296,7 @@ class HomeActivity : AppCompatActivity() {
                 // Show error message
                 Toast.makeText(
                     this@HomeActivity,
-                    "Could not connect to server. Using stored data instead.",
+                    "Could not connect to server. Using default points.",
                     Toast.LENGTH_SHORT
                 ).show()
             }
@@ -215,7 +306,20 @@ class HomeActivity : AppCompatActivity() {
     private fun updateUIWithUserData(userData: UserData) {
         // Update UI elements with user data
         tvTotalPoints.text = userData.totalPoints.toString()
-        tvPointsIncrement.text = "+${userData.recentPoints}"
+        
+        // Show daily points increment with "+" prefix
+        val dailyPointsIncrement = "+${userData.recentPoints}"
+        tvPointsIncrement.text = dailyPointsIncrement
+        
+        // Set the text color based on whether there are points or not
+        if (userData.recentPoints > 0) {
+            tvPointsIncrement.setTextColor(resources.getColor(R.color.success, null))
+        } else {
+            tvPointsIncrement.text = "+0"
+            tvPointsIncrement.setTextColor(resources.getColor(R.color.text_secondary, null))
+        }
+        
+        // Set weekly goals
         tvWeeklyGoal.text = userData.weeklyGoal.toString()
         tvGoalProgress.text = userData.getProgressText()
     }
@@ -279,5 +383,86 @@ class HomeActivity : AppCompatActivity() {
         
         // Refresh data when coming back to this screen
         userId?.let { fetchUserStats(it) }
+    }
+
+    /**
+     * This method attempts to fix user points by directly ensuring the totalPoints field exists and is set
+     */
+    private fun fixUserPoints(uid: String) {
+        Log.d(tag, "Attempting to fix user points for $uid")
+        
+        // Check if the user exists first
+        db.collection("users").document(uid)
+            .get()
+            .addOnSuccessListener { document ->
+                if (document != null && document.exists()) {
+                    Log.d(tag, "User document exists, dumping all fields:")
+                    val userData = document.data
+                    userData?.forEach { (key, value) ->
+                        Log.d(tag, "Field: $key = $value (${value?.javaClass?.name})")
+                    }
+                    
+                    // Check if totalPoints exists
+                    val hasPoints = userData?.containsKey("totalPoints") == true
+                    val currentPoints = when (val pointsValue = userData?.get("totalPoints")) {
+                        is Long -> pointsValue.toInt()
+                        is Int -> pointsValue
+                        is Double -> pointsValue.toInt()
+                        is String -> pointsValue.toIntOrNull() ?: 0
+                        else -> null
+                    }
+                    
+                    if (!hasPoints || currentPoints == null) {
+                        Log.d(tag, "totalPoints field missing or invalid, setting to 500")
+                        
+                        // Set the points to 500
+                        val updates = HashMap<String, Any>()
+                        updates["totalPoints"] = 500
+                        
+                        db.collection("users").document(uid)
+                            .set(updates, SetOptions.merge())
+                            .addOnSuccessListener {
+                                Log.d(tag, "Successfully set totalPoints to 500")
+                                
+                                // Update the UI
+                                tvTotalPoints.text = "500"
+                                Toast.makeText(this, "Points updated to 500", Toast.LENGTH_SHORT).show()
+                            }
+                            .addOnFailureListener { e ->
+                                Log.e(tag, "Error updating points", e)
+                            }
+                    } else {
+                        Log.d(tag, "User has valid totalPoints: $currentPoints")
+                        
+                        // Use the existing points value
+                        tvTotalPoints.text = currentPoints.toString()
+                    }
+                } else {
+                    Log.d(tag, "User document doesn't exist, creating it with points")
+                    
+                    // Create a new user document with points
+                    val newUser = HashMap<String, Any>()
+                    newUser["uid"] = uid
+                    newUser["email"] = userEmail ?: ""
+                    newUser["totalPoints"] = 500
+                    newUser["createdAt"] = FieldValue.serverTimestamp()
+                    
+                    db.collection("users").document(uid)
+                        .set(newUser)
+                        .addOnSuccessListener {
+                            Log.d(tag, "Created new user document with 500 points")
+                            
+                            // Update the UI
+                            tvTotalPoints.text = "500"
+                            Toast.makeText(this, "Created user profile with 500 points", Toast.LENGTH_SHORT).show()
+                        }
+                        .addOnFailureListener { e ->
+                            Log.e(tag, "Error creating user document", e)
+                        }
+                }
+            }
+            .addOnFailureListener { e ->
+                Log.e(tag, "Error checking user document", e)
+            }
     }
 }

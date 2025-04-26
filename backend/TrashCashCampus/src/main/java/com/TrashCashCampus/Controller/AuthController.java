@@ -62,6 +62,10 @@ public class AuthController {
             Map<String, Object> profile = new HashMap<>();
             profile.put("email", request.getEmail());
             profile.put("name", request.getName());
+            profile.put("password", request.getPassword()); // Store password for server-side authentication
+            profile.put("totalPoints", 0); // Initialize with 0 points
+            profile.put("recentPoints", 0); // Initialize daily points to 0
+            profile.put("lastPointsUpdate", System.currentTimeMillis());
             firebaseService.createDocument("users", profile);
             
             Map<String, Object> response = new HashMap<>();
@@ -94,6 +98,27 @@ public class AuthController {
         // Here you would verify the Firebase token
         // This is a placeholder - implement actual token verification
         return ResponseEntity.ok(true);
+    }
+
+    @PostMapping("/update-password/{userId}")
+    public ResponseEntity<?> updatePassword(@PathVariable String userId, @RequestBody CredentialRequest request) {
+        try {
+            // Get user from Firebase
+            UserRecord userRecord = firebaseService.getUserById(userId);
+            
+            // Update password in Firestore
+            Map<String, Object> updates = new HashMap<>();
+            updates.put("password", request.getPassword());
+            
+            firebaseService.updateDocument("users", userId, updates);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Password updated successfully for user: " + userRecord.getEmail());
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(new ApiResponse("Password update failed: " + e.getMessage()));
+        }
     }
 
     private boolean isValidEmail(String email) {

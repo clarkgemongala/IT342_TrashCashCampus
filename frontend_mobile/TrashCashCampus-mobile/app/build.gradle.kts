@@ -58,6 +58,7 @@ dependencies {
     // For QR code scanning
     implementation ("com.github.yuriy-budiyev:code-scanner:2.3.2")
     implementation ("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    implementation ("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
     
     // Retrofit for API calls
     implementation ("com.squareup.retrofit2:retrofit:2.9.0")

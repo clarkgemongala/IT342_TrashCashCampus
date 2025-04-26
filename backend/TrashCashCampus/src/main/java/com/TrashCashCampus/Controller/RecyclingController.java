@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Calendar;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -231,10 +232,22 @@ public class RecyclingController {
                 int currentPoints = ((Long) userData.getOrDefault("totalPoints", 0L)).intValue();
                 int newTotalPoints = currentPoints + points;
                 
+                // Get today's date (for daily points tracking)
+                long currentTime = System.currentTimeMillis();
+                long lastPointsUpdate = ((Long) userData.getOrDefault("lastPointsUpdate", 0L)).longValue();
+                
+                // Calculate daily points (recentPoints)
+                int currentDailyPoints = ((Long) userData.getOrDefault("recentPoints", 0L)).intValue();
+                
+                // Check if last update was on a different day
+                boolean isNewDay = !isSameDay(lastPointsUpdate, currentTime);
+                int newDailyPoints = isNewDay ? points : currentDailyPoints + points;
+                
                 // Update user data
                 Map<String, Object> updates = new HashMap<>();
                 updates.put("totalPoints", newTotalPoints);
-                updates.put("lastPointsUpdate", System.currentTimeMillis());
+                updates.put("recentPoints", newDailyPoints);
+                updates.put("lastPointsUpdate", currentTime);
                 
                 firebaseService.updateDocument("users", userId, updates);
             }
@@ -256,5 +269,18 @@ public class RecyclingController {
             
             return ResponseEntity.internalServerError().body(errorResponse);
         }
+    }
+
+    /**
+     * Helper method to check if two timestamps are on the same day
+     */
+    private boolean isSameDay(long timestamp1, long timestamp2) {
+        Calendar cal1 = Calendar.getInstance();
+        Calendar cal2 = Calendar.getInstance();
+        cal1.setTimeInMillis(timestamp1);
+        cal2.setTimeInMillis(timestamp2);
+        
+        return cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR) &&
+               cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR);
     }
 } 

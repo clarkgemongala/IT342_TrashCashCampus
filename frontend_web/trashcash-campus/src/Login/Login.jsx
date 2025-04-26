@@ -4,15 +4,14 @@ import './Login.css';
 import trashCashLogo from '../assets/trashcash-logo.png';
 import recyclingVideo from '../assets/recycling-video.mp4';
 import { auth } from '../firebase';
-import { signInWithEmailAndPassword, sendPasswordResetEmail, signOut } from 'firebase/auth';
-import { login as apiLogin } from '../services/api';
+import { signOut } from 'firebase/auth';
 import { useAuth } from '../contexts/AuthContext';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 
 function Login() {
   const navigate = useNavigate();
-  const { isBackendOnline, checkBackendStatus, currentUser, signOut: contextSignOut } = useAuth();
+  const { isBackendOnline, checkBackendStatus, currentUser, signOut: contextSignOut, login, resetPassword } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -139,49 +138,32 @@ function Login() {
         return;
       }
       
-      // Use Firebase authentication
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      console.log('Firebase auth successful:', userCredential.user);
+      // Use the login method from AuthContext which handles both backend and Firebase auth
+      const loginResponse = await login(email, password);
       
-      // Get user data from Firestore to check role
-      const userDocRef = doc(db, "users", userCredential.user.uid);
-      const userSnap = await getDoc(userDocRef);
+      // If we're still executing code here, login was successful
+      console.log('Login successful');
       
-      // Check if user is admin
-      if (userSnap.exists()) {
-        const userData = userSnap.data();
-        if (userData.role !== 'admin') {
-          // Show notification for non-admin users and sign them out
-          alert('Only administrators can log in to this application');
-          await signOut(auth);
-          setLoading(false);
-          return;
-        }
-      } else {
-        // If user document doesn't exist in Firestore, sign them out
-        alert('User profile not found. Please contact an administrator.');
-        await signOut(auth);
-        setLoading(false);
-        return;
-      }
-      
-      // API login (no need to wait for it)
-      apiLogin(email, password)
-        .then(userData => {
-          console.log('API login successful:', userData);
-        })
-        .catch(error => {
-          console.warn('API login failed:', error);
-        });
-      
-      // navigation will happen through the useEffect hook that watches currentUser
+      // Now manually navigate to dashboard since authentication was successful
+      // This is needed because Firebase Auth state change might not trigger due to our workaround
+      navigate('/dashboard');
     } catch (error) {
       console.error('Login error:', error);
       
-      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
-        setPasswordError('Invalid email or password');
+      if (error.message) {
+        if (error.message.includes('Invalid credentials')) {
+          setPasswordError('Invalid email or password');
+        } else if (error.message.includes('Only administrators')) {
+          setPasswordError('Only administrators can log in to this application');
+        } else if (error.message.includes('User profile not found')) {
+          setPasswordError('User profile not found. Please contact an administrator.');
+        } else {
+          setPasswordError(error.message);
+        }
       } else if (error.code === 'auth/too-many-requests') {
         setPasswordError('Too many failed attempts. Please try again later.');
+      } else if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+        setPasswordError('Invalid email or password');
       } else {
         setPasswordError('Authentication failed. Please check your credentials.');
       }
@@ -200,7 +182,7 @@ function Login() {
     
     try {
       setLoading(true);
-      await sendPasswordResetEmail(auth, email);
+      await resetPassword(email);
       alert('Password reset email sent. Check your inbox.');
     } catch (error) {
       console.error('Password reset error:', error);

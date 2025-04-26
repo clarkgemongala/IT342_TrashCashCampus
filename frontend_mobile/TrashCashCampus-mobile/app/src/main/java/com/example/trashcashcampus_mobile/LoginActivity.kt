@@ -78,11 +78,15 @@ class LoginActivity : AppCompatActivity() {
                         val userEmail = loginResponse.email
                         val token = loginResponse.token
                         
+                        // Save successful login to log
+                        Log.d(tag, "Login successful for user: $userEmail")
+                        
                         // Navigate back to MainActivity with success
                         returnToMainActivityWithSuccess(userId, userEmail, token)
                     } else {
                         // Login failed
-                        returnToMainActivity("Authentication failed. Check your credentials.")
+                        Log.e(tag, "Login failed - loginResponse is null")
+                        returnToMainActivity("Authentication failed. Please check your credentials.")
                     }
                 }
             } catch (e: Exception) {
@@ -90,8 +94,9 @@ class LoginActivity : AppCompatActivity() {
                     // Hide loading overlay
                     LoadingManager.hideLoading(this@LoginActivity)
                     
-                    Log.e(tag, "Error during login: ${e.message}", e)
-                    returnToMainActivity("Authentication failed: ${e.message}")
+                    // Authentication failed
+                    Log.e(tag, "Login failed with exception: ${e.message}")
+                    returnToMainActivity("Authentication failed. Please check your credentials.")
                 }
             }
         }

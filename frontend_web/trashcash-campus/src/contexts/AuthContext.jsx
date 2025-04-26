@@ -2,11 +2,13 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { auth, db } from '../firebase';
 import { 
   onAuthStateChanged, 
-  signOut as firebaseSignOut 
+  signOut as firebaseSignOut,
+  signInWithEmailAndPassword,
+  sendPasswordResetEmail
 } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { ensureUserDocument, seedDatabase } from '../seedData';
-import { pingBackend } from '../services/api';
+import { pingBackend, login as apiLogin } from '../services/api';
 
 // Create context
 const AuthContext = createContext();
@@ -17,6 +19,60 @@ export function AuthProvider({ children }) {
   const [userRole, setUserRole] = useState(null);
   const [loading, setLoading] = useState(true);
   const [isBackendOnline, setIsBackendOnline] = useState(null);
+
+  // Login function that uses the backend API
+  const login = async (email, password) => {
+    try {
+      // First authenticate with backend
+      const apiResponse = await apiLogin(email, password);
+      console.log("API login successful:", apiResponse);
+      
+      // If backend authentication is successful
+      if (apiResponse && apiResponse.userId) {
+        // Check if the user is an admin before proceeding
+        const userDocRef = doc(db, "users", apiResponse.userId);
+        const userSnap = await getDoc(userDocRef);
+        
+        if (userSnap.exists()) {
+          const userData = userSnap.data();
+          if (userData.role !== 'admin') {
+            // Not an admin - throw an error
+            throw new Error('Only administrators can log in to this application');
+          }
+          
+          try {
+            // Try to sign in with Firebase but don't block if it fails
+            await signInWithEmailAndPassword(auth, email, password);
+          } catch (firebaseError) {
+            console.error("Firebase auth error:", firebaseError);
+            console.log("Setting user manually since Firebase auth failed but backend auth succeeded");
+            
+            // Manually set the current user since backend authentication was successful
+            // We'll simulate what onAuthStateChanged would normally do
+            setCurrentUser({
+              uid: apiResponse.userId,
+              email: apiResponse.email,
+              displayName: userData.name || email,
+              ...userData
+            });
+            setUserRole(userData.role || 'user');
+          }
+          
+          // Return the backend response regardless of Firebase auth result
+          return apiResponse;
+        } else {
+          // User document doesn't exist
+          throw new Error('User profile not found. Please contact an administrator.');
+        }
+      }
+      
+      // If we got here without a valid response, throw an error
+      throw new Error('Authentication failed with the backend');
+    } catch (error) {
+      console.error("Login error in AuthContext:", error);
+      throw error;
+    }
+  };
 
   // Sign out function
   const signOut = () => {
@@ -137,11 +193,18 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
+  // Password reset function
+  const resetPassword = (email) => {
+    return sendPasswordResetEmail(auth, email);
+  };
+
   const value = {
     currentUser,
     userRole,
     loading,
+    login,
     signOut,
+    resetPassword,
     isAdmin: userRole === 'admin',
     isAuthenticated: !!currentUser,
     isBackendOnline,

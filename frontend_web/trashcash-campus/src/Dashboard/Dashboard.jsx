@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../firebase';
-import { collection, query, where, getDocs, limit, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, limit, orderBy, doc, getDoc } from 'firebase/firestore';
 import Navigation from '../components/Navigation';
 import BackendStatus from '../components/BackendStatus';
 import './Dashboard.css';
@@ -62,30 +62,54 @@ const Dashboard = () => {
         try {
           const activitiesRef = collection(db, 'recyclingActivities');
           
-          // First try with a simple query without ordering to avoid index issues
-          const simpleQuery = query(
+          // Query to get all recent recycling activities from all bins
+          const activitiesQuery = query(
             activitiesRef,
-            where('userId', '==', currentUser.uid),
+            orderBy('timestamp', 'desc'),
             limit(5)
           );
           
-          const activitiesSnapshot = await getDocs(simpleQuery);
+          const activitiesSnapshot = await getDocs(activitiesQuery);
           let activities = activitiesSnapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data()
           }));
           
-          // Sort activities client-side
-          activities.sort((a, b) => {
-            const timeA = a.timestamp ? (a.timestamp.toDate ? a.timestamp.toDate() : new Date(a.timestamp)) : new Date(0);
-            const timeB = b.timestamp ? (b.timestamp.toDate ? b.timestamp.toDate() : new Date(b.timestamp)) : new Date(0);
-            return timeB - timeA; // Descending order
-          });
+          // For each activity, if we don't have the user email, try to fetch it
+          const activitiesWithUser = await Promise.all(
+            activities.map(async (activity) => {
+              // If we already have the userEmail, just return the activity
+              if (activity.userEmail) {
+                return activity;
+              }
+              
+              // If we have the userId but no userEmail, try to fetch the user data
+              if (activity.userId) {
+                try {
+                  const userRef = doc(db, 'users', activity.userId);
+                  const userSnap = await getDoc(userRef);
+                  
+                  if (userSnap.exists()) {
+                    // Add the user email to the activity
+                    return {
+                      ...activity,
+                      userEmail: userSnap.data().email || 'Unknown User'
+                    };
+                  }
+                } catch (err) {
+                  console.error("Error fetching user for activity:", err);
+                }
+              }
+              
+              // If we couldn't get the user email, return activity with default
+              return {
+                ...activity,
+                userEmail: 'Unknown User'
+              };
+            })
+          );
           
-          // Limit to 5 activities
-          activities = activities.slice(0, 5);
-          
-          setRecentActivities(activities);
+          setRecentActivities(activitiesWithUser);
         } catch (activityError) {
           console.error('Error fetching activities:', activityError);
           setRecentActivities([]); // Set empty array on error
@@ -176,9 +200,9 @@ const Dashboard = () => {
               
               {recentActivities.length === 0 ? (
                 <div className="no-activities">
-                  <p>You haven't recycled anything yet!</p>
-                  <p>Start recycling to earn points and see your activities here.</p>
-              </div>
+                  <p>No recent recycling activities found!</p>
+                  <p>Start recycling to earn points and see activities here.</p>
+                </div>
               ) : (
                 <div className="activities-list">
                   {recentActivities.map((activity) => (
@@ -188,17 +212,37 @@ const Dashboard = () => {
                          activity.wasteType === 'plastic' ? '🥤' :
                          activity.wasteType === 'glass' ? '🍶' :
                          activity.wasteType === 'metal' ? '🥫' : '♻️'}
-            </div>
+                      </div>
                       <div className="activity-details">
                         <div className="activity-title">
-                          Recycled {activity.wasteType} at {activity.binLocation || 'Unknown Location'}
-          </div>
+                          {activity.userEmail || 'Unknown User'} recycled {activity.wasteType} at {activity.binLocation || 'Unknown Location'}
+                        </div>
+                        <div className="activity-subtitle">
+                          Bin: {activity.binName || activity.binId || 'Unknown Bin'}
+                        </div>
                         <div className="activity-date">{formatDate(activity.timestamp)}</div>
-        </div>
-                      <div className="activity-points">+{activity.pointsEarned || 0} pts</div>
-          </div>
+                      </div>
+                      <div className="activity-points">
+                        <div className="bin-info">
+                          {(() => {
+                            const binType = activity.binType || 
+                              (activity.wasteType === 'organic' ? 'organic' :
+                               activity.wasteType === 'plastic' || activity.wasteType === 'paper' || 
+                               activity.wasteType === 'glass' || activity.wasteType === 'metal' ? 'recyclable' : 'unknown');
+                            
+                            const binLabel = binType === 'organic' ? 'Biodegradable' : 
+                                             binType === 'non-recyclable' ? 'Non-Biodegradable' : 
+                                             binType === 'recyclable' ? 'Recyclable' : 
+                                             activity.binName || 'Bin';
+                            
+                            return <span className={`bin-type ${binType}`}>{binLabel}</span>;
+                          })()}
+                        </div>
+                        <div className="points-earned">+{activity.pointsEarned || 0} pts</div>
+                      </div>
+                    </div>
                   ))}
-          </div>
+                </div>
               )}
             </section>
           </>

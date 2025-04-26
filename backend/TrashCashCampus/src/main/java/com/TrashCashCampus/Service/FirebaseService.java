@@ -73,14 +73,55 @@ public class FirebaseService {
     
     public String signIn(String email, String password) {
         // Firebase doesn't support server-side email/password authentication directly
-        // For this, you'd usually use Firebase Client SDK in the frontend
-        // This is a placeholder - actual implementation will require a custom token approach
+        // This is a security issue - we need to properly validate credentials
         try {
             UserRecord userRecord = firebaseAuth.getUserByEmail(email);
-            // In a real implementation, you'd create a custom token here
-            return userRecord.getUid();
+            
+            // In a real production app, we would need to use Firebase Admin SDK with
+            // a custom authentication system that verifies passwords.
+            // For now, let's add a simple check against Firestore
+            
+            try {
+                System.out.println("Attempting to authenticate: " + email);
+                
+                // Look up the user document in Firestore to check credentials
+                CollectionReference usersRef = firestore.collection("users");
+                QuerySnapshot querySnapshot = usersRef.whereEqualTo("email", email).get().get();
+                
+                if (querySnapshot.isEmpty()) {
+                    System.out.println("User not found in database: " + email);
+                    throw new RuntimeException("User not found in database");
+                }
+                
+                // Get the user document from Firestore
+                DocumentSnapshot userDoc = querySnapshot.getDocuments().get(0);
+                
+                // Check if the password is stored in Firestore
+                // Note: In a production app, passwords should be hashed, never stored in plain text
+                if (userDoc.contains("password")) {
+                    String storedPassword = userDoc.getString("password");
+                    if (password.equals(storedPassword)) {
+                        System.out.println("User authenticated successfully: " + email);
+                        return userRecord.getUid();
+                    }
+                } else {
+                    // For test account without migration to proper password storage yet
+                    if (email.equals("test@cit.edu") && password.equals("Test123!")) {
+                        System.out.println("Test account authenticated successfully");
+                        return userRecord.getUid();
+                    }
+                }
+                
+                // Authentication failed - password doesn't match
+                System.out.println("Authentication failed for: " + email + " - Invalid password");
+                throw new RuntimeException("Invalid credentials");
+            } catch (Exception e) {
+                System.out.println("Authentication error: " + e.getMessage());
+                throw new RuntimeException("Authentication failed: " + e.getMessage(), e);
+            }
         } catch (FirebaseAuthException e) {
-            throw new RuntimeException("Authentication failed", e);
+            System.out.println("Firebase Auth Exception: " + e.getMessage());
+            throw new RuntimeException("Authentication failed: User not found", e);
         }
     }
     

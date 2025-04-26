@@ -1,7 +1,9 @@
 package com.example.trashcashcampus_mobile.models
 
 import android.util.Log
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.BufferedReader
@@ -36,15 +38,18 @@ class ApiClient {
         
         // Flag to track if network operations have failed and should be skipped
         private val networkFailure = AtomicBoolean(false)
+        // Counter for retry attempts before falling back to direct Firebase
+        private var retryCount = 0
+        private const val MAX_RETRIES = 2
         
         /**
          * Gets user data including points, badges, and weekly goal progress
          */
         suspend fun getUserData(userId: String): UserData = withContext(Dispatchers.IO) {
-            // If we've had network failures, return default data instead of trying again
+            // If we've had persistent network failures, use direct Firebase access
             if (networkFailure.get()) {
-                Log.w(TAG, "Network operations disabled due to previous failures, returning default data")
-                return@withContext createDefaultUserData(userId)
+                Log.w(TAG, "Network operations disabled due to persistent failures, using direct Firebase access")
+                return@withContext getUserDataFromFirebase(userId)
             }
             
             try {
@@ -62,16 +67,48 @@ class ApiClient {
                 Log.d(TAG, "Backend server response code: $responseCode")
                 
                 if (responseCode == HttpURLConnection.HTTP_OK) {
+                    // Success - reset retry counter
+                    retryCount = 0
                     val response = readResponse(connection)
                     Log.d(TAG, "Backend user data: $response")
                     return@withContext parseUserData(response)
                 } else if (responseCode == HttpURLConnection.HTTP_NOT_FOUND) {
-                    // User doesn't exist in the database yet, create default data
-                    Log.w(TAG, "User not found (404), creating default user data")
+                    // User doesn't exist in the database yet, try to create default data
+                    Log.w(TAG, "User not found (404) on backend, creating default data")
                     return@withContext createDefaultUserData(userId)
                 } else {
+                    // Server error handling
                     Log.e(TAG, "Error fetching user data: $responseCode")
-                    // Return default data in case of error
+                    
+                    // Increment retry count
+                    retryCount++
+                    if (retryCount >= MAX_RETRIES) {
+                        Log.w(TAG, "Max retries reached ($MAX_RETRIES), falling back to direct Firebase access")
+                        return@withContext getUserDataFromFirebase(userId)
+                    } else {
+                        // Return default data but don't switch to Firebase yet
+                        Log.w(TAG, "Backend error, using temporary default data (retry $retryCount/$MAX_RETRIES)")
+                        return@withContext UserData(
+                            totalPoints = 0,
+                            recentPoints = 0,
+                            weeklyGoal = 100,
+                            weeklyProgress = 0
+                        )
+                    }
+                }
+            } catch (e: SocketTimeoutException) {
+                Log.e(TAG, "Socket timeout connecting to backend.", e)
+                
+                // Increment retry count
+                retryCount++
+                if (retryCount >= MAX_RETRIES) {
+                    // Set flag to prevent further network operations after multiple failures
+                    networkFailure.set(true)
+                    Log.w(TAG, "Max retries reached ($MAX_RETRIES), falling back to direct Firebase access")
+                    return@withContext getUserDataFromFirebase(userId)
+                } else {
+                    // Return default data but don't switch to Firebase yet
+                    Log.w(TAG, "Connection timeout, using temporary default data (retry $retryCount/$MAX_RETRIES)")
                     return@withContext UserData(
                         totalPoints = 0,
                         recentPoints = 0,
@@ -79,39 +116,125 @@ class ApiClient {
                         weeklyProgress = 0
                     )
                 }
-            } catch (e: SocketTimeoutException) {
-                Log.e(TAG, "Socket timeout connecting to backend. Disabling network operations.", e)
-                // Set flag to prevent further network operations
-                networkFailure.set(true)
-                // Return default data
-                return@withContext UserData(
-                    totalPoints = 250, // Default points for demo
-                    recentPoints = 0,
-                    weeklyGoal = 100,
-                    weeklyProgress = 25
-                )
             } catch (e: Exception) {
                 Log.e(TAG, "Exception in getUserData", e)
-                // Return default data in case of error
-                return@withContext UserData(
-                    totalPoints = 0,
-                    recentPoints = 0,
-                    weeklyGoal = 100,
-                    weeklyProgress = 0
-                )
+                
+                // Increment retry count
+                retryCount++
+                if (retryCount >= MAX_RETRIES) {
+                    Log.w(TAG, "Max retries reached ($MAX_RETRIES), falling back to direct Firebase access")
+                    return@withContext getUserDataFromFirebase(userId)
+                } else {
+                    // Return default data but don't switch to Firebase yet
+                    Log.w(TAG, "Error connecting to backend, using temporary default data (retry $retryCount/$MAX_RETRIES)")
+                    return@withContext UserData(
+                        totalPoints = 0,
+                        recentPoints = 0,
+                        weeklyGoal = 100,
+                        weeklyProgress = 0
+                    )
+                }
             }
         }
         
-        // Create default user data for new users
+        /**
+         * Gets user data directly from Firebase when the backend is unavailable
+         * This is used only as a last resort after multiple backend failures
+         */
+        private suspend fun getUserDataFromFirebase(userId: String): UserData = withContext(Dispatchers.IO) {
+            try {
+                Log.d(TAG, "Fetching user data directly from Firebase for ID: $userId")
+                
+                val db = FirebaseFirestore.getInstance()
+                val userDoc = db.collection("users").document(userId).get().await()
+                
+                if (userDoc.exists()) {
+                    Log.d(TAG, "Successfully retrieved user data from Firebase, document exists")
+                    
+                    // Dump all fields for debugging
+                    val allData = userDoc.data
+                    allData?.forEach { (key, value) ->
+                        Log.d(TAG, "Firebase field: $key = $value (${value?.javaClass?.name})")
+                    }
+                    
+                    // Try multiple ways to get totalPoints
+                    var totalPoints = 0
+                    
+                    // First try: direct get with field name
+                    val totalPointsValue = userDoc.get("totalPoints")
+                    if (totalPointsValue != null) {
+                        Log.d(TAG, "Found totalPoints via get(): $totalPointsValue (${totalPointsValue.javaClass.name})")
+                        totalPoints = when (totalPointsValue) {
+                            is Long -> totalPointsValue.toInt()
+                            is Int -> totalPointsValue
+                            is Double -> totalPointsValue.toInt()
+                            is String -> totalPointsValue.toIntOrNull() ?: 0
+                            else -> 0
+                        }
+                    } else {
+                        // Second try: with getLong
+                        val longValue = userDoc.getLong("totalPoints")
+                        if (longValue != null) {
+                            Log.d(TAG, "Found totalPoints via getLong(): $longValue")
+                            totalPoints = longValue.toInt()
+                        } else {
+                            // Third try: with data map
+                            val dataMap = userDoc.data
+                            if (dataMap != null && dataMap.containsKey("totalPoints")) {
+                                val mapValue = dataMap["totalPoints"]
+                                Log.d(TAG, "Found totalPoints in data map: $mapValue (${mapValue?.javaClass?.name})")
+                                totalPoints = when (mapValue) {
+                                    is Long -> mapValue.toInt()
+                                    is Int -> mapValue
+                                    is Double -> mapValue.toInt()
+                                    is String -> mapValue.toIntOrNull() ?: 0
+                                    else -> 0
+                                }
+                            } else {
+                                Log.w(TAG, "totalPoints field not found in any expected location")
+                            }
+                        }
+                    }
+                    
+                    Log.d(TAG, "Final resolved totalPoints: $totalPoints")
+                    
+                    // Get totalRecycled with similar approach (but simpler)
+                    val totalRecycledValue = userDoc.get("totalRecycled")
+                    val totalRecycled = when (totalRecycledValue) {
+                        is Long -> totalRecycledValue.toInt()
+                        is Int -> totalRecycledValue
+                        is Double -> totalRecycledValue.toInt()
+                        is String -> totalRecycledValue.toIntOrNull() ?: 0
+                        else -> 0
+                    }
+                    
+                    // Return with actual Firebase data
+                    return@withContext UserData(
+                        totalPoints = totalPoints,
+                        recentPoints = 0, // We don't have this in Firebase directly
+                        weeklyGoal = 100, // Default weekly goal
+                        weeklyProgress = totalRecycled.coerceAtMost(100) // Use totalRecycled as progress up to 100%
+                    )
+                } else {
+                    Log.w(TAG, "User document not found in Firebase, returning default data with 0 points")
+                    return@withContext createDefaultUserData(userId)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error fetching user data from Firebase", e)
+                return@withContext createDefaultUserData(userId)
+            }
+        }
+        
+        // Create default user data for new users and attempt to save it to backend
         private suspend fun createDefaultUserData(userId: String): UserData {
             val defaultData = UserData(
-                totalPoints = 250, // Default points for demo
+                totalPoints = 0, // Default points for new users is 0
                 recentPoints = 0,
                 weeklyGoal = 100,
-                weeklyProgress = 25
+                weeklyProgress = 0
             )
             
-            // Only try to create the data on the backend if network operations haven't failed
+            // Only try to create the data on the backend if network operations haven't persistently failed
             if (!networkFailure.get()) {
                 try {
                     // Create data for the user through backend
@@ -127,6 +250,9 @@ class ApiClient {
                     val endpoint = "$USER_ENDPOINT/create"
                     val response = makeApiRequest(endpoint, jsonData, "POST")
                     Log.d(TAG, "Created default user data through backend: $response")
+                    
+                    // Reset retry counter on successful API call
+                    retryCount = 0
                 } catch (e: Exception) {
                     Log.e(TAG, "Error creating default user data", e)
                 }
