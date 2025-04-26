@@ -16,6 +16,7 @@ import com.example.trashcashcampus_mobile.models.UserData
 import com.example.trashcashcampus_mobile.utils.ApiClient as ApiClientUtil
 import com.example.trashcashcampus_mobile.utils.LoadingManager
 import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.SetOptions
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
@@ -48,6 +49,9 @@ class HomeActivity : AppCompatActivity() {
     // Retry variables
     private var backendRetryCount = 0
     private val maxBackendRetries = 2
+    
+    // Firebase listener
+    private var userPointsListener: ListenerRegistration? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -76,8 +80,102 @@ class HomeActivity : AppCompatActivity() {
         // Load user data
         loadUserData()
         
+        // Set up real-time listener for user points
+        setupUserPointsListener()
+        
         // Set up button click listeners
         setupListeners()
+    }
+    
+    override fun onDestroy() {
+        // Remove the Firebase listener when activity is destroyed
+        userPointsListener?.remove()
+        super.onDestroy()
+    }
+    
+    private fun setupUserPointsListener() {
+        userId?.let { uid ->
+            Log.d(tag, "Setting up real-time listener for user points changes")
+            
+            // Remove any existing listener
+            userPointsListener?.remove()
+            
+            // Set up a listener for the user document
+            userPointsListener = db.collection("users").document(uid)
+                .addSnapshotListener { snapshot, error ->
+                    if (error != null) {
+                        Log.e(tag, "Error listening for user points changes", error)
+                        return@addSnapshotListener
+                    }
+                    
+                    if (snapshot != null && snapshot.exists()) {
+                        Log.d(tag, "Received real-time update for user document")
+                        
+                        // Get the total points from the document
+                        var totalPoints = 0
+                        
+                        // Try multiple ways to get totalPoints to handle different types
+                        val totalPointsValue = snapshot.get("totalPoints")
+                        if (totalPointsValue != null) {
+                            totalPoints = when (totalPointsValue) {
+                                is Long -> totalPointsValue.toInt()
+                                is Int -> totalPointsValue
+                                is Double -> totalPointsValue.toInt()
+                                is String -> totalPointsValue.toIntOrNull() ?: 0
+                                else -> 0
+                            }
+                            
+                            Log.d(tag, "Real-time update: totalPoints = $totalPoints")
+                            
+                            // Check if this is an actual update (not the initial load)
+                            val currentPoints = userData?.totalPoints ?: 0
+                            if (currentPoints != totalPoints) {
+                                // Points have changed
+                                val pointsDiff = totalPoints - currentPoints
+                                if (pointsDiff > 0) {
+                                    // Points increased
+                                    Toast.makeText(
+                                        this@HomeActivity,
+                                        "Points updated: +$pointsDiff points",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                } else if (pointsDiff < 0) {
+                                    // Points decreased
+                                    Toast.makeText(
+                                        this@HomeActivity,
+                                        "Points updated: $pointsDiff points",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                            }
+                            
+                            // Update the UI with the new points
+                            tvTotalPoints.text = totalPoints.toString()
+                            
+                            // Update our user data object with new points
+                            userData = userData?.copy(totalPoints = totalPoints)?.also {
+                                // When points update, also update the weekly progress display
+                                tvWeeklyGoal.text = it.weeklyGoal.toString()
+                                tvGoalProgress.text = it.getProgressText()
+                                
+                                // Show points change animation
+                                showPointsUpdateAnimation()
+                            } ?: UserData(
+                                totalPoints = totalPoints,
+                                recentPoints = 0,
+                                weeklyGoal = 100,
+                                weeklyProgress = 0
+                            ).also {
+                                // Set default values for new users
+                                tvWeeklyGoal.text = it.weeklyGoal.toString()
+                                tvGoalProgress.text = it.getProgressText()
+                            }
+                        }
+                    } else {
+                        Log.d(tag, "User document doesn't exist or was deleted")
+                    }
+                }
+        }
     }
     
     private fun initializeUI() {
@@ -464,5 +562,14 @@ class HomeActivity : AppCompatActivity() {
             .addOnFailureListener { e ->
                 Log.e(tag, "Error checking user document", e)
             }
+    }
+
+    private fun showPointsUpdateAnimation() {
+        // Simple animation to highlight points update
+        tvTotalPoints.alpha = 0.3f
+        tvTotalPoints.animate()
+            .alpha(1.0f)
+            .setDuration(500)
+            .start()
     }
 }
