@@ -73,7 +73,11 @@ const Navigation = () => {
     <nav className="navigation">
       <div className="nav-container">
         <div className="nav-brand">
-          <img src={trashCashLogo} alt="TrashCash Logo" />
+          <img 
+            src={trashCashLogo} 
+            alt="TrashCash Logo" 
+            style={{height: '40px', display: 'block'}} 
+          />
           <h1>TrashCash Campus</h1>
         </div>
 
