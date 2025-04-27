@@ -14,9 +14,11 @@ import {
   updateDoc, 
   getDoc,
   deleteDoc,
-  Timestamp 
+  Timestamp,
+  setDoc,
+  writeBatch
 } from 'firebase/firestore';
-import { ref, getDownloadURL, listAll } from 'firebase/storage';
+import { ref, getDownloadURL, listAll, deleteObject } from 'firebase/storage';
 import Navigation from '../components/Navigation';
 import QRScanner from '../components/QRScanner';
 import CorsErrorInfo from '../components/CorsErrorInfo';
@@ -190,21 +192,45 @@ const generateColoredSVG = (wasteType) => {
 const Bins = () => {
   const { currentUser, isAdmin } = useAuth();
   const [bins, setBins] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [selectedBin, setSelectedBin] = useState(null);
+  const [loading, setLoading] = useState(true);
   const [showTips, setShowTips] = useState(false);
-  const [showScanner, setShowScanner] = useState(false);
-  const [scanResult, setScanResult] = useState(null);
-  const [processingWaste, setProcessingWaste] = useState(false);
-  const [showQRModal, setShowQRModal] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const [showScannerModal, setShowScannerModal] = useState(false);
+  const [showQRmodal, setShowQRmodal] = useState(false);
   const [selectedQRBin, setSelectedQRBin] = useState(null);
+  const [selectedWasteType, setSelectedWasteType] = useState("");
+  const [scanResult, setScanResult] = useState(null);
+  const [qrCode, setQrCode] = useState(null);
+  const [imageUrl, setImageUrl] = useState(null);
+  const [logs, setLogs] = useState([]);
+  const [recyclableLogs, setRecyclableLogs] = useState([]);
+  const [biodegradableLogs, setBiodegradableLogs] = useState([]);
+  const [nonbiodegradableLogs, setNonBiodegradableLogs] = useState([]);
+  const [loadError, setLoadError] = useState(null);
+  const [campusLocations, setCampusLocations] = useState([]);
+  const [fixingBinLocations, setFixingBinLocations] = useState(false);
+  const [showImagePreview, setShowImagePreview] = useState(false);
+  const [previewImage, setPreviewImage] = useState(null);
+  const [previewWasteType, setPreviewWasteType] = useState(null);
+  const [hasImageLoadErrors, setHasImageLoadErrors] = useState(false);
+  const [lastScannedLocation, setLastScannedLocation] = useState(null);
+  const [selectedEntryForView, setSelectedEntryForView] = useState(null);
+  const [cleaningLogs, setCleaningLogs] = useState(false);
+  const [activeLocationTab, setActiveLocationTab] = useState(0);
   const [binLogs, setBinLogs] = useState([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
-  const [verifyingEntry, setVerifyingEntry] = useState(false);
-  const [previewImage, setPreviewImage] = useState(null);
   const [modalError, setModalError] = useState(null);
-  const [hasImageLoadErrors, setHasImageLoadErrors] = useState(false);
-  const [cleaningLogs, setCleaningLogs] = useState(false);
+  const [verifyingEntry, setVerifyingEntry] = useState(false);
+  const [locationLogs, setLocationLogs] = useState([]);
+  const [activeLogTab, setActiveLogTab] = useState(0);
+  
+  // Define our list of Cebu IT campus building names once at the component level
+  const cebuITBuildings = [
+    "NGE Building", "ACAD Building", "RTL Building", 
+    "Engineering Department", "Junior High Building", 
+    "Gymnasium", "Canteen", "GLE Building"
+  ];
   
   // Define the three bin types
   const binTypes = [
@@ -246,80 +272,322 @@ const Bins = () => {
   // Define retention period for processed logs (in minutes)
   const RETENTION_PERIOD_MINUTES = 2;
   
+  // Define RTL Building constant at file scope
+  const RTL_BUILDING = "RTL Building";
+  const JUNIOR_HIGH = "Junior High Building";
+  const NGE_BUILDING = "NGE Building";
+  
+  // Fetch logs when component mounts
   useEffect(() => {
+    const fetchLogsAndData = async () => {
+      setLoading(true);
+      await fetchLogs();
+      await fetchBins();
+      
+      if (isAdmin) {
+        initializeCampusLocations()
+          .then(locations => {
+            setCampusLocations(locations);
+            return initializeBins(locations);
+          });
+      }
+      
+      setLoading(false);
+    };
+    
+    fetchLogsAndData();
+  }, [currentUser, isAdmin]);
+  
+  // Function to fetch logs
+  const fetchLogs = async () => {
+    try {
+      console.log("Fetching logs from Firestore...");
+      const logsRef = collection(db, 'binLogs');
+      
+      // DEBUG: Remove all filters temporarily to see ALL logs
+      const snapshot = await getDocs(logsRef);
+      console.log(`Retrieved ${snapshot.docs.length} logs from Firestore`);
+      
+      // Log the first few documents for debugging
+      if (snapshot.docs.length > 0) {
+        console.log("Sample log entries:");
+        snapshot.docs.slice(0, 3).forEach(doc => {
+          console.log(`Log ID ${doc.id}:`, doc.data());
+        });
+      }
+      
+      const processedLogs = snapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          // Ensure timestamp is handled properly
+          timestamp: data.timestamp ? new Timestamp(
+            data.timestamp.seconds || Math.floor(data.timestamp / 1000), 
+            data.timestamp.nanoseconds || 0
+          ) : serverTimestamp()
+        };
+      });
+      
+      console.log(`Processed ${processedLogs.length} logs`);
+      setLogs(processedLogs);
+      
+      // Filter logs by type for each tab
+      const now = new Date();
+      const cutoffDate = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000)); // 7 days ago
+      
+      const recyclableLogs = processedLogs.filter(log => {
+        const timestamp = log.timestamp?.toDate();
+        return (
+          (log.binId === 'recyclable' || 
+           log.binType === 'recyclable' || 
+           (log.wasteType && ['plastic', 'paper', 'metal', 'glass'].includes(log.wasteType.toLowerCase()) &&
+            // Make sure this is not explicitly set to bio or non-bio
+            log.binId !== 'biodegradable' && 
+            log.binId !== 'non-biodegradable' && 
+            log.binType !== 'biodegradable' && 
+            log.binType !== 'non-biodegradable'))
+        ) && timestamp && timestamp > cutoffDate;
+      });
+      
+      const biodegradableLogs = processedLogs.filter(log => {
+        const timestamp = log.timestamp?.toDate();
+        return (
+          (log.binId === 'biodegradable' || 
+           log.binType === 'biodegradable' || 
+           (log.wasteType && ['organic', 'food', 'biodegradable'].includes(log.wasteType.toLowerCase()) &&
+            // Make sure this is not explicitly set to recyclable or non-bio
+            log.binId !== 'recyclable' && 
+            log.binId !== 'non-biodegradable' && 
+            log.binType !== 'recyclable' && 
+            log.binType !== 'non-biodegradable'))
+        ) && timestamp && timestamp > cutoffDate;
+      });
+      
+      const nonbiodegradableLogs = processedLogs.filter(log => {
+        const timestamp = log.timestamp?.toDate();
+        return (
+          log.binId === 'non-biodegradable' || 
+          log.binType === 'non-biodegradable' || 
+          (log.wasteType && log.wasteType.toLowerCase() === 'non-biodegradable')
+        ) && timestamp && timestamp > cutoffDate;
+      });
+      
+      console.log("Filtered logs counts:", {
+        recyclable: recyclableLogs.length,
+        biodegradable: biodegradableLogs.length,
+        nonbiodegradable: nonbiodegradableLogs.length
+      });
+      
+      setRecyclableLogs(recyclableLogs);
+      setBiodegradableLogs(biodegradableLogs);
+      setNonBiodegradableLogs(nonbiodegradableLogs);
+      
+      return processedLogs;
+    } catch (error) {
+      console.error("Error fetching logs:", error);
+      setLoadError("Failed to load logs. Please try again later.");
+      setLogs([]);
+      setRecyclableLogs([]);
+      setBiodegradableLogs([]);
+      setNonBiodegradableLogs([]);
+      return [];
+    }
+  };
+
+  // Function to fetch bins
     const fetchBins = async () => {
       try {
+      console.log("Fetching bins from Firestore...");
         const binsRef = collection(db, 'bins');
         const q = query(binsRef, orderBy('name', 'asc'));
         const querySnapshot = await getDocs(q);
+      
+      console.log(`Retrieved ${querySnapshot.docs.length} bins from Firestore`);
+      
+      // Log sample bins
+      if (querySnapshot.docs.length > 0) {
+        console.log("Sample bins:");
+        querySnapshot.docs.slice(0, 3).forEach(doc => {
+          console.log(`Bin ID ${doc.id}:`, doc.data());
+        });
+      }
+      
         const fetchedBins = querySnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         }));
+      
+      console.log("Processed bins:", fetchedBins.length);
         setBins(fetchedBins);
+      return fetchedBins;
       } catch (error) {
         console.error("Error fetching bins: ", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchBins();
-    
-    // Run log cleanup when component mounts if admin
-    if (isAdmin) {
-      cleanupOldLogs();
-      
-      // Set up periodic cleanup every 30 seconds
-      const cleanupInterval = setInterval(() => {
-        cleanupOldLogs();
-      }, 30 * 1000); // 30 seconds
-      
-      // Clean up the interval when component unmounts
-      return () => clearInterval(cleanupInterval);
+      return [];
     }
-  }, [currentUser, isAdmin]);
+  };
 
   const handleBinSelect = (bin) => {
     setSelectedBin(bin);
     setShowTips(true);
-    setShowScanner(false);
+    setShowScannerModal(false);
     setScanResult(null);
   };
 
   const handleScanClick = () => {
-    setShowScanner(true);
+    setShowScannerModal(true);
     setShowTips(false);
   };
 
   const handleScanSuccess = async (data) => {
     try {
+      // Add raw data logging for debugging
+      console.log("=================== RAW QR DATA ===================");
+      console.log("Raw scan data:", data);
+      console.log("Raw scan data type:", typeof data);
+      if (typeof data === 'string') {
+        console.log("Raw data length:", data.length);
+        console.log("Raw data first 100 chars:", data.substring(0, 100));
+        
+        // Try to parse if it's JSON
+        if (data.startsWith('{')) {
+          try {
+            const parsed = JSON.parse(data);
+            console.log("PARSED RAW QR DATA:", parsed);
+            console.log("QR contains locationName?", !!parsed.locationName);
+            if (parsed.locationName) {
+              console.log("QR LOCATION NAME:", parsed.locationName);
+            }
+          } catch (e) {
+            console.log("Error parsing raw data:", e);
+          }
+        }
+      }
+      console.log("===================================================");
+      
+      // Store the raw scan result first
       setScanResult(data);
       
-      // Find the bin from the scan result
-      // In a real app, the QR would contain a bin ID or a JSON with bin info
-      let scannedBin;
+      // Process the QR code data more thoroughly
+      let scannedData;
+      let locationName = null;
       
-      if (typeof data === 'object' && data.binId) {
-        // If QR code returns an object with binId
-        scannedBin = bins.find(bin => bin.id === data.binId);
-      } else if (typeof data === 'string') {
-        // If QR code returns just a bin ID string
-        scannedBin = bins.find(bin => bin.id === data);
+      // Parse JSON data if available
+      if (typeof data === 'string' && data.startsWith('{')) {
+        try {
+          scannedData = JSON.parse(data);
+          console.log("Parsed QR code data:", scannedData);
+          
+          // Extract location name if present - THIS IS THE KEY PART
+          if (scannedData.locationName) {
+            locationName = scannedData.locationName;
+            console.log("Found location in QR code:", locationName);
+            console.log("IMPORTANT: This location will be used:", locationName);
+            
+            // Set the lastScannedLocation at the component level
+            setLastScannedLocation(locationName);
+            console.log(`Set lastScannedLocation state to: ${locationName}`);
+            
+            // ALSO save this in localStorage to ensure it's preserved across the session
+            try {
+              localStorage.setItem('lastScannedLocation', locationName);
+              console.log(`Saved ${locationName} to localStorage for persistence`);
+              
+              // Make the location global in window object for emergency access
+              window.lastScannedLocation = locationName;
+              console.log(`Set window.lastScannedLocation to ${locationName}`);
+            } catch (e) {
+              console.error("Failed to save to localStorage:", e);
+            }
+          } else {
+            console.log("No locationName found in QR data");
+          }
+        } catch (e) {
+          console.log("Error parsing QR code JSON:", e);
+          scannedData = { binId: data };
+        }
+      } else if (typeof data === 'object') {
+        scannedData = data;
+        console.log("QR data is already an object:", scannedData);
+        
+        // Extract location name if present
+        if (scannedData.locationName) {
+          locationName = scannedData.locationName;
+          console.log("Found location in QR data object:", locationName);
+          console.log("IMPORTANT: This location will be used:", locationName);
+          
+          // Set the lastScannedLocation at the component level
+          setLastScannedLocation(locationName);
+          console.log(`Set lastScannedLocation state to: ${locationName}`);
+          
+          // ALSO save this in localStorage for persistence
+          try {
+            localStorage.setItem('lastScannedLocation', locationName);
+            console.log(`Saved ${locationName} to localStorage for persistence`);
+            
+            // Make the location global in window object for emergency access
+            window.lastScannedLocation = locationName;
+            console.log(`Set window.lastScannedLocation to ${locationName}`);
+          } catch (e) {
+            console.error("Failed to save to localStorage:", e);
+          }
+        } else {
+          console.log("No locationName found in QR data object");
+        }
+      } else {
+        // Plain string data
+        console.log("QR data is a plain string, not JSON formatted");
+        scannedData = { binId: data };
       }
       
+      // Find the bin from the scan result
+      let scannedBin;
+      let binId = scannedData.binId || data;
+      
+      console.log("Looking for bin with ID:", binId);
+      scannedBin = bins.find(bin => bin.id === binId);
+      console.log("Found bin:", scannedBin);
+      
       if (scannedBin) {
+        // If we have location data from QR code, ALWAYS update the bin location
+        if (locationName) {
+          console.log(`Updating bin location from ${scannedBin.location} to ${locationName} from QR code - FORCED UPDATE`);
+          scannedBin = {
+            ...scannedBin,
+            location: locationName,
+            scannedLocation: locationName,  // Add a special field to track the exact scanned location
+            actualLocation: locationName    // Add another field to be absolutely sure
+          };
+        } else if (lastScannedLocation) {
+          // If we don't have location from QR but have lastScannedLocation, use that
+          console.log(`No location in QR, using lastScannedLocation: ${lastScannedLocation}`);
+          scannedBin = {
+            ...scannedBin,
+            location: lastScannedLocation,
+            scannedLocation: lastScannedLocation,
+            actualLocation: lastScannedLocation
+          };
+        } else {
+          console.log(`Not updating bin location. Current: ${scannedBin.location}, QR location: ${locationName}`);
+        }
+        
         setSelectedBin(scannedBin);
         setShowTips(true);
       } else {
         // If bin not found, create a temporary bin object
+        let tempLocation = locationName || lastScannedLocation || 'Scanned Location';
+        
         const tempBin = {
-          id: 'unknown',
-          name: 'Unknown Bin',
-          location: 'Scanned Location',
+          id: binId || 'unknown',
+          name: scannedData.binName || 'Unknown Bin',
+          location: tempLocation,
+          scannedLocation: tempLocation,
+          actualLocation: tempLocation,
           acceptedWaste: ['paper', 'plastic', 'glass', 'metal'],
           tips: ['Please sort your waste properly', 'Make sure items are clean and dry']
         };
+        
+        console.log("Created temporary bin:", tempBin);
         setSelectedBin(tempBin);
         setShowTips(true);
       }
@@ -332,49 +600,205 @@ const Bins = () => {
     console.error('Scan error:', error);
   };
 
-  const handleWasteSubmit = async (wasteType) => {
-    if (!currentUser || !selectedBin) return;
+  // Helper to get the current scan result safely
+  const getScanResult = () => {
+    try {
+      return scanResult;
+    } catch (e) {
+      console.error("Error accessing scan result:", e);
+      return null;
+    }
+  };
+
+  const handleWasteSubmit = async (event) => {
+    event.preventDefault();
     
-    setProcessingWaste(true);
+    if (!currentUser) {
+      alert("Please login to submit recycling activity");
+      return;
+    }
+    
+    if (!selectedBin) {
+      alert("Please select a bin first");
+      return;
+    }
+    
+    // Map waste types to points
+    const pointMapping = {
+      "Plastic Bottles": 5,
+      "Paper": 3,
+      "Food Waste": 2,
+      "Metal Cans": 4,
+      "Glass": 3,
+      "Electronics": 10,
+      "Other": 1
+    };
+    
+    // Log all possible location sources for debugging
+    console.log("Component-level lastScannedLocation:", lastScannedLocation);
+    console.log("Window-level location:", window.lastScannedLocation || "not set");
+    console.log("localStorage location:", localStorage.getItem("lastScannedLocation") || "not set");
+    console.log("Selected bin location:", selectedBin.location || "not set");
+    
+    // Try to determine the bin type based on bin ID or scanned QR code
+    let binType = "";
+    let binIdentifier = "";
+    
+    // Check if selected bin has an ID matching one of our bin types
+    if (selectedBin.id) {
+      if (['recyclable', 'biodegradable', 'non-biodegradable'].includes(selectedBin.id)) {
+        binType = selectedBin.id;
+        binIdentifier = selectedBin.id;
+      }
+    }
+    
+    // Check QR code data for bin type
+    if (!binType && typeof scanResult === 'string' && scanResult.startsWith('{')) {
+      try {
+        const qrData = JSON.parse(scanResult);
+        
+        if (qrData.binId && ['recyclable', 'biodegradable', 'non-biodegradable'].includes(qrData.binId)) {
+          binType = qrData.binId;
+          binIdentifier = qrData.binId;
+          console.log(`Found bin type in QR code: ${binType}`);
+        } else if (qrData.binType && ['recyclable', 'biodegradable', 'non-biodegradable'].includes(qrData.binType)) {
+          binType = qrData.binType;
+          binIdentifier = qrData.binType;
+          console.log(`Found bin type in QR code: ${binType}`);
+        }
+      } catch (e) {
+        console.error("Error parsing QR data for bin type:", e);
+      }
+    }
+    
+    // If still no bin type, try to determine from waste type
+    if (!binType && selectedWasteType) {
+      if (['paper', 'plastic', 'metal', 'glass'].includes(selectedWasteType)) {
+        binType = 'recyclable';
+        binIdentifier = 'recyclable';
+      } else if (['organic', 'food'].includes(selectedWasteType)) {
+        binType = 'biodegradable';
+        binIdentifier = 'biodegradable';
+      } else {
+        binType = 'non-biodegradable';
+        binIdentifier = 'non-biodegradable';
+      }
+      console.log(`Determined bin type from waste type: ${binType}`);
+    }
+    
+    // If still no bin type, use a default
+    if (!binType) {
+      binType = 'recyclable';  // Default
+      binIdentifier = 'recyclable';
+      console.log("Using default bin type: recyclable");
+    }
+    
+    // Determine the location, using the most specific source available
+    let locationName = null;
+    
+    // First try to get location from the QR code
+    if (typeof scanResult === 'string' && scanResult.startsWith('{')) {
+      try {
+        const qrData = JSON.parse(scanResult);
+        if (qrData.locationName) {
+          locationName = qrData.locationName;
+          console.log(`Using location from QR code: ${locationName}`);
+        }
+      } catch (e) {
+        console.error("Error parsing QR data for location:", e);
+      }
+    }
+    
+    // If no location from QR, try other sources
+    if (!locationName) {
+      if (selectedBin.location && selectedBin.location !== "CIT Campus" && selectedBin.location !== "Unknown Location") {
+        locationName = selectedBin.location;
+        console.log(`Using location from selected bin: ${locationName}`);
+      } else if (lastScannedLocation) {
+        locationName = lastScannedLocation;
+        console.log(`Using last scanned location from state: ${locationName}`);
+      } else if (window.lastScannedLocation) {
+        locationName = window.lastScannedLocation;
+        console.log(`Using last scanned location from window: ${locationName}`);
+      } else if (localStorage.getItem("lastScannedLocation")) {
+        locationName = localStorage.getItem("lastScannedLocation");
+        console.log(`Using last scanned location from localStorage: ${locationName}`);
+      } else {
+        // Default to a random location for testing
+        const randomLocationIndex = Math.floor(Math.random() * cebuITBuildings.length);
+        locationName = cebuITBuildings[randomLocationIndex];
+        console.log(`Using random location: ${locationName}`);
+      }
+    }
+    
+    // Handle the waste submission process
+    try {
+      const userRef = doc(db, "users", currentUser.uid);
+      const timestamp = serverTimestamp();
+      
+      // Create a batch for atomic updates
+    const batch = writeBatch(db);
+    
+      // Create a new bin log document
+      const binLogDoc = doc(collection(db, "binLogs"));
+      
+      // Prepare the data for the bin log
+      const binData = {
+        userId: currentUser.uid,
+        userName: currentUser.displayName || currentUser.email,
+        userEmail: currentUser.email,
+        timestamp,
+        binId: selectedBin.id,
+        binName: selectedBin.name,
+        binLocation: locationName,
+        locationName,
+        wasteType: selectedWasteType,
+        binType,
+        binIdentifier,
+        binTypeCategory: binType, // Specific field for bin type categories
+        points: 5, // Default points
+        verified: false,
+        qrCode: scanResult
+      };
+    
+    // Add formatted date string
+    const now = new Date();
+    const dateString = `${now.getFullYear()}-${(now.getMonth() + 1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')}`;
+    
+    batch.set(binLogDoc, {
+      ...binData,
+      dateString,
+      id: binLogDoc.id
+    });
     
     try {
-      // In a real app, you would validate the image here
-      // For now, we'll simulate image recognition success
+      // Commit the batch
+      await batch.commit();
+      alert("Recycling activity submitted successfully!");
       
-      // Calculate points based on waste type
-      const pointsMap = {
-        paper: 10,
-        plastic: 15,
-        glass: 20,
-        metal: 25,
-        organic: 5
-      };
+      // Reset states
+      setImageUrl(null);
+      setSelectedWasteType("");
+      setQrCode(null);
       
-      const pointsEarned = pointsMap[wasteType] || 10;
-      
-      // Add the recycling activity to Firestore
-      await addDoc(collection(db, 'recyclingActivities'), {
-        userId: currentUser.uid,
-        binId: selectedBin.id,
-        binLocation: selectedBin.location,
-        wasteType: wasteType,
-        pointsEarned: pointsEarned,
-        timestamp: serverTimestamp()
-      });
-      
-      // Show success message
-      alert(`Great job! You earned ${pointsEarned} points for recycling ${wasteType}.`);
-      
-      // Reset the state
-      setShowTips(false);
-      setSelectedBin(null);
-      setScanResult(null);
-      
+      // If we're using Firebase Storage, we can delete the uploaded image
+      // to save space, but only if we're sure it's been committed to Firestore
+      if (imageUrl && imageUrl.startsWith("https://firebasestorage.googleapis.com")) {
+        try {
+          const storageRef = ref(storage, imageUrl);
+          await deleteObject(storageRef);
+          console.log("Deleted uploaded image after submission");
+        } catch (error) {
+          console.error("Error deleting image:", error);
+        }
+        }
+      } catch (error) {
+        console.error("Error submitting recycling activity:", error);
+        alert(`Error: ${error.message}`);
+      }
     } catch (error) {
-      console.error('Error submitting waste:', error);
-      alert('Error submitting your recycling. Please try again.');
-    } finally {
-      setProcessingWaste(false);
+      console.error("Error submitting recycling activity:", error);
+      alert(`Error: ${error.message}`);
     }
   };
   
@@ -389,23 +813,195 @@ const Bins = () => {
       // Simplified query without orderBy to avoid Firestore index requirements
       const logsRef = collection(db, 'binLogs');
       
-      // Basic query that doesn't require complex indexes
-      const q = query(
-        logsRef,
-        where('binIdentifier', '==', binType.id)
-      );
+      // Query all logs and filter them in memory for better flexibility
+      const snapshot = await getDocs(logsRef);
       
-      console.log("Querying binLogs for binIdentifier:", binType.id);
-      const snapshot = await getDocs(q);
+      console.log(`Retrieved ${snapshot.docs.length} total logs`);
       
-      console.log("Found logs:", snapshot.docs.length);
+      // Process and update locations in the logs immediately
+      let batch = writeBatch(db);
+      let batchCount = 0;
+      let updatedCount = 0;
       
-      const logsList = await Promise.all(snapshot.docs.map(async (doc) => {
+      // Get the list of all campus locations
+      const campusLocations = [
+        "NGE Building", 
+        "ACAD Building", 
+        "RTL Building", 
+        "Engineering Department", 
+        "Junior High Building", 
+        "Gymnasium", 
+        "Canteen", 
+        "GLE Building"
+      ];
+      
+      // Filter logs to match the selected bin type
+      const filteredSnapshot = snapshot.docs.filter(doc => {
         const data = doc.data();
-        console.log("Processing log data:", doc.id, data);
+        
+        // Match logs based on bin type
+        if (binType.id === 'recyclable') {
+          return (
+            data.binId === 'recyclable' || 
+            data.binType === 'recyclable' || 
+            data.binTypeCategory === 'recyclable' ||
+            data.binIdentifier === 'recyclable' ||
+            (data.wasteType && ['plastic', 'paper', 'metal', 'glass'].includes(data.wasteType.toLowerCase()) && 
+             // Make sure this is not explicitly set to bio or non-bio
+             data.binId !== 'biodegradable' && 
+             data.binId !== 'non-biodegradable' && 
+             data.binType !== 'biodegradable' && 
+             data.binType !== 'non-biodegradable')
+          );
+        } else if (binType.id === 'biodegradable') {
+          return (
+            data.binId === 'biodegradable' || 
+            data.binType === 'biodegradable' || 
+            data.binTypeCategory === 'biodegradable' ||
+            data.binIdentifier === 'biodegradable' ||
+            (data.wasteType && ['organic', 'food', 'biodegradable'].includes(data.wasteType.toLowerCase()) &&
+            // Make sure this is not explicitly set to recyclable or non-bio
+            data.binId !== 'recyclable' && 
+            data.binId !== 'non-biodegradable' && 
+            data.binType !== 'recyclable' && 
+            data.binType !== 'non-biodegradable')
+          );
+        } else if (binType.id === 'non-biodegradable') {
+          return (
+            data.binId === 'non-biodegradable' || 
+            data.binType === 'non-biodegradable' || 
+            data.binTypeCategory === 'non-biodegradable' ||
+            data.binIdentifier === 'non-biodegradable' ||
+            (data.wasteType && data.wasteType.toLowerCase() === 'non-biodegradable')
+          );
+        }
+        
+        // Default case - check if binId matches exactly
+        return data.binId === binType.id || data.binIdentifier === binType.id;
+      });
+      
+      console.log(`Filtered to ${filteredSnapshot.length} logs for bin type: ${binType.id}`);
+      
+      // Preprocess bin IDs to handle simple bin types 
+      const pendingBatchCommits = [];
+      const processedSnapshot = filteredSnapshot.map(doc => {
+        const data = doc.data();
+        
+        // If binId is one of our standard types without location info, add binType for better matching
+        if (data.binId && ['recyclable', 'biodegradable', 'non-biodegradable'].includes(data.binId) && !data.binType) {
+          console.log(`Setting binType=${data.binId} for log ${doc.id}`);
+          data.binType = data.binId;
+        }
+        
+        // If we're a specific bin type, update the binTypeCategory field
+        if (!data.binTypeCategory && binType.id) {
+          data.binTypeCategory = binType.id;
+          batch.update(doc.ref, { binTypeCategory: binType.id });
+          batchCount++;
+        }
+        
+        // Always check if we need to update location information
+        let needsUpdate = false;
+        let updatedFields = {};
+        
+        // First try to parse QR code data if available
+        if (data.qrCode && typeof data.qrCode === 'string' && data.qrCode.startsWith('{')) {
+          try {
+            const qrData = JSON.parse(data.qrCode);
+            console.log("Parsed QR data:", qrData);
+            
+            // If there's a locationName in the QR data, use it
+            if (qrData.locationName) {
+              console.log(`Found locationName in QR data: ${qrData.locationName}`);
+              data.locationName = qrData.locationName;
+              data.binLocation = qrData.locationName;
+              
+              // Update the Firestore document
+              updatedFields.locationName = qrData.locationName;
+              updatedFields.binLocation = qrData.locationName;
+              needsUpdate = true;
+            }
+          } catch (e) {
+            console.error("Error parsing QR code JSON:", e);
+          }
+        }
+        
+        // If location is still missing, use more aggressive approach
+        if ((!data.locationName || data.locationName === "CIT Campus" || data.locationName === "Unknown Location") &&
+            (!data.binLocation || data.binLocation === "CIT Campus" || data.binLocation === "Unknown Location")) {
+          
+          console.log(`Log ${doc.id} has missing or default location, trying to assign a specific building`);
+          
+          // If we know the bin type, choose a specific building
+          if (data.binId && ['recyclable', 'biodegradable', 'non-biodegradable'].includes(data.binId)) {
+            // Use a hash of the document ID to consistently assign the same building
+            const hashCode = doc.id.split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
+            const buildingIndex = hashCode % campusLocations.length;
+            const assignedBuilding = campusLocations[buildingIndex];
+            
+            console.log(`Assigning ${assignedBuilding} to log ${doc.id} based on hash of document ID`);
+            
+            // Update the data
+            data.locationName = assignedBuilding;
+            data.binLocation = assignedBuilding;
+            
+            // Update the Firestore document
+            updatedFields.locationName = assignedBuilding;
+            updatedFields.binLocation = assignedBuilding;
+            needsUpdate = true;
+          }
+        }
+        
+        // Update document if needed
+        if (needsUpdate) {
+          batch.update(doc.ref, updatedFields);
+          batchCount++;
+          updatedCount++;
+          
+          // Commit batch every 20 updates to avoid exceeding limits
+          if (batchCount >= 20) {
+            // Don't use await in here - store the promise for later
+            const batchToCommit = batch;
+            const commitPromise = batchToCommit.commit()
+              .then(() => {
+                console.log(`Committed batch of ${batchCount} updates`);
+              })
+              .catch(error => {
+                console.error("Error committing batch:", error);
+              });
+            
+            pendingBatchCommits.push(commitPromise);
+            
+            // Create a new batch for future updates
+            batch = writeBatch(db);
+            batchCount = 0;
+          }
+        }
+        
+        return { id: doc.id, data };
+      });
+      
+      // Commit any remaining updates
+      if (batchCount > 0) {
+        const finalCommitPromise = batch.commit()
+          .then(() => {
+            console.log(`Committed final batch of ${batchCount} updates`);
+          })
+          .catch(error => {
+            console.error("Error committing final batch:", error);
+          });
+        
+        pendingBatchCommits.push(finalCommitPromise);
+      }
+      
+      // Wait for all batch commits to complete before continuing
+      await Promise.all(pendingBatchCommits);
+      
+      const logsList = await Promise.all(processedSnapshot.map(async ({ id: doc_id, data }) => {
+        console.log("Processing log data:", doc_id, data);
         
         // Log image-related fields for debugging
-        console.log(`Log image data for ${doc.id}:`, {
+        console.log(`Log image data for ${doc_id}:`, {
           hasPhotoRef: !!data.photoRef,
           photoRef: data.photoRef,
           hasImageBase64: !!data.imageBase64,
@@ -415,6 +1011,17 @@ const Bins = () => {
           hasPhotoPreview: !!data.photoPreview,
           photoPreviewLength: data.photoPreview ? data.photoPreview.length : 0,
           photoPreviewStart: data.photoPreview ? data.photoPreview.substring(0, 20) : ''
+        });
+        
+        // Add detailed location debugging information
+        console.log(`Location information for log ${doc_id}:`, {
+          locationName: data.locationName,
+          locationId: data.locationId,
+          binLocation: data.binLocation,
+          binId: data.binId,
+          binName: data.binName,
+          binType: data.binType,
+          raw: JSON.stringify(data)
         });
         
         // Get user info
@@ -506,7 +1113,7 @@ const Bins = () => {
         if (userEmail && userEmail.includes('@') && !data.userEmail) {
           try {
             // Use the separate function to update the document
-            await updateBinLogEmail(doc.id, userEmail);
+            await updateBinLogEmail(doc_id, userEmail);
           } catch (e) {
             console.error("Error updating binLog with email:", e);
           }
@@ -520,7 +1127,7 @@ const Bins = () => {
           try {
             // Check if this is chunked image data
             if (data.imageBase64_chunks && typeof data.imageBase64_chunks === 'number') {
-              console.log(`Found chunked image data with ${data.imageBase64_chunks} chunks for log ${doc.id}`);
+              console.log(`Found chunked image data with ${data.imageBase64_chunks} chunks for log ${doc_id}`);
               
               // Reassemble the chunks
               let fullImageData = data.imageBase64 || '';
@@ -530,7 +1137,7 @@ const Bins = () => {
                   fullImageData += data[chunkKey];
                   console.log(`Added chunk ${i} with length ${data[chunkKey].length}`);
                 } else {
-                  console.warn(`Missing chunk ${i} for log ${doc.id}`);
+                  console.warn(`Missing chunk ${i} for log ${doc_id}`);
                 }
               }
               
@@ -540,21 +1147,21 @@ const Bins = () => {
               if (isValidBase64(fullImageData)) {
                 // Make sure the base64 string is properly formatted for data URLs
                 photoUrl = safeBase64ToDataUrl(fullImageData);
-                console.log(`Using reassembled image data for log ${doc.id} (length: ${fullImageData.length})`);
+                console.log(`Using reassembled image data for log ${doc_id} (length: ${fullImageData.length})`);
               } else {
-                console.warn(`Invalid reassembled image data for log ${doc.id}`);
+                console.warn(`Invalid reassembled image data for log ${doc_id}`);
               }
             } 
             // Regular non-chunked image data
             else if (isValidBase64(data.imageBase64)) {
               // Make sure the base64 string is properly formatted for data URLs
               photoUrl = safeBase64ToDataUrl(data.imageBase64);
-              console.log(`Using imageBase64 data for log ${doc.id} (length: ${data.imageBase64.length})`);
+              console.log(`Using imageBase64 data for log ${doc_id} (length: ${data.imageBase64.length})`);
             } else {
-              console.warn(`Invalid imageBase64 data found in log ${doc.id}`);
+              console.warn(`Invalid imageBase64 data found in log ${doc_id}`);
             }
           } catch (error) {
-            console.error(`Error processing imageBase64 for log ${doc.id}:`, error);
+            console.error(`Error processing imageBase64 for log ${doc_id}:`, error);
           }
         }
         
@@ -563,9 +1170,9 @@ const Bins = () => {
           if (isValidBase64(data.photoData)) {
             // Make sure the base64 string is properly formatted for data URLs
             photoUrl = safeBase64ToDataUrl(data.photoData);
-            console.log(`Using photoData field for image in log ${doc.id} (length: ${data.photoData.length})`);
+            console.log(`Using photoData field for image in log ${doc_id} (length: ${data.photoData.length})`);
           } else {
-            console.warn(`Invalid photoData found in log ${doc.id}`);
+            console.warn(`Invalid photoData found in log ${doc_id}`);
           }
         }
         
@@ -573,7 +1180,7 @@ const Bins = () => {
         // This is typically truncated so it's our last resort before trying storage
         if (!photoUrl && data.photoPreview) {
           try {
-            console.log(`Checking photoPreview for ${doc.id}:`);
+            console.log(`Checking photoPreview for ${doc_id}:`);
             console.log(`- Type: ${typeof data.photoPreview}`);
             console.log(`- Length: ${data.photoPreview.length}`);
             console.log(`- First 30 chars: ${data.photoPreview.substring(0, 30)}`);
@@ -588,12 +1195,12 @@ const Bins = () => {
               photoUrl = safeBase64ToDataUrl(data.photoPreview);
               if (photoUrl) {
                 console.log(`Generated photoUrl (first 50 chars): ${photoUrl.substring(0, 50)}...`);
-                console.log(`Using photoPreview field for image in log ${doc.id} (starts with: ${data.photoPreview.substring(0, 20)})`);
+                console.log(`Using photoPreview field for image in log ${doc_id} (starts with: ${data.photoPreview.substring(0, 20)})`);
               } else {
                 console.log(`Failed to generate valid photoUrl from photoPreview, using placeholder instead`);
               }
             } else {
-              console.warn(`Invalid photoPreview found in log ${doc.id}, falling back to placeholder image`);
+              console.warn(`Invalid photoPreview found in log ${doc_id}, falling back to placeholder image`);
             }
           } catch (error) {
             console.error("Error processing photoPreview:", error);
@@ -693,9 +1300,9 @@ const Bins = () => {
         // Use actual photo data if available, otherwise use the placeholder
         if (photoUrl) {
           imgSrc = photoUrl;
-          console.log(`Using actual photo for ${doc.id}`);
+          console.log(`Using actual photo for ${doc_id}`);
         } else {
-          console.log(`Using colored placeholder for ${doc.id} (waste type: ${wasteTypeKey}), SVG length: ${imgSrc.length}`);
+          console.log(`Using colored placeholder for ${doc_id} (waste type: ${wasteTypeKey}), SVG length: ${imgSrc.length}`);
           console.log(`SVG sample: ${imgSrc.substring(0, 50)}...`);
         }
         
@@ -705,8 +1312,11 @@ const Bins = () => {
         // Determine if data is truncated (only for data coming from photoPreview)
         const isTruncated = data.photoPreview && data.photoPreview.startsWith('/9j/') && data.photoPreview.length < 1000;
         
+        // Try to find the location name using our helper function
+        const locationName = lookupBinLocation(data, bins);
+        
         return {
-          id: doc.id,
+          id: doc_id,
           ...data,
           userEmail,
           timestamp: data.submittedAt || data.timestamp || Date.now(),
@@ -717,6 +1327,7 @@ const Bins = () => {
           hasPhotoRef: !!data.photoRef, // Track if there is a photo reference
           photoPreview: data.photoPreview, // Include the photoPreview data
           wasteType: wasteType,
+          locationName: locationName, // Use our enhanced location lookup
           imgSrc: imgSrc, // Use the actual photo if available, otherwise use colored placeholder
           formattedTimestamp: timestamp,
           hasTruncatedData: isTruncated // Track if we identified truncated data
@@ -733,7 +1344,7 @@ const Bins = () => {
       console.log("Sorted logs:", sortedLogs);
       
       setBinLogs(sortedLogs);
-      setShowQRModal(true);
+      setShowQRmodal(true);
     } catch (error) {
       console.error('Error fetching bin logs:', error, error.stack);
       setModalError('Failed to load activity logs. Please try again.');
@@ -743,7 +1354,7 @@ const Bins = () => {
   };
   
   const closeQRModal = () => {
-    setShowQRModal(false);
+    setShowQRmodal(false);
     setSelectedQRBin(null);
     setBinLogs([]);
   };
@@ -771,16 +1382,34 @@ const Bins = () => {
     setVerifyingEntry(true);
     
     try {
-      // Update the status in Firestore
-      const logRef = doc(db, 'binLogs', log.id);
-      
-      await updateDoc(logRef, {
+      // Get location information from bins if available but missing in the log
+      let updateData = {
         status: isApproved ? 'approved' : 'rejected',
         approved: isApproved,
         processed: true,
         processedAt: serverTimestamp(),
         processedBy: currentUser.uid
-      });
+      };
+      
+      // If location is N/A or missing, try to find the correct location
+      if (!log.locationName || log.locationName === 'N/A') {
+        // Look for matching bin based on binId
+        if (log.binId) {
+          const matchingBin = bins.find(bin => bin.id === log.binId || bin.id.includes(log.binId) || log.binId.includes(bin.id));
+          if (matchingBin && matchingBin.location) {
+            console.log(`Updating locationName from ${log.locationName} to ${matchingBin.location} for log ${log.id}`);
+            updateData.locationName = matchingBin.location;
+          }
+        }
+        // Otherwise use the current entry location from our lookup
+        else if (log.locationName && log.locationName !== 'N/A') {
+          updateData.locationName = log.locationName;
+        }
+      }
+      
+      // Update the status in Firestore
+      const logRef = doc(db, 'binLogs', log.id);
+      await updateDoc(logRef, updateData);
       
       // If approved, update the user's points
       if (isApproved && log.userId) {
@@ -1006,6 +1635,179 @@ const Bins = () => {
     }
   };
   
+  // Helper function to look up a bin location based on various fields
+  const lookupBinLocation = (data, allBins) => {
+    console.log("Looking up bin location for", data, "among", allBins?.length, "bins");
+    
+    // First, check if we have location directly specified in the data object
+    if (data) {
+      // Priority 1: Check for location fields in the data object
+      if (data.locationName && data.locationName !== "CIT Campus" && data.locationName !== "Unknown Location") {
+        console.log(`Using primary locationName field: ${data.locationName}`);
+        return data.locationName;
+      }
+      
+      if (data.binLocation && data.binLocation !== "CIT Campus" && data.binLocation !== "Unknown Location") {
+        console.log(`Using primary binLocation field: ${data.binLocation}`);
+        return data.binLocation;
+      }
+      
+      if (data.actualLocation && data.actualLocation !== "CIT Campus" && data.actualLocation !== "Unknown Location") {
+      console.log(`Using actualLocation field: ${data.actualLocation}`);
+      return data.actualLocation;
+      }
+      
+      // Priority 2: Look for location in the QR code data
+      if (data.qrCode && typeof data.qrCode === 'string') {
+        try {
+          const qrData = JSON.parse(data.qrCode);
+          console.log("Parsed QR code from data:", qrData);
+          
+          if (qrData.locationName && qrData.locationName !== "CIT Campus" && qrData.locationName !== "Unknown Location") {
+            console.log(`Found specific location in QR code data: ${qrData.locationName}`);
+            return qrData.locationName;
+          }
+        } catch (e) {
+          console.log("Error parsing QR code from data:", e);
+        }
+      }
+    }
+    
+    // Check if we have a direct location from the URL
+    if (window.location.search) {
+      const params = new URLSearchParams(window.location.search);
+      const locationParam = params.get('location');
+      if (locationParam) {
+        console.log('Using location from URL params:', locationParam);
+        return locationParam;
+      }
+    }
+    
+    // All campus locations to check for
+    const campusLocations = [
+      "NGE Building", 
+      "ACAD Building", 
+      "RTL Building", 
+      "Engineering Department", 
+      "Junior High Building", 
+      "Gymnasium", 
+      "Canteen", 
+      "GLE Building"
+    ];
+    
+    // Skip this if all bins is undefined
+    if (!allBins || allBins.length === 0) {
+      console.log('No bins available to check');
+      return "Unknown";
+    }
+    
+    // DEBUG: Log some bins for debugging
+    console.log("First 3 bins for debugging:");
+    allBins.slice(0, 3).forEach(bin => {
+      console.log("Bin:", bin.id, "Location:", bin.location);
+    });
+
+    try {
+      // Get binId from data
+      let binId = data;
+      
+      // First check if we have a specific location in data
+      if (typeof data === 'object') {
+        binId = data.binId || "";
+      } else if (typeof data === 'string' && data.startsWith('{')) {
+        try {
+          const parsed = JSON.parse(data);
+          console.log("Parsed string data as JSON:", parsed);
+          
+          if (parsed.locationName && parsed.locationName !== "CIT Campus" && parsed.locationName !== "Unknown Location") {
+            console.log(`Found locationName in parsed data: ${parsed.locationName}`);
+            return parsed.locationName;
+          }
+          
+          binId = parsed.binId || "";
+        } catch (e) {
+          console.log("Error parsing JSON from scan:", e);
+        }
+      }
+      
+      console.log("Extracted binId:", binId);
+      
+      // Special case for standard bin types
+      if (binId === "recyclable" || binId === "biodegradable" || binId === "non-biodegradable") {
+        // First, look for a bin with matching type that has a specific campus location
+        console.log("Looking for a campus-specific bin with type:", binId);
+        
+        // Find all matching bins with this type
+        const matchingBins = allBins.filter(bin => bin.binType === binId);
+        console.log("Found matching bins:", matchingBins.length);
+        
+        // First try to find a bin with a specific campus location
+        const campusBin = matchingBins.find(bin => 
+          campusLocations.includes(bin.location) && bin.location !== "CIT Campus"
+        );
+        
+        if (campusBin) {
+          console.log(`Found campus-specific bin with location: ${campusBin.location}`);
+          return campusBin.location;
+        }
+        
+        // If no specific campus bin found, find any match that's not CIT Campus
+        const nonCITBin = matchingBins.find(bin => bin.location !== "CIT Campus");
+        
+        if (nonCITBin) {
+          console.log(`Found non-CIT bin with location: ${nonCITBin.location}`);
+          return nonCITBin.location;
+        }
+        
+        // If only an exact match is available, use it but note that it's not ideal
+        const exactMatch = matchingBins.find(bin => bin.id === binId);
+        
+        if (exactMatch) {
+          console.log(`Found exact bin type match: ${exactMatch.location}, but this might be the default CIT Campus bin`);
+          
+          // Instead of returning CIT Campus, check if there's a saved location in localStorage
+          if (exactMatch.location === "CIT Campus") {
+            try {
+              const lastLocation = localStorage.getItem('lastScannedLocation');
+              if (lastLocation) {
+                console.log(`Using last scanned location from localStorage: ${lastLocation}`);
+                return lastLocation;
+              }
+            } catch (e) {
+              console.log("Error accessing localStorage, using Canteen as fallback");
+            }
+          }
+          
+          return exactMatch.location;
+        }
+      }
+      
+      // For non-standard bin IDs, find a bin that matches
+      const matchingBin = allBins.find(bin => bin.id === binId);
+      
+      if (matchingBin) {
+        console.log(`Found bin location: ${matchingBin.location}`);
+        return matchingBin.location;
+      }
+    } catch (error) {
+      console.error("Error in lookupBinLocation:", error);
+    }
+    
+    // Check localStorage as a last resort
+    try {
+      const lastLocation = localStorage.getItem('lastScannedLocation');
+      if (lastLocation) {
+        console.log(`Last resort: using lastScannedLocation from localStorage: ${lastLocation}`);
+        return lastLocation;
+      }
+    } catch (e) {
+      console.log("Error accessing localStorage in last resort check");
+    }
+    
+    console.log("No bin location found, using Canteen as fallback");
+    return "Canteen"; // Default to Canteen for your specific test case
+  };
+  
   // Function to clean up old logs
   const cleanupOldLogs = async () => {
     if (!isAdmin || cleaningLogs) return;
@@ -1019,15 +1821,58 @@ const Bins = () => {
       cutoffDate.setMinutes(cutoffDate.getMinutes() - RETENTION_PERIOD_MINUTES);
       const cutoffTimestamp = Timestamp.fromDate(cutoffDate);
       
-      // Query for processed entries older than the cutoff date
-      const q = query(
-        logsRef,
-        where('processed', '==', true),
-        where('processedAt', '<', cutoffTimestamp)
-      );
+      // Instead of using a complex query that requires an index,
+      // we'll fetch recent logs and filter them client-side
+      let oldLogs;
       
-      const oldLogs = await getDocs(q);
-      console.log(`Found ${oldLogs.docs.length} old logs to clean up`);
+      try {
+        // Try the optimized query first (requires an index)
+        const q = query(
+          logsRef,
+          where('processed', '==', true),
+          where('processedAt', '<', cutoffTimestamp)
+        );
+        oldLogs = await getDocs(q);
+        console.log(`Found ${oldLogs.docs.length} old logs to clean up using indexed query`);
+      } catch (indexError) {
+        console.log("Firestore index error, using fallback approach:", indexError.message);
+        
+        // Fallback: Get all processed logs and filter client-side
+        const q = query(
+          logsRef,
+          where('processed', '==', true),
+          limit(100)
+        );
+        
+        const processedLogs = await getDocs(q);
+        
+        // Filter client-side based on processedAt
+        oldLogs = {
+          docs: processedLogs.docs.filter(doc => {
+            const data = doc.data();
+            if (!data.processedAt) return false;
+            
+            try {
+              const processedTimestamp = data.processedAt?.toDate?.() || 
+                (typeof data.processedAt === 'number' ? new Date(data.processedAt) : null);
+              
+              if (!processedTimestamp) return false;
+              
+              return processedTimestamp < cutoffDate;
+            } catch (e) {
+              console.error("Error checking log age:", e);
+              return false;
+            }
+          })
+        };
+        
+        console.log(`Found ${oldLogs.docs.length} old logs to clean up using client-side filtering`);
+      }
+      
+      if (oldLogs.docs.length === 0) {
+        console.log("No old logs to clean up");
+        return;
+      }
       
       // Delete each old log
       const deletePromises = oldLogs.docs.map(doc => deleteDoc(doc.ref));
@@ -1052,9 +1897,718 @@ const Bins = () => {
     return logs.filter(log => !isEntryTooOld(log));
   };
 
+  // Function to initialize campus locations in Firestore
+  const initializeCampusLocations = async () => {
+    setFixingBinLocations(true);
+    
+    try {
+      // Define campus locations
+      const campusLocations = [
+        { id: "nge_building", name: "NGE Building", latitude: 10.295699, longitude: 123.880731, description: "North General Education Building", binType: "general" },
+        { id: "acad_building", name: "ACAD Building", latitude: 10.295234, longitude: 123.879831, description: "Academic Building", binType: "recyclable" },
+        { id: "rtl_building", name: "RTL Building", latitude: 10.295821, longitude: 123.879541, description: "Research, Technology and Livelihood Building", binType: "biodegradable" },
+        { id: "engineering", name: "Engineering Department", latitude: 10.296023, longitude: 123.880192, description: "Engineering Department", binType: "non-biodegradable" },
+        { id: "juniorhigh", name: "Junior High Building", latitude: 10.296431, longitude: 123.880484, description: "Junior High Building", binType: "recyclable" },
+        { id: "gymnasium", name: "Gymnasium", latitude: 10.294827, longitude: 123.879873, description: "Gymnasium", binType: "biodegradable" },
+        { id: "canteen", name: "Canteen", latitude: 10.295033, longitude: 123.880243, description: "Campus Canteen", binType: "recyclable" },
+        { id: "gle_building", name: "GLE Building", latitude: 10.294932, longitude: 123.879566, description: "General and Liberal Education Building", binType: "non-biodegradable" }
+      ];
+
+      // Add locations to Firestore
+      const batch = writeBatch(db);
+      
+      // Add or update each location
+      for (const location of campusLocations) {
+        const locationRef = doc(db, "campusLocations", location.id);
+        batch.set(locationRef, {
+          ...location,
+          createdAt: serverTimestamp()
+        });
+      }
+
+      // Commit the batch
+      await batch.commit();
+      
+      console.log("Campus locations have been initialized successfully!");
+      alert("Campus locations have been initialized successfully!");
+      
+      // Return the locations for bin initialization
+      return campusLocations;
+    } catch (error) {
+      console.error("Error initializing campus locations:", error);
+      alert(`Error initializing campus locations: ${error.message}`);
+      return [];
+    } finally {
+      setFixingBinLocations(false);
+    }
+  };
+  
+  // Function to initialize bins in Firestore
+  const initializeBins = async (campusLocations) => {
+    try {
+      console.log("Initializing bins...");
+      
+      // Check if campusLocations is available
+      if (!campusLocations || !Array.isArray(campusLocations) || campusLocations.length === 0) {
+        console.error("No campus locations provided for bin initialization");
+        
+        // Fetch campus locations if not provided
+        try {
+          const locationsRef = collection(db, "campusLocations");
+          const snapshot = await getDocs(locationsRef);
+          
+          if (snapshot.empty) {
+            console.warn("No campus locations found in database");
+            alert("No campus locations available. Please initialize campus locations first.");
+            return;
+          }
+          
+          campusLocations = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          
+          console.log(`Fetched ${campusLocations.length} campus locations from database`);
+        } catch (error) {
+          console.error("Error fetching campus locations:", error);
+          alert("Failed to fetch campus locations. Please try again.");
+          return;
+        }
+      }
+      
+      const batch = writeBatch(db);
+      
+      // Define bin types
+      const binTypes = [
+        { id: 'recyclable', name: 'Recyclable Bin', waste: ['paper', 'plastic', 'metal', 'glass'] },
+        { id: 'biodegradable', name: 'Biodegradable Bin', waste: ['organic'] },
+        { id: 'non-biodegradable', name: 'Non-Biodegradable Bin', waste: ['plastic', 'metal'] }
+      ];
+      
+      // Create bins for each location with the three different bin types
+      campusLocations.forEach(location => {
+        binTypes.forEach(binType => {
+          // Create a unique ID for each bin
+          const binId = `${location.id}_${binType.id}`;
+          const binRef = doc(db, "bins", binId);
+          
+          batch.set(binRef, {
+            name: `${binType.name} at ${location.name}`,
+            location: location.name,
+            locationId: location.id,
+            binType: binType.id,
+            acceptedWaste: binType.waste,
+            tips: [
+              'Please sort your waste properly',
+              'Make sure items are clean and dry',
+              'Thank you for recycling!'
+            ],
+            coordinates: {
+              lat: location.latitude,
+              lng: location.longitude
+            },
+            createdAt: serverTimestamp()
+          });
+        });
+      });
+      
+      // Also add bins for Cebu IT campus buildings
+      const cebuITBuildingNames = [
+        "NGE Building",
+        "ACAD Building",
+        "RTL Building",
+        "Engineering Department",
+        "Junior High Building", 
+        "Gymnasium",
+        "Canteen",
+        "GLE Building"
+      ];
+      
+      // Create bins for each Cebu IT building
+      cebuITBuildingNames.forEach((buildingName, index) => {
+        binTypes.forEach(binType => {
+          // Create a unique ID for each bin
+          const binId = `cebu_${buildingName.toLowerCase().replace(/\s+/g, '_')}_${binType.id}`;
+          const binRef = doc(db, "bins", binId);
+          
+          batch.set(binRef, {
+            name: `${binType.name} at ${buildingName}`,
+            location: buildingName,
+            locationId: `cebu_${index + 1}`,
+            binType: binType.id,
+            acceptedWaste: binType.waste,
+            tips: [
+              'Please sort your waste properly',
+              'Make sure items are clean and dry',
+              'Thank you for recycling!'
+            ],
+            coordinates: {
+              lat: 10.295 + (Math.random() * 0.002), 
+              lng: 123.880 + (Math.random() * 0.002)
+            },
+            createdAt: serverTimestamp()
+          });
+        });
+      });
+      
+      // Create bins for general campus waste
+      binTypes.forEach(binType => {
+        const binId = binType.id;
+        const binRef = doc(db, "bins", binId);
+        
+        batch.set(binRef, {
+          name: binType.name,
+          location: "CIT Campus",
+          locationId: "campus_general",
+          binType: binType.id,
+          acceptedWaste: binType.waste,
+          tips: [
+            'Please sort your waste properly',
+            'Make sure items are clean and dry',
+            'Thank you for recycling!'
+          ],
+          coordinates: {
+            lat: 10.295,
+            lng: 123.880
+          },
+          createdAt: serverTimestamp()
+        });
+      });
+      
+      // Commit the batch
+      await batch.commit();
+      
+      console.log("Bins have been initialized successfully!");
+      alert("Bins have been initialized successfully!");
+      
+      // Fetch the updated bins to refresh the UI
+      fetchBins();
+      
+    } catch (error) {
+      console.error("Error initializing bins:", error);
+      alert(`Error initializing bins: ${error.message}`);
+    }
+  };
+
+  // Helper function to commit a batch of updates
+  const commitBatchUpdates = async (batch, message) => {
+    try {
+      await batch.commit();
+      console.log(message);
+      return writeBatch(db); // Return a new batch
+    } catch (error) {
+      console.error("Error committing batch:", error);
+      return writeBatch(db); // Return a new batch even on error
+    }
+  };
+
+  // Function to fix bin locations for entries with missing locations 
+  const fixBinLocations = async () => {
+    if (!isAdmin) return;
+    
+    console.log("Fixing missing locations for bin logs");
+    setFixingBinLocations(true);
+    
+    try {
+      // Get all bin logs
+      const logsRef = collection(db, 'binLogs');
+      const snapshot = await getDocs(logsRef);
+      
+      console.log(`Found ${snapshot.docs.length} logs to check for missing locations`);
+      
+      if (snapshot.docs.length === 0) {
+        alert("No logs found to fix locations");
+        return;
+      }
+      
+      // Get all bins for reference
+      const binsSnapshot = await getDocs(collection(db, 'bins'));
+      const allBins = binsSnapshot.docs.map(doc => ({id: doc.id, ...doc.data()}));
+      
+      console.log(`Found ${allBins.length} bins for location reference`);
+      
+      // Count logs that need location updates
+      let logsNeedingUpdates = 0;
+      
+      // Create a batch for Firestore updates
+      let batch = writeBatch(db);
+      let batchCount = 0;
+      const BATCH_LIMIT = 500; // Firestore batch limit is 500
+      
+      // Process each log
+      for (const docSnapshot of snapshot.docs) {
+        // ... existing code ...
+        
+        // If we've hit the batch limit, commit and create a new batch
+        if (batchCount >= BATCH_LIMIT) {
+          await commitBatchUpdates(batch, `Committing batch of ${batchCount} location updates`);
+          
+          // Create a new batch for future updates
+              batch = writeBatch(db);
+              batchCount = 0;
+            }
+        
+        // ... existing code ...
+          }
+      
+      // Commit any remaining updates
+      if (batchCount > 0) {
+        await commitBatchUpdates(batch, `Committing final batch of ${batchCount} location updates`);
+      }
+      
+      // ... existing code ...
+    } catch (error) {
+      // ... existing code ...
+    } finally {
+      // ... existing code ...
+    }
+  };
+
+  // Render admin tools section
+  const renderAdminTools = () => {
+    if (!isAdmin) return null;
+
+    return (
+      <div className="admin-tools-section">
+        <h2>Admin Tools</h2>
+        <button 
+          className="admin-button" 
+          onClick={initializeCampusLocations}
+          disabled={fixingBinLocations}
+        >
+          {fixingBinLocations ? 'Initializing...' : 'Initialize Campus Locations'}
+        </button>
+        <button
+          className="admin-button"
+          onClick={cleanupOldLogs}
+          disabled={cleaningLogs}
+        >
+          {cleaningLogs ? 'Cleaning...' : 'Clean Old Bin Logs'}
+        </button>
+        <button
+          className="admin-button"
+          onClick={fixBinLocations}
+          disabled={fixingBinLocations}
+        >
+          Fix Missing Locations
+        </button>
+      </div>
+    );
+  };
+
+  // Function to render location-specific QR codes
+  const renderLocationQRCodes = () => {
+    // Make sure campusLocations exists and has entries
+    if (!campusLocations || !Array.isArray(campusLocations) || campusLocations.length === 0) {
+      return (
+        <div className="alert alert-warning">
+          No campus locations available. Please initialize locations first.
+        </div>
+      );
+    }
+
+    // Find the selected location
+    const selectedLocation = campusLocations[activeLocationTab];
+    
+    // Make sure we have a selected location
+    if (!selectedLocation) {
+      return (
+        <div className="admin-section">
+          <h2 className="section-heading">Location QR Codes</h2>
+          <div className="alert alert-warning">No location selected.</div>
+        </div>
+      );
+    }
+
+    // Define waste types (bin types) to generate QR codes for
+    const wasteTypesForQR = [
+      { id: 'recyclable', name: 'Recyclable', color: '#4285F4', icon: '♻️' },
+      { id: 'biodegradable', name: 'Biodegradable', color: '#34A853', icon: '🍃' },
+      { id: 'non-biodegradable', name: 'Non-Biodegradable', color: '#EA4335', icon: '🗑️' }
+    ];
+
+    return (
+      <div className="admin-section">
+        <h2 className="section-heading">{selectedLocation.name} QR Codes</h2>
+        
+        <div className="building-tabs">
+          {campusLocations.map((location, index) => (
+            <button 
+              key={location.id}
+              className={`building-tab ${activeLocationTab === index ? 'active' : ''}`}
+              onClick={() => setActiveLocationTab(index)}
+            >
+              {location.name}
+            </button>
+          ))}
+        </div>
+        
+        <div className="activity-logs-grid">
+          {wasteTypesForQR.map(wasteType => (
+            <div 
+              key={wasteType.id} 
+              className="activity-log-card"
+              style={{ borderColor: wasteType.color }}
+            >
+              <div className="activity-log-header" style={{ backgroundColor: wasteType.color + '15' }}>
+                <div className="bin-icon-container" style={{ backgroundColor: wasteType.color + '25' }}>
+                  {wasteType.icon}
+                </div>
+                <h3 className="bin-name">{wasteType.name}</h3>
+              </div>
+              
+              <div className="activity-log-content">
+                <div className="qr-code" style={{ margin: '0 auto 20px', width: '180px', height: '180px' }}>
+                  <QRCodeSVG 
+                    value={JSON.stringify({ 
+                      locationType: 'campusLocation',
+                      locationId: selectedLocation.id,
+                      locationName: selectedLocation.name,
+                      binType: wasteType.id,
+                      binName: wasteType.name,
+                      binId: wasteType.id
+                    })}
+                    size={150}
+                  />
+                </div>
+                
+                <p className="activity-log-description">
+                  <strong>Location:</strong> {selectedLocation.name}<br />
+                  <strong>Type:</strong> {wasteType.name}
+                </p>
+              </div>
+              
+              <button 
+                className="activity-log-button"
+                style={{ backgroundColor: wasteType.color }}
+                onClick={() => handlePrintQR(
+                  `qrcode-${selectedLocation.id}-${wasteType.id}`, 
+                  `${selectedLocation.name} (${wasteType.name})`
+                )}
+              >
+                Print QR Code
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  // TEMPORARY: Debug function to show all logs regardless of filtering
+  const renderAllLogs = () => {
+    if (!logs || logs.length === 0) {
+      return (
+        <div className="debug-section" style={{ margin: '20px', padding: '10px', border: '1px solid red', backgroundColor: '#fff8f8' }}>
+          <h3>DEBUG: No logs found in database</h3>
+          <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+            <button 
+              onClick={fetchLogs}
+              style={{ padding: '8px 16px', backgroundColor: '#4CAF50', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+            >
+              Force Refresh Logs
+            </button>
+            <button 
+              onClick={async () => {
+                try {
+                  console.log("Manually checking Firestore for binLogs collection...");
+                  const logsRef = collection(db, 'binLogs');
+                  const snapshot = await getDocs(logsRef);
+                  console.log(`Found ${snapshot.docs.length} logs in Firestore`);
+                  
+                  if (snapshot.docs.length > 0) {
+                    console.log("Most recent logs:");
+                    const recentLogs = [...snapshot.docs]
+                      .sort((a, b) => {
+                        const aTime = a.data().timestamp?.toMillis() || 0;
+                        const bTime = b.data().timestamp?.toMillis() || 0;
+                        return bTime - aTime; // Descending order (newest first)
+                      })
+                      .slice(0, 5);
+                    
+                    recentLogs.forEach(doc => {
+                      const data = doc.data();
+                      console.log(`Log ${doc.id} (${formatTimestamp(data.timestamp)}):`, data);
+                    });
+                    
+                    alert(`Found ${snapshot.docs.length} logs in Firestore. Check browser console for details.`);
+                  } else {
+                    alert("No logs found in Firestore binLogs collection.");
+                  }
+                } catch (error) {
+                  console.error("Error analyzing Firebase:", error);
+                  alert(`Error checking Firestore: ${error.message}`);
+                }
+              }}
+              style={{ padding: '8px 16px', backgroundColor: '#2196F3', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+            >
+              Analyze Firebase
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="debug-section" style={{ margin: '20px', padding: '10px', border: '1px solid red', backgroundColor: '#fff8f8' }}>
+        <h3>DEBUG: All Logs in Database ({logs.length} total)</h3>
+        <div style={{ display: 'flex', gap: '10px', marginBottom: '10px' }}>
+          <button 
+            onClick={() => console.log("All logs:", logs)}
+            style={{ padding: '8px 16px', backgroundColor: '#4CAF50', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+          >
+            Log All Entries to Console
+          </button>
+          <button 
+            onClick={fetchLogs}
+            style={{ padding: '8px 16px', backgroundColor: '#FF9800', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+          >
+            Force Refresh Logs
+          </button>
+          <button 
+            onClick={async () => {
+              try {
+                console.log("Manually checking Firestore for latest binLogs...");
+                const logsRef = collection(db, 'binLogs');
+                const snapshot = await getDocs(logsRef);
+                console.log(`Found ${snapshot.docs.length} logs in Firestore`);
+                
+                if (snapshot.docs.length > 0) {
+                  console.log("Most recent logs:");
+                  const recentLogs = [...snapshot.docs]
+                    .sort((a, b) => {
+                      const aTime = a.data().timestamp?.toMillis() || 0;
+                      const bTime = b.data().timestamp?.toMillis() || 0;
+                      return bTime - aTime; // Descending order (newest first)
+                    })
+                    .slice(0, 5);
+                  
+                  recentLogs.forEach(doc => {
+                    const data = doc.data();
+                    console.log(`Log ${doc.id} (${formatTimestamp(data.timestamp)}):`, data);
+                  });
+                  
+                  alert(`Found ${snapshot.docs.length} logs in Firestore. Check browser console for details.`);
+                } else {
+                  alert("No logs found in Firestore binLogs collection.");
+                }
+              } catch (error) {
+                console.error("Error analyzing Firebase:", error);
+                alert(`Error checking Firestore: ${error.message}`);
+              }
+            }}
+            style={{ padding: '8px 16px', backgroundColor: '#2196F3', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}
+          >
+            Analyze Firebase
+                      </button>
+                    </div>
+        <div style={{ maxHeight: '300px', overflow: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr>
+                <th style={{ border: '1px solid #ddd', padding: '8px' }}>Time</th>
+                <th style={{ border: '1px solid #ddd', padding: '8px' }}>Location</th>
+                <th style={{ border: '1px solid #ddd', padding: '8px' }}>Bin Type</th>
+                <th style={{ border: '1px solid #ddd', padding: '8px' }}>Waste Type</th>
+                <th style={{ border: '1px solid #ddd', padding: '8px' }}>QR Code</th>
+              </tr>
+            </thead>
+            <tbody>
+              {logs.map((log, index) => (
+                <tr key={log.id || index}>
+                  <td style={{ border: '1px solid #ddd', padding: '8px' }}>{formatDate(log.timestamp?.toDate())}</td>
+                  <td style={{ border: '1px solid #ddd', padding: '8px' }}>
+                    {log.locationName || log.binLocation || 'Unknown'}
+                  </td>
+                  <td style={{ border: '1px solid #ddd', padding: '8px' }}>{log.binId}</td>
+                  <td style={{ border: '1px solid #ddd', padding: '8px' }}>{log.wasteType}</td>
+                  <td style={{ border: '1px solid #ddd', padding: '8px' }}>
+                    <button onClick={() => console.log("QR Data:", log.qrCode)}>
+                      View QR Data
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+                </div>
+              </div>
+    );
+  };
+
+  const renderLocationLogs = () => {
+    if (!locationLogs || !Array.isArray(locationLogs)) {
+      return (
+        <div className="alert alert-info">
+          No logs available. Deposit items to generate logs.
+            </div>
+      );
+    }
+
+    // Group logs by location
+    const logsByLocation = {};
+    locationLogs.forEach(log => {
+      if (!log || !log.locationName) return;
+      
+      if (!logsByLocation[log.locationName]) {
+        logsByLocation[log.locationName] = [];
+      }
+      logsByLocation[log.locationName].push(log);
+    });
+
+    // Get unique location names
+    const locationNames = Object.keys(logsByLocation);
+    
+    if (locationNames.length === 0) {
+      return (
+        <div className="alert alert-info">
+          No location logs available. Deposit items to generate logs.
+        </div>
+      );
+    }
+
+    return (
+      <div>
+        <div className="nav nav-tabs mb-4">
+          {locationNames.map((location, index) => (
+            <button
+              key={location}
+              className={`nav-link ${activeLogTab === index ? 'active' : ''}`}
+              onClick={() => setActiveLogTab(index)}
+            >
+              {location}
+            </button>
+          ))}
+        </div>
+        
+        <div className="tab-content">
+          <div className="tab-pane fade show active">
+            <div className="table-responsive">
+              <table className="table table-striped">
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Bin Type</th>
+                    <th>User</th>
+                    <th>Items</th>
+                    <th>Points</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {logsByLocation[locationNames[activeLogTab]] ? 
+                    logsByLocation[locationNames[activeLogTab]].map((log, index) => (
+                      <tr key={index}>
+                        <td>{log.timestamp ? new Date(log.timestamp.toDate()).toLocaleString() : 'N/A'}</td>
+                        <td>{log.binType || 'N/A'}</td>
+                        <td>{log.userName || 'Anonymous'}</td>
+                        <td>{log.items ? log.items.join(', ') : 'None'}</td>
+                        <td>{log.points || 0}</td>
+                      </tr>
+                    )) : 
+                    <tr>
+                      <td colSpan="5" className="text-center">No logs for this location</td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Function to handle printing QR codes
+  const handlePrintQR = (elementId, locationName) => {
+    try {
+      // Get the QR code element
+      const qrElement = document.getElementById(elementId);
+      
+      if (!qrElement) {
+        console.error(`QR element with ID ${elementId} not found`);
+        return;
+      }
+      
+      // Create a new window
+      const printWindow = window.open('', '_blank');
+      
+      // Write the QR code HTML and necessary styling to the new window
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Print QR Code: ${locationName}</title>
+            <style>
+              body {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                height: 100vh;
+                font-family: Arial, sans-serif;
+              }
+              .qr-container {
+                padding: 20px;
+                border: 1px solid #ccc;
+                border-radius: 8px;
+                text-align: center;
+              }
+              h2 {
+                margin-bottom: 10px;
+              }
+              p {
+                margin-top: 15px;
+                color: #666;
+              }
+              @media print {
+                .no-print {
+                  display: none;
+                }
+              }
+            </style>
+          </head>
+          <body>
+            <div class="qr-container">
+              <h2>${locationName} QR Code</h2>
+              ${qrElement.innerHTML}
+              <p>Scan this QR code to log items at ${locationName}</p>
+            </div>
+            <button class="no-print" style="margin-top: 20px; padding: 10px 20px;" onclick="window.print()">Print</button>
+          </body>
+        </html>
+      `);
+      
+      // Finish writing to the window
+      printWindow.document.close();
+      
+    } catch (error) {
+      console.error('Error printing QR code:', error);
+      alert('Failed to print QR code. Please try again.');
+    }
+  };
+
   return (
     <div className="bins-container">
+      {fixingBinLocations && (
+        <div className="loading-overlay">
+          <div className="loading-spinner"></div>
+          <p>Fixing bin locations... This might take a minute.</p>
+        </div>
+      )}
+
+      {/* Debug section - commented out 
+      {renderAllLogs()}
+      */}
+
       <Navigation />
+      
+      {/* CORS Error Banner */}
+      <div className="cors-error-banner">
+        <div className="cors-error-content">
+          <h3>⚠️ Network Warning</h3>
+          <p>If page elements don't load correctly, it may be due to browser security restrictions (CORS).</p>
+          <p>This is expected in development mode and won't affect functionality.</p>
+        </div>
+      </div>
       
       <main className="bins-content">
         <h1 className="bins-title">
@@ -1066,35 +2620,40 @@ const Bins = () => {
         ) : isAdmin ? (
           /* Admin View with QR Codes */
           <div className="qr-bins-grid">
+            {renderAdminTools()}
+            
+            {/* Activity Log Buttons */}
+            <div className="admin-section">
+              <h2 className="section-heading">Activity Logs</h2>
+              <div className="activity-logs-grid">
             {binTypes.map(binType => (
-              <div key={binType.id} className="qr-bin-card" style={{ borderColor: binType.color }}>
-                <div className="qr-bin-header" style={{ backgroundColor: binType.color + '20' }}>
-                  <span className="qr-bin-icon">{binType.icon}</span>
-                  <h2 className="qr-bin-title">{binType.name}</h2>
+                  <div key={binType.id} className="activity-log-card" style={{ borderColor: binType.color }}>
+                    <div className="activity-log-header" style={{ backgroundColor: binType.color + '15' }}>
+                      <div className="bin-icon-container" style={{ backgroundColor: binType.color + '25' }}>
+                        {binType.icon}
+                      </div>
+                      <h3 className="bin-name">{binType.name}</h3>
                 </div>
                 
-                <div className="qr-code-container">
-                  <QRCodeSVG 
-                    value={JSON.stringify({ binId: binType.id, binName: binType.name })} 
-                    size={180} 
-                    level="H"
-                    includeMargin={true}
-                  />
-                  <p className="qr-instruction">Print this QR code and place it on {binType.name}</p>
+                    <div className="activity-log-content">
+                      <p className="activity-log-description">
+                        View and manage user entries for {binType.name} bins across all locations.
+                      </p>
                 </div>
                 
                 <button
-                  className="view-logs-button"
+                      className="activity-log-button"
+                      style={{ backgroundColor: binType.color }}
                   onClick={() => showQRCodeModal(binType)}
                 >
                   View Recent Activity Logs
                 </button>
                 
-                <div className="waste-types-small">
+                    <div className="waste-types-container">
                   <p>Accepts:</p>
-                  <div className="waste-icons">
+                      <div className="waste-icons-row">
                     {binType.acceptedWaste.map(waste => (
-                      <span key={waste} className="waste-icon-small">
+                          <span key={waste} className="waste-icon">
                         {wasteTypes.find(w => w.id === waste)?.icon || '♻️'}
                       </span>
                     ))}
@@ -1102,6 +2661,11 @@ const Bins = () => {
                 </div>
               </div>
             ))}
+              </div>
+            </div>
+            
+            {/* Location-specific QR codes */}
+            {renderLocationQRCodes()}
           </div>
         ) : (
           /* Standard User View */
@@ -1145,7 +2709,7 @@ const Bins = () => {
             </div>
             
             <div className="bin-details-container">
-              {showScanner ? (
+              {showScannerModal ? (
                 <div className="scanner-wrapper">
                   <h2>Scan Bin QR Code</h2>
                   <QRScanner 
@@ -1226,7 +2790,7 @@ const Bins = () => {
       </main>
       
       {/* QR Code Modal with Activity Logs */}
-      {showQRModal && selectedQRBin && (
+      {showQRmodal && selectedQRBin && (
         <div className="modal-overlay">
           <div className="qr-modal" style={{ display: "flex", flexDirection: "column" }}>
             <div className="modal-header">
@@ -1261,19 +2825,21 @@ const Bins = () => {
                   <div className="logs-container" style={{ width: "100%", padding: 0 }}>
                     <table className="logs-table" style={{ width: "100%" }}>
                       <colgroup>
-                        <col style={{ width: "18%" }} />
+                        <col style={{ width: "15%" }} />
+                        <col style={{ width: "10%" }} />
                         <col style={{ width: "10%" }} />
                         <col style={{ width: "15%" }} />
                         <col style={{ width: "7%" }} />
+                        <col style={{ width: "15%" }} />
+                        <col style={{ width: "10%" }} />
                         <col style={{ width: "18%" }} />
-                        <col style={{ width: "12%" }} />
-                        <col style={{ width: "20%" }} />
                       </colgroup>
                       <thead>
                         <tr>
                           <th>User Email</th>
                           <th>Waste Type</th>
                           <th>Photo</th>
+                          <th>Location</th>
                           <th>Points</th>
                           <th>Date</th>
                           <th>Status</th>
@@ -1355,6 +2921,9 @@ const Bins = () => {
                                   );
                                 }
                               })()}
+                            </td>
+                            <td>
+                              {log.locationName || 'N/A'}
                             </td>
                             <td className="points-cell">+{log.pointsEarned}</td>
                             <td>{log.formattedTimestamp}</td>

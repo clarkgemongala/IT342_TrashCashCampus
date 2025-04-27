@@ -15,6 +15,7 @@ public class ScanBin {
     private String message;
     private String fact;
     private LocalDateTime timestamp;
+    private String locationName;
 
     public ScanBin() {
         this.timestamp = LocalDateTime.now();
@@ -84,5 +85,13 @@ public class ScanBin {
 
     public void setTimestamp(LocalDateTime timestamp) {
         this.timestamp = timestamp;
+    }
+    
+    public String getLocationName() {
+        return locationName;
+    }
+    
+    public void setLocationName(String locationName) {
+        this.locationName = locationName;
     }
 }

@@ -63,6 +63,10 @@ dependencies {
     implementation ("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
     implementation ("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
     
+    // OpenStreetMap dependencies
+    implementation("org.osmdroid:osmdroid-android:6.1.16")
+    implementation("org.osmdroid:osmdroid-mapsforge:6.1.16")
+    
     // Retrofit for API calls
     implementation ("com.squareup.retrofit2:retrofit:2.9.0")
     implementation ("com.squareup.retrofit2:converter-gson:2.9.0")

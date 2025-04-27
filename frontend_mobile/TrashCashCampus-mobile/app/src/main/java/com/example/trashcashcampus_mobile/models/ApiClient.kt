@@ -1,6 +1,7 @@
 package com.example.trashcashcampus_mobile.models
 
 import android.util.Log
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
@@ -13,6 +14,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.net.SocketTimeoutException
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.Locale
 
 /**
  * API Client for handling network requests to the backend server.
@@ -31,6 +33,8 @@ class ApiClient {
         private const val SCAN_ENDPOINT = "$SERVER_BASE_URL/bins/scan"
         private const val RECYCLING_ENDPOINT = "$SERVER_BASE_URL/recycling/submit"
         private const val REWARDS_ENDPOINT = "$SERVER_BASE_URL/rewards"
+        private const val LOCATIONS_ENDPOINT = "$SERVER_BASE_URL/locations"
+        private const val LOCATION_QR_ENDPOINT = "$SERVER_BASE_URL/bins/location"
         
         // Increase timeout values for slower connections
         private const val CONNECTION_TIMEOUT = 30000 // 30 seconds timeout
@@ -282,6 +286,7 @@ class ApiClient {
                     Log.w(TAG, "Network operations disabled due to previous failures, returning simulated success")
                     return@withContext ScanResult(
                         success = true,
+                        status = "success",
                         message = "Your recycling has been processed successfully! (Offline Mode)",
                         pointsEarned = calculatePointsForWasteAndSize(wasteType, itemSize),
                         totalPoints = 250,
@@ -298,6 +303,7 @@ class ApiClient {
                         Log.e(TAG, "User ID is empty or null")
                         return@withContext ScanResult(
                             success = false,
+                            status = "error",
                             message = "User not authenticated. Please log in again."
                         )
                     }
@@ -305,13 +311,15 @@ class ApiClient {
                     // Extract bin info from QR code
                     var binId = binType
                     var binName = "Recycling Bin"
+                    var locationName: String? = null
                     
                     try {
                         // Try to parse QR code if it's JSON
                         val qrData = JSONObject(qrCode)
                         binId = qrData.optString("binId", binType)
                         binName = qrData.optString("binName", "Recycling Bin")
-                        Log.d(TAG, "Parsed QR code: binId=$binId, binName=$binName")
+                        locationName = qrData.optString("locationName", null)
+                        Log.d(TAG, "Parsed QR code: binId=$binId, binName=$binName, location=$locationName")
                     } catch (e: Exception) {
                         // If not JSON, use the string as binId
                         Log.d(TAG, "Using QR code as bin ID: $binId")
@@ -322,59 +330,109 @@ class ApiClient {
                     val sizeBonus = if (itemSize == "big") 5 else 0
                     val potentialPoints = basePoints + sizeBonus
                     
-                    // Submit through backend server
-                    val jsonData = JSONObject().apply {
-                        put("userId", userId)
-                        put("userName", userName)
-                        put("binId", binId)
-                        put("binName", binName)
-                        put("wasteType", wasteType)
-                        put("itemSize", itemSize)
-                        put("potentialPoints", potentialPoints)
-                        put("timestamp", timestamp)
-                        put("dateTime", dateTime)
-                        put("status", "pending")
-                        put("approved", false)
-                        put("processed", false)
-                        // Include photo data for verification if available
-                        if (photoBase64.isNotEmpty()) {
-                            // Log the photo data length for debugging
-                            Log.d(TAG, "Including photo data in request, length: ${photoBase64.length}")
-                            // Send the full photo data - the backend will handle storage appropriately
-                            put("photoData", photoBase64)
+                    // Submit to Firestore
+                    val db = FirebaseFirestore.getInstance()
+                    val binLog = HashMap<String, Any>()
+                    
+                    binLog["userId"] = userId
+                    binLog["userName"] = userName
+                    binLog["timestamp"] = timestamp
+                    binLog["dateTime"] = dateTime
+                    binLog["binId"] = binId
+                    binLog["wasteType"] = wasteType
+                    binLog["photoUrl"] = photoBase64
+                    binLog["qrCode"] = qrCode
+                    binLog["itemSize"] = itemSize
+                    binLog["pointsEarned"] = potentialPoints
+                    binLog["status"] = "pending"
+                    binLog["photoPreview"] = photoBase64
+                    
+                    // IMPORTANT: Add location name to binLog document
+                    if (locationName != null && locationName.isNotEmpty()) {
+                        binLog["locationName"] = locationName
+                        binLog["binLocation"] = locationName
+                        binLog["actualLocation"] = locationName
+                        Log.d(TAG, "Added location to binLog: $locationName")
                         } else {
-                            Log.w(TAG, "No photo data available for this submission!")
+                        // Try to extract from QR code again as a fallback
+                        try {
+                            val qrData = JSONObject(qrCode)
+                            if (qrData.has("locationName")) {
+                                val extractedLocation = qrData.getString("locationName")
+                                binLog["locationName"] = extractedLocation
+                                binLog["binLocation"] = extractedLocation
+                                binLog["actualLocation"] = extractedLocation
+                                Log.d(TAG, "Added extracted location to binLog: $extractedLocation")
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error extracting location from QR", e)
                         }
                     }
                     
+                    // Ensure we have a location, default to a specific building if needed
+                    if (!binLog.containsKey("locationName") || binLog["locationName"] == "CIT Campus") {
+                        val defaultLocation = "NGE Building" // Choose a better default
+                        binLog["locationName"] = defaultLocation
+                        binLog["binLocation"] = defaultLocation
+                        binLog["actualLocation"] = defaultLocation
+                        Log.d(TAG, "Using default location for binLog: $defaultLocation")
+                    }
+                    
                     try {
-                        val response = makeApiRequest(RECYCLING_ENDPOINT, jsonData)
-                        Log.d(TAG, "Backend recycling submission response: $response")
+                        // Add a document with a temporary auto ID.
+                        db.collection("binLogs")
+                            .add(binLog)
+                            .addOnSuccessListener { documentReference ->
+                                Log.d(TAG, "DocumentSnapshot added with ID: ${documentReference.id}")
+                            }
+                            .addOnFailureListener { e ->
+                                Log.e(TAG, "Error adding document", e)
+                            }
                         
-                        // Parse the response
-                        val responseJson = JSONObject(response)
-                        val success = responseJson.optBoolean("success", false)
-                        val message = responseJson.optString("message", "Your recycling has been submitted for admin approval!")
+                        // Also update user stats
+                        try {
+                            val userRef = db.collection("users").document(userId)
+                            
+                            db.runTransaction { transaction ->
+                                val snapshot = transaction.get(userRef)
+                                val oldPoints = snapshot.getLong("points") ?: 0
+                                val newPoints = oldPoints + potentialPoints
+                                
+                                transaction.update(userRef, "points", newPoints)
+                                transaction.update(userRef, "lastUpdated", FieldValue.serverTimestamp())
+                                Log.d(TAG, "Updated user points from $oldPoints to $newPoints")
+                                
+                                // Also increment their recycling counts
+                                when (wasteType) {
+                                    "plastic", "metal", "paper", "glass" -> {
+                                        val field = "recycled${wasteType.capitalize(Locale.ROOT)}"
+                                        val oldCount = snapshot.getLong(field) ?: 0
+                                        transaction.update(userRef, field, oldCount + 1)
+                                        Log.d(TAG, "Incremented $field from $oldCount to ${oldCount+1}")
+                                    }
+                                }
+                                null
+                            }
+                    } catch (e: Exception) {
+                            Log.e(TAG, "Error updating user points", e)
+                        }
                         
-                        // Return response based on backend result
                         return@withContext ScanResult(
-                            success = success,
-                            message = message,
-                            pointsEarned = 0,  // No points yet until approved
-                            totalPoints = 0,   // No points awarded yet
+                            success = true,
+                            status = "pending",
+                            message = "Your recycling has been submitted for admin approval!",
+                            pointsEarned = potentialPoints,
+                            totalPoints = 250, // This will be updated by the user refresh
                             fact = getRandomRecyclingFact()
                         )
                     } catch (e: Exception) {
-                        Log.e(TAG, "Error submitting to backend, falling back to offline mode: ${e.message}", e)
-                        networkFailure.set(true)
-                        
-                        // Fall back to simulated success
+                        Log.e(TAG, "Error submitting to Firestore", e)
                         return@withContext ScanResult(
-                            success = true,
-                            message = "Your recycling has been processed successfully! (Offline Mode)",
-                            pointsEarned = potentialPoints,
-                            totalPoints = 250 + potentialPoints,
-                            fact = getRandomRecyclingFact()
+                            success = false,
+                            status = "error",
+                            message = "Error submitting to database: ${e.message}",
+                            pointsEarned = 0,
+                            totalPoints = 0
                         )
                     }
                 } catch (e: SocketTimeoutException) {
@@ -386,6 +444,7 @@ class ApiClient {
                     val earnedPoints = calculatePointsForWasteAndSize(wasteType, itemSize)
                     return@withContext ScanResult(
                         success = true,
+                        status = "success",
                         message = "Your recycling has been processed successfully! (Offline Mode)",
                         pointsEarned = earnedPoints,
                         totalPoints = 250 + earnedPoints,
@@ -395,7 +454,10 @@ class ApiClient {
                     Log.e(TAG, "Error submitting recycling for approval", e)
                     return@withContext ScanResult(
                         success = false,
-                        message = "Error: Could not submit your recycling. Please try again.\nDetails: ${e.message}"
+                        status = "error",
+                        message = "Error: Could not submit your recycling. Please try again.\nDetails: ${e.message}",
+                        pointsEarned = 0,
+                        totalPoints = 0
                     )
                 }
             }
@@ -592,6 +654,252 @@ class ApiClient {
                 } finally {
                     connection?.disconnect()
                 }
+            }
+        }
+        
+        /**
+         * Gets all campus locations with trash bins
+         */
+        suspend fun getCampusLocations(): List<CampusLocation> = withContext(Dispatchers.IO) {
+            // If we've had persistent network failures, return empty list
+            if (networkFailure.get()) {
+                Log.w(TAG, "Network operations disabled due to persistent failures, returning empty location list")
+                return@withContext emptyList()
+            }
+            
+            try {
+                Log.d(TAG, "Fetching campus locations from backend")
+                
+                val url = URL(LOCATIONS_ENDPOINT)
+                val connection = url.openConnection() as HttpURLConnection
+                connection.requestMethod = "GET"
+                connection.setRequestProperty("Content-Type", "application/json")
+                connection.setRequestProperty("Accept", "application/json")
+                connection.connectTimeout = CONNECTION_TIMEOUT
+                connection.readTimeout = READ_TIMEOUT
+                
+                val responseCode = connection.responseCode
+                Log.d(TAG, "Backend server response code: $responseCode")
+                
+                if (responseCode == HttpURLConnection.HTTP_OK) {
+                    // Success - reset retry counter
+                    retryCount = 0
+                    val response = readResponse(connection)
+                    Log.d(TAG, "Backend locations data: $response")
+                    return@withContext parseLocationsList(response)
+                } else {
+                    // Server error handling
+                    Log.e(TAG, "Error fetching locations data: $responseCode")
+                    return@withContext emptyList()
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Exception in getCampusLocations", e)
+                return@withContext emptyList()
+            }
+        }
+        
+        /**
+         * Get QR code information for a specific location
+         */
+        suspend fun getLocationQrInfo(locationName: String): Map<String, Any> = withContext(Dispatchers.IO) {
+            // If we've had persistent network failures, return empty map
+            if (networkFailure.get()) {
+                Log.w(TAG, "Network operations disabled due to persistent failures, returning empty location QR info")
+                return@withContext emptyMap()
+            }
+            
+            try {
+                Log.d(TAG, "Fetching QR info for location: $locationName")
+                
+                val encodedLocationName = java.net.URLEncoder.encode(locationName, "UTF-8")
+                val url = URL("$LOCATION_QR_ENDPOINT/$encodedLocationName")
+                val connection = url.openConnection() as HttpURLConnection
+                connection.requestMethod = "GET"
+                connection.setRequestProperty("Content-Type", "application/json")
+                connection.setRequestProperty("Accept", "application/json")
+                connection.connectTimeout = CONNECTION_TIMEOUT
+                connection.readTimeout = READ_TIMEOUT
+                
+                val responseCode = connection.responseCode
+                Log.d(TAG, "Backend server response code: $responseCode")
+                
+                if (responseCode == HttpURLConnection.HTTP_OK) {
+                    // Success - reset retry counter
+                    retryCount = 0
+                    val response = readResponse(connection)
+                    Log.d(TAG, "Backend location QR info: $response")
+                    return@withContext parseLocationQrInfo(response)
+                } else {
+                    // Server error handling
+                    Log.e(TAG, "Error fetching location QR info: $responseCode")
+                    return@withContext mapOf("status" to "error", "message" to "Failed to get QR info for location")
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Exception in getLocationQrInfo", e)
+                return@withContext mapOf("status" to "error", "message" to "Exception: ${e.message}")
+            }
+        }
+        
+        /**
+         * Submits a bin scan with location data
+         */
+        suspend fun submitScan(
+            qrCode: String,
+            wasteType: String,
+            imageBase64: String,
+            locationName: String? = null
+        ): ScanResult = withContext(Dispatchers.IO) {
+            try {
+                Log.d(TAG, "Submitting scan to backend: QR=$qrCode, wasteType=$wasteType, locationName=$locationName")
+                
+                val jsonData = JSONObject().apply {
+                    put("qrCode", qrCode)
+                    put("wasteType", wasteType)
+                    put("imageBase64", imageBase64)
+                    // Add location if present
+                    locationName?.let { put("locationName", it) }
+                }
+                
+                val url = URL(SCAN_ENDPOINT)
+                val connection = url.openConnection() as HttpURLConnection
+                connection.requestMethod = "POST"
+                connection.setRequestProperty("Content-Type", "application/json")
+                connection.setRequestProperty("Accept", "application/json")
+                connection.doOutput = true
+                connection.connectTimeout = CONNECTION_TIMEOUT
+                connection.readTimeout = READ_TIMEOUT
+                
+                // Write request body
+                val writer = OutputStreamWriter(connection.outputStream)
+                writer.write(jsonData.toString())
+                writer.flush()
+                
+                val responseCode = connection.responseCode
+                Log.d(TAG, "Backend server response code: $responseCode")
+                
+                if (responseCode == HttpURLConnection.HTTP_OK) {
+                    val response = readResponse(connection)
+                    Log.d(TAG, "Backend scan response: $response")
+                    return@withContext parseScanResult(response)
+                } else {
+                    Log.e(TAG, "Error submitting scan: $responseCode")
+                    return@withContext ScanResult(
+                        success = false,
+                        status = "error",
+                        message = "Server error (code $responseCode)",
+                        pointsEarned = 0,
+                        totalPoints = 0
+                    )
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Exception in submitScan", e)
+                return@withContext ScanResult(
+                    success = false,
+                    status = "error",
+                    message = "Network error: ${e.message}",
+                    pointsEarned = 0,
+                    totalPoints = 0
+                )
+            }
+        }
+        
+        private fun parseLocationsList(json: String): List<CampusLocation> {
+            return try {
+                val jsonArray = org.json.JSONArray(json)
+                val locations = mutableListOf<CampusLocation>()
+                
+                for (i in 0 until jsonArray.length()) {
+                    val obj = jsonArray.getJSONObject(i)
+                    locations.add(
+                        CampusLocation(
+                            id = obj.optString("id", ""),
+                            name = obj.optString("name", ""),
+                            latitude = obj.optDouble("latitude", 0.0),
+                            longitude = obj.optDouble("longitude", 0.0),
+                            description = obj.optString("description", ""),
+                            binType = obj.optString("binType", "")
+                        )
+                    )
+                }
+                
+                locations
+            } catch (e: Exception) {
+                Log.e(TAG, "Error parsing locations list", e)
+                emptyList()
+            }
+        }
+        
+        private fun parseLocationQrInfo(json: String): Map<String, Any> {
+            return try {
+                val result = mutableMapOf<String, Any>()
+                val jsonObject = JSONObject(json)
+                
+                result["status"] = jsonObject.optString("status", "error")
+                
+                if (jsonObject.has("qrInfo")) {
+                    val qrInfo = jsonObject.getJSONObject("qrInfo")
+                    val qrInfoMap = mutableMapOf<String, String>()
+                    
+                    qrInfoMap["binId"] = qrInfo.optString("binId", "")
+                    qrInfoMap["binName"] = qrInfo.optString("binName", "")
+                    qrInfoMap["description"] = qrInfo.optString("description", "")
+                    
+                    result["qrInfo"] = qrInfoMap
+                }
+                
+                if (jsonObject.has("location")) {
+                    val location = jsonObject.getJSONObject("location")
+                    
+                    result["location"] = CampusLocation(
+                        id = location.optString("id", ""),
+                        name = location.optString("name", ""),
+                        latitude = location.optDouble("latitude", 0.0),
+                        longitude = location.optDouble("longitude", 0.0),
+                        description = location.optString("description", ""),
+                        binType = location.optString("binType", "")
+                    )
+                }
+                
+                if (jsonObject.has("message")) {
+                    result["message"] = jsonObject.optString("message", "")
+                }
+                
+                result
+            } catch (e: Exception) {
+                Log.e(TAG, "Error parsing location QR info", e)
+                mapOf("status" to "error", "message" to "Failed to parse server response")
+            }
+        }
+        
+        private fun parseScanResult(json: String): ScanResult {
+            return try {
+                val jsonObject = JSONObject(json)
+                
+                // Parse the response
+                val status = jsonObject.optString("status", "error")
+                val message = jsonObject.optString("message", "Unknown response")
+                val pointsEarned = jsonObject.optInt("pointsEarned", 0)
+                val totalPoints = jsonObject.optInt("totalPoints", 0)
+                val fact = jsonObject.optString("fact", "Recycling helps protect the environment!")
+                
+                // Return result object with success flag based on status
+                ScanResult(
+                    success = (status == "success"),
+                    status = status,
+                    message = message,
+                    pointsEarned = pointsEarned,
+                    totalPoints = totalPoints,
+                    fact = fact
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "Error parsing scan result", e)
+                ScanResult(
+                    success = false,
+                    status = "error",
+                    message = "Failed to parse server response: ${e.message}",
+                    pointsEarned = 0,
+                    totalPoints = 0
+                )
             }
         }
     }

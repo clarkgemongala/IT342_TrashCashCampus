@@ -68,6 +68,9 @@ class QRScannerActivity : AppCompatActivity() {
     private var capturedPhotoBase64: String = ""
     private var selectedItemSize: String = "small" // Default size
     
+    // Location data from map
+    private var locationName: String? = null
+    
     // Authentication variables
     private var userId: String? = null
     
@@ -81,6 +84,10 @@ class QRScannerActivity : AppCompatActivity() {
         // Check for authentication state
         checkAuthentication()
         
+        // Get the location name from the intent if available
+        locationName = intent.getStringExtra("LOCATION_NAME")
+        Log.d(tag, "LOCATION: Starting scanner with location: $locationName")
+        
         // Initialize UI elements
         initializeUI()
         
@@ -93,6 +100,11 @@ class QRScannerActivity : AppCompatActivity() {
         
         // Set up button listeners
         setupListeners()
+        
+        // Update the prompt if launched from a map marker
+        if (locationName != null) {
+            tvScannerPrompt.text = "Scanning at $locationName\nPlease scan the QR code"
+        }
     }
     
     private fun checkAuthentication() {
@@ -198,6 +210,28 @@ class QRScannerActivity : AppCompatActivity() {
                             scannedBinType = json.getString("binId")
                             val binName = json.getString("binName")
                             
+                            // Add location info to the scanned QR code if we have it
+                            if (locationName != null) {
+                                // Create an enhanced QR code with location info
+                                val enhancedQrData = JSONObject(result.text)
+                                enhancedQrData.put("locationName", locationName)
+                                
+                                // IMPORTANT: Log current location and QR data
+                                Log.d(tag, "LOCATION: Scanning at $locationName")
+                                Log.d(tag, "LOCATION: Original QR data: $result.text")
+                                Log.d(tag, "LOCATION: Enhanced QR data: $enhancedQrData")
+                                
+                                scannedQRCode = enhancedQrData.toString()
+                                Log.d(tag, "Enhanced QR data with location: $scannedQRCode")
+                            } else {
+                                // Without location name, use the building from the intent extras if available
+                                val building = intent.getStringExtra("BUILDING_NAME") ?: "NGE Building"
+                                val enhancedQrData = JSONObject(result.text)
+                                enhancedQrData.put("locationName", building)
+                                scannedQRCode = enhancedQrData.toString()
+                                Log.d(tag, "Enhanced QR data with default building: $scannedQRCode")
+                            }
+                            
                             // Show photo verification UI
                             showPhotoVerificationUI(binName)
                         } else {
@@ -211,6 +245,37 @@ class QRScannerActivity : AppCompatActivity() {
                         
                         // For backwards compatibility, assume it's a bin ID
                         scannedBinType = "recyclable" // Default type
+                        
+                        // Create a JSON object with the bin ID and location
+                        if (locationName != null) {
+                            try {
+                                val jsonData = JSONObject()
+                                jsonData.put("binId", scannedQRCode)
+                                jsonData.put("binName", "Recyclable Bin")
+                                jsonData.put("locationName", locationName)
+                                
+                                // IMPORTANT: Log for debugging
+                                Log.d(tag, "LOCATION: Creating JSON with location=$locationName")
+                                
+                                scannedQRCode = jsonData.toString()
+                                Log.d(tag, "Created JSON QR data with location: $scannedQRCode")
+                            } catch (e2: Exception) {
+                                Log.e(tag, "Error creating JSON data", e2)
+                            }
+                        } else {
+                            // If no location name, use a default building
+                            try {
+                                val jsonData = JSONObject()
+                                jsonData.put("binId", scannedQRCode)
+                                jsonData.put("binName", "Recyclable Bin")
+                                jsonData.put("locationName", "NGE Building") // Default to NGE Building
+                                scannedQRCode = jsonData.toString()
+                                Log.d(tag, "Created JSON QR data with default building: $scannedQRCode")
+                            } catch (e2: Exception) {
+                                Log.e(tag, "Error creating JSON data", e2)
+                            }
+                        }
+                        
                         showPhotoVerificationUI("Recyclable Bin")
                     }
                 }
@@ -324,6 +389,18 @@ class QRScannerActivity : AppCompatActivity() {
         val timestamp = System.currentTimeMillis()
         val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
         val dateStr = dateFormat.format(Date(timestamp))
+        
+        // Debug logs for location tracking
+        Log.d(tag, "LOCATION: Processing waste with location: $locationName")
+        try {
+            val qrData = JSONObject(scannedQRCode)
+            Log.d(tag, "LOCATION: QR data has locationName: ${qrData.has("locationName")}")
+            if (qrData.has("locationName")) {
+                Log.d(tag, "LOCATION: QR code location is: ${qrData.getString("locationName")}")
+            }
+        } catch (e: Exception) {
+            Log.e(tag, "Error parsing QR data for location check", e)
+        }
         
         // Send to backend via API with photo
         lifecycleScope.launch {
@@ -541,5 +618,81 @@ class QRScannerActivity : AppCompatActivity() {
         if (::codeScanner.isInitialized) {
             codeScanner.releaseResources()
         }
+    }
+
+    private fun submitScanResults(wasteType: String) {
+        if (capturedPhotoBase64.isEmpty()) {
+            Toast.makeText(this, "No photo captured. Please take a photo first.", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        // Show loading state during submission
+        progressBar.visibility = View.VISIBLE
+        btnSubmit.isEnabled = false
+
+        // Send scan data to the server (including location)
+        lifecycleScope.launch {
+            try {
+                val response = ApiClient.submitScan(
+                    qrCode = scannedQRCode,
+                    wasteType = wasteType,
+                    imageBase64 = capturedPhotoBase64,
+                    locationName = locationName // Pass the location name to the API
+                )
+
+                // Handle response
+                if (response.success) {
+                    // Show success message
+                    val message = "${response.message}\nYou earned ${response.pointsEarned} points!"
+                    showSuccessDialog(message, response.fact, response.pointsEarned)
+                } else {
+                    // Show error
+                    Toast.makeText(this@QRScannerActivity, 
+                        "Error: ${response.message}", 
+                        Toast.LENGTH_LONG).show()
+                    
+                    // Return to scanner
+                    resetToScanner()
+                }
+            } catch (e: Exception) {
+                // Handle error
+                Log.e(tag, "Error submitting scan", e)
+                Toast.makeText(this@QRScannerActivity, 
+                    "Error submitting: ${e.message}", 
+                    Toast.LENGTH_LONG).show()
+                
+                // Return to scanner
+                resetToScanner()
+            }
+        }
+    }
+    
+    // Add the missing methods
+    private fun showSuccessDialog(message: String, fact: String, pointsEarned: Int) {
+        // Hide progress first
+        progressBar.visibility = View.GONE
+        
+        // Build and show success dialog
+        val builder = AlertDialog.Builder(this)
+        builder.setTitle("Recycling Successful!")
+            .setMessage("$message\n\nDid you know?\n$fact")
+            .setPositiveButton("Great!") { _, _ ->
+                // Set result to indicate points should be refreshed
+                val resultIntent = Intent()
+                resultIntent.putExtra("POINTS_EARNED", pointsEarned)
+                setResult(RESULT_OK, resultIntent)
+                finish() // Return to previous screen
+            }
+            .setCancelable(false)
+            .create()
+            .show()
+    }
+    
+    private fun resetToScanner() {
+        // Hide progress
+        progressBar.visibility = View.GONE
+        
+        // Reset UI and data (reusing existing resetToScanMode method)
+        resetToScanMode()
     }
 } 

@@ -23,8 +23,9 @@ public class ScanBinController {
         String qrCode = request.get("qrCode");
         String wasteType = request.get("wasteType");
         String imageBase64 = request.get("imageBase64");
+        String locationName = request.get("locationName");
 
-        ScanBin saved = scanBinService.handleScan(qrCode, wasteType, imageBase64);
+        ScanBin saved = scanBinService.handleScan(qrCode, wasteType, imageBase64, locationName);
 
         Map<String, Object> response = new HashMap<>();
         response.put("status", "success");
@@ -34,5 +35,17 @@ public class ScanBinController {
         response.put("fact", saved.getFact());
 
         return response;
+    }
+    
+    /**
+     * Get QR code info for a specific campus location
+     * @param locationName The name of the campus location
+     * @return QR code information for that location
+     */
+    @GetMapping("/location/{locationName}")
+    public Map<String, Object> getLocationQrInfo(@PathVariable String locationName) {
+        Map<String, Object> locationInfo = scanBinService.getLocationQrInfo(locationName);
+        
+        return locationInfo;
     }
 }

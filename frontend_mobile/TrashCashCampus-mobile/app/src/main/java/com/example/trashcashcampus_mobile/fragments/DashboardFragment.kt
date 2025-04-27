@@ -174,12 +174,9 @@ class DashboardFragment : Fragment() {
             logout()
         }
         
-        // Add QR code scan functionality - find through parent activity
-        activity?.findViewById<Button>(R.id.btn_scan_qr)?.setOnClickListener {
-            // Navigate to QR scanner
-            val intent = Intent(requireContext(), QRScannerActivity::class.java)
-            startActivityForResult(intent, QR_SCANNER_REQUEST_CODE)
-        }
+        // NOTE: The global QR code scan button has been removed from the Map fragment
+        // QR scanning is now only available through location markers on the map
+        // This enhances the user experience by tying scanning to specific locations
     }
     
     private fun loadUserData() {
@@ -750,85 +747,6 @@ class DashboardFragment : Fragment() {
             }
     }
     
-    // Handle result from QR scanner
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        
-        if (requestCode == QR_SCANNER_REQUEST_CODE) {
-            Log.d(tag, "Returned from QR scanner with result: $resultCode")
-            
-            if (resultCode == android.app.Activity.RESULT_OK) {
-                // QR scan was successful, refresh points
-                Log.d(tag, "QR scan successful, refreshing points")
-                
-                // Force a refresh of user data
-                forceRefreshUserData()
-            }
-        }
-    }
-    
-    private fun forceRefreshUserData() {
-        // Show loading indicator
-        showLoading(true)
-        
-        userId?.let { uid ->
-            // First try to get fresh data from Firestore
-            db.collection("users").document(uid)
-                .get()
-                .addOnSuccessListener { document ->
-                    if (document != null && document.exists()) {
-                        // Extract points from the document
-                        val totalPoints = when (val pointsValue = document.get("totalPoints")) {
-                            is Long -> pointsValue.toInt()
-                            is Int -> pointsValue
-                            is Double -> pointsValue.toInt()
-                            is String -> pointsValue.toIntOrNull() ?: 0
-                            else -> 0
-                        }
-                        
-                        Log.d(tag, "Force refreshed points from Firestore: $totalPoints")
-                        
-                        // Create user data with the retrieved points 
-                        val retrievedData = UserData(
-                            totalPoints = totalPoints,
-                            recentPoints = 0,
-                            weeklyGoal = 100,
-                            weeklyProgress = totalPoints.coerceAtMost(100) // Use points as progress up to 100
-                        )
-                        
-                        // Update our stored user data
-                        userData = retrievedData
-                        
-                        // Update UI
-                        updateUIWithUserData(retrievedData)
-                        
-                        // Show points animation if this is an actual update
-                        val oldPoints = userData?.totalPoints ?: 0
-                        if (oldPoints != totalPoints && totalPoints > oldPoints) {
-                            showPointsUpdateAnimation(totalPoints - oldPoints)
-                        }
-                        
-                        // Hide loading indicator
-                        showLoading(false)
-                    } else {
-                        // No document exists
-                        Log.d(tag, "No user document found during force refresh")
-                        showDefaultPoints()
-                        showLoading(false)
-                    }
-                }
-                .addOnFailureListener { e ->
-                    Log.e(tag, "Error force refreshing points from Firestore", e)
-                    // Fall back to regular API fetch
-                    fetchUserStats(uid)
-                    showLoading(false)
-                }
-        } ?: run {
-            // No user ID available
-            showLoading(false)
-        }
-    }
-    
     private fun showLoading(isLoading: Boolean) {
         if (isLoading) {
             progressBarLoading.visibility = View.VISIBLE
@@ -1151,6 +1069,85 @@ class DashboardFragment : Fragment() {
         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         startActivity(intent)
         requireActivity().finish() // This is important to finish the HomeActivity
+    }
+
+    // Handle result from QR scanner
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        
+        if (requestCode == QR_SCANNER_REQUEST_CODE) {
+            Log.d(tag, "Returned from QR scanner with result: $resultCode")
+            
+            if (resultCode == android.app.Activity.RESULT_OK) {
+                // QR scan was successful, refresh points
+                Log.d(tag, "QR scan successful, refreshing points")
+                
+                // Force a refresh of user data
+                forceRefreshUserData()
+            }
+        }
+    }
+    
+    private fun forceRefreshUserData() {
+        // Show loading indicator
+        showLoading(true)
+        
+        userId?.let { uid ->
+            // First try to get fresh data from Firestore
+            db.collection("users").document(uid)
+                .get()
+                .addOnSuccessListener { document ->
+                    if (document != null && document.exists()) {
+                        // Extract points from the document
+                        val totalPoints = when (val pointsValue = document.get("totalPoints")) {
+                            is Long -> pointsValue.toInt()
+                            is Int -> pointsValue
+                            is Double -> pointsValue.toInt()
+                            is String -> pointsValue.toIntOrNull() ?: 0
+                            else -> 0
+                        }
+                        
+                        Log.d(tag, "Force refreshed points from Firestore: $totalPoints")
+                        
+                        // Create user data with the retrieved points 
+                        val retrievedData = UserData(
+                            totalPoints = totalPoints,
+                            recentPoints = 0,
+                            weeklyGoal = 100,
+                            weeklyProgress = totalPoints.coerceAtMost(100) // Use points as progress up to 100
+                        )
+                        
+                        // Update our stored user data
+                        userData = retrievedData
+                        
+                        // Update UI
+                        updateUIWithUserData(retrievedData)
+                        
+                        // Show points animation if this is an actual update
+                        val oldPoints = userData?.totalPoints ?: 0
+                        if (oldPoints != totalPoints && totalPoints > oldPoints) {
+                            showPointsUpdateAnimation(totalPoints - oldPoints)
+                        }
+                        
+                        // Hide loading indicator
+                        showLoading(false)
+                    } else {
+                        // No document exists
+                        Log.d(tag, "No user document found during force refresh")
+                        showDefaultPoints()
+                        showLoading(false)
+                    }
+                }
+                .addOnFailureListener { e ->
+                    Log.e(tag, "Error force refreshing points from Firestore", e)
+                    // Fall back to regular API fetch
+                    fetchUserStats(uid)
+                    showLoading(false)
+                }
+        } ?: run {
+            // No user ID available
+            showLoading(false)
+        }
     }
 
     companion object {

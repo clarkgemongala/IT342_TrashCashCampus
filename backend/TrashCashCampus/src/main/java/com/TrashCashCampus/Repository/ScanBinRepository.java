@@ -67,6 +67,8 @@ public class ScanBinRepository {
             data.put("message", scanBin.getMessage());
             data.put("fact", scanBin.getFact());
             data.put("timestamp", Instant.now().toEpochMilli()); // Store as timestamp for Firestore
+            data.put("locationName", scanBin.getLocationName()); // Save location name properly
+            data.put("binLocation", scanBin.getLocationName()); // Add binLocation field for backward compatibility
             
             if (scanBin.getId() == null || scanBin.getId().isEmpty()) {
                 // Create new document
@@ -100,6 +102,9 @@ public class ScanBinRepository {
         scanBin.setImageBase64((String) doc.get("imageBase64"));
         scanBin.setMessage((String) doc.get("message"));
         scanBin.setFact((String) doc.get("fact"));
+        
+        // Extract location information
+        scanBin.setLocationName((String) doc.get("locationName"));
         
         // Handle timestamp conversion
         Object timestampObj = doc.get("timestamp");
