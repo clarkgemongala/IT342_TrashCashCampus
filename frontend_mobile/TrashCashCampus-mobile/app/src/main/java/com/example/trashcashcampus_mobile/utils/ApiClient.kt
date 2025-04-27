@@ -137,6 +137,60 @@ object ApiClient {
         }
     }
     
+    // User data functions
+    
+    suspend fun getUserData(context: Context, userId: String): UserData {
+        Log.d(TAG, "Fetching user data for userId: $userId")
+        
+        return try {
+            // First try to get user data from the backend API
+            val response = api.getUserPoints(userId)
+            
+            if (response.isSuccessful) {
+                val body = response.body()
+                Log.d(TAG, "Successfully retrieved user data from API: $body")
+                
+                if (body != null) {
+                    // Parse the points from the response
+                    val totalPoints = body["totalPoints"] as? Int ?: 0
+                    val recentPoints = body["recentPoints"] as? Int ?: 0
+                    val weeklyGoal = body["weeklyGoal"] as? Int ?: 100
+                    val weeklyProgress = body["weeklyProgress"] as? Int ?: 0
+                    
+                    UserData(
+                        totalPoints = totalPoints,
+                        recentPoints = recentPoints,
+                        weeklyGoal = weeklyGoal,
+                        weeklyProgress = weeklyProgress
+                    )
+                } else {
+                    // Fallback to Firestore if the response body is null
+                    getUserDataFromFirestore(userId)
+                }
+            } else {
+                // Handle unsuccessful response
+                Log.e(TAG, "Error getting user data: ${response.code()} - ${response.message()}")
+                getUserDataFromFirestore(userId)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Exception fetching user data", e)
+            getUserDataFromFirestore(userId)
+        }
+    }
+    
+    private suspend fun getUserDataFromFirestore(userId: String): UserData {
+        Log.d(TAG, "Fetching user data from Firestore for userId: $userId")
+        
+        // This is a simplified implementation - it should be expanded with 
+        // actual Firestore query, but for now we'll return a default object
+        return UserData(
+            totalPoints = 0,
+            recentPoints = 0,
+            weeklyGoal = 100,
+            weeklyProgress = 0
+        )
+    }
+    
     // Pickup location functions
     
     suspend fun getPickupLocations(context: Context): PickupLocationResponse? {

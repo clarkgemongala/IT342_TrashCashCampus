@@ -6,8 +6,10 @@ import android.text.Editable
 import android.text.InputType
 import android.text.TextWatcher
 import android.util.Log
+import android.view.MenuItem
 import android.view.View
 import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.ImageButton
 import android.widget.TextView
 import android.widget.Toast
@@ -16,8 +18,13 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.AppCompatButton
 import androidx.constraintlayout.widget.ConstraintLayout
+import androidx.fragment.app.Fragment
+import com.example.trashcashcampus_mobile.fragments.DashboardFragment
+import com.example.trashcashcampus_mobile.fragments.MapFragment
+import com.example.trashcashcampus_mobile.fragments.RewardsFragment
 import com.example.trashcashcampus_mobile.utils.ApiClient
 import com.example.trashcashcampus_mobile.utils.LoadingManager
+import com.google.android.material.bottomnavigation.BottomNavigationView
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
@@ -36,6 +43,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnLogin: AppCompatButton
     private lateinit var tvRegister: TextView
     private lateinit var loginLayout: ConstraintLayout
+    private lateinit var fragmentContainer: FrameLayout
+    private lateinit var bottomNavigation: BottomNavigationView
     
     // Firebase Auth
     private lateinit var auth: FirebaseAuth
@@ -43,32 +52,93 @@ class MainActivity : AppCompatActivity() {
     // Activity Result Launcher for LoginActivity
     private lateinit var loginActivityResultLauncher: ActivityResultLauncher<Intent>
     
+    // Current active fragment
+    private var activeFragment: Fragment? = null
+    
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_main)
         
+        // Initialize Firebase Auth
+        auth = FirebaseAuth.getInstance()
+        
+        // Decide which layout to use based on authentication state
+        val currentUser = auth.currentUser
+        if (currentUser != null && currentUser.isEmailVerified) {
+            // User is signed in and verified, show home with navigation
+            setContentView(R.layout.activity_main_with_navigation)
+            initializeNavigation()
+        } else {
+            // Not signed in, show login form
+            setContentView(R.layout.activity_main)
+            initializeLoginForm()
+        }
+    }
+    
+    private fun initializeNavigation() {
+        // Initialize navigation
+        fragmentContainer = findViewById(R.id.fragment_container)
+        bottomNavigation = findViewById(R.id.bottom_navigation)
+        
+        // Set up navigation listener
+        bottomNavigation.setOnItemSelectedListener { item ->
+            handleNavigationItemSelected(item)
+        }
+        
+        // Set initial fragment if needed
+        if (activeFragment == null) {
+            // Load dashboard fragment by default
+            loadFragment(DashboardFragment.newInstance())
+            bottomNavigation.selectedItemId = R.id.navigation_dashboard
+        }
+    }
+    
+    private fun initializeLoginForm() {
         try {
-            // Initialize Firebase Auth
-            auth = FirebaseAuth.getInstance()
-            
             // Set up the Activity Result Launcher
             setupActivityResultLauncher()
             
             // Initialize UI elements
-            initializeUI()
+            loginLayout = findViewById(R.id.loginLayout)
+            etEmail = findViewById(R.id.etEmail)
+            etPassword = findViewById(R.id.etPassword)
+            btnTogglePasswordVisibility = findViewById(R.id.btnTogglePasswordVisibility)
+            btnLogin = findViewById(R.id.btnLogin)
+            tvRegister = findViewById(R.id.tvRegister)
             
             // Set up listeners
             setupListeners()
             
             // Check backend connectivity
             checkBackendConnection()
-            
-            // Check if user is already logged in
-            checkCurrentUser()
         } catch (e: Exception) {
-            Log.e(TAG, "Error in onCreate: ${e.message}", e)
+            Log.e(TAG, "Error in initializeLoginForm: ${e.message}", e)
             Toast.makeText(this, "Something went wrong. Please try again.", Toast.LENGTH_SHORT).show()
         }
+    }
+    
+    private fun handleNavigationItemSelected(item: MenuItem): Boolean {
+        when (item.itemId) {
+            R.id.navigation_dashboard -> {
+                loadFragment(DashboardFragment.newInstance())
+                return true
+            }
+            R.id.navigation_rewards -> {
+                loadFragment(RewardsFragment.newInstance())
+                return true
+            }
+            R.id.navigation_map -> {
+                loadFragment(MapFragment.newInstance())
+                return true
+            }
+        }
+        return false
+    }
+    
+    private fun loadFragment(fragment: Fragment) {
+        activeFragment = fragment
+        supportFragmentManager.beginTransaction()
+            .replace(R.id.fragment_container, fragment)
+            .commit()
     }
     
     private fun checkBackendConnection() {
@@ -108,7 +178,7 @@ class MainActivity : AppCompatActivity() {
                     val userId = data?.getStringExtra("userId")
                     val email = data?.getStringExtra("email")
                     
-                    // Navigate to Dashboard or Home screen
+                    // Navigate to Dashboard or Home screen with navigation
                     navigateToDashboard(userId, email)
                 } else {
                     // Login failed, show error message
@@ -121,15 +191,6 @@ class MainActivity : AppCompatActivity() {
                 showLoginForm()
             }
         }
-    }
-    
-    private fun initializeUI() {
-        loginLayout = findViewById(R.id.loginLayout)
-        etEmail = findViewById(R.id.etEmail)
-        etPassword = findViewById(R.id.etPassword)
-        btnTogglePasswordVisibility = findViewById(R.id.btnTogglePasswordVisibility)
-        btnLogin = findViewById(R.id.btnLogin)
-        tvRegister = findViewById(R.id.tvRegister)
     }
     
     private fun setupListeners() {
@@ -165,17 +226,6 @@ class MainActivity : AppCompatActivity() {
                 etPassword.error = null
             }
         })
-    }
-    
-    private fun checkCurrentUser() {
-        val currentUser = auth.currentUser
-        if (currentUser != null && currentUser.isEmailVerified) {
-            // User is already logged in and verified
-            navigateToDashboard(currentUser.uid, currentUser.email)
-        } else {
-            // No user logged in or not verified, show login form
-            showLoginForm()
-        }
     }
     
     private fun showLoginForm() {
@@ -266,26 +316,22 @@ class MainActivity : AppCompatActivity() {
     }
     
     private fun showLoadingState() {
-        // Disable login button
+        LoadingManager.showLoading(this)
         btnLogin.isEnabled = false
-        
-        // Show loading overlay with custom message
-        LoadingManager.showLoading(this, "Signing in...")
+        loginLayout.alpha = 0.5f
     }
     
     private fun navigateToDashboard(userId: String?, email: String?) {
-        // Store current user info if needed
-        val sharedPref = getSharedPreferences("TrashCashPrefs", MODE_PRIVATE)
-        with(sharedPref.edit()) {
+        // Save user info to shared preferences for later use
+        val prefs = getSharedPreferences("TrashCashPrefs", MODE_PRIVATE)
+        with(prefs.edit()) {
             putString("userId", userId)
             putString("email", email)
             apply()
         }
         
-        // Navigate to HomeActivity
-        val intent = Intent(this, HomeActivity::class.java)
-        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-        startActivity(intent)
-        finish() // Close the login activity
+        // Switch to the navigation layout
+        setContentView(R.layout.activity_main_with_navigation)
+        initializeNavigation()
     }
 }

@@ -58,6 +58,12 @@ interface ApiService {
         @Body emailRequest: EmailRequest
     ): Response<EmailResponse>
 
+    // User points and data endpoint
+    @GET("/api/users/{userId}/points")
+    suspend fun getUserPoints(
+        @Path("userId") userId: String
+    ): Response<Map<String, Any>>
+
     // Ping endpoint to check if server is available
     @GET("/")
     suspend fun ping(): Response<Void>

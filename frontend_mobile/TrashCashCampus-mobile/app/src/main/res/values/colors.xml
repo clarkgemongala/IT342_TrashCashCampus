@@ -30,4 +30,7 @@
     
     <!-- Scanner Colors -->
     <color name="scanner_mask">#99000000</color>
+    
+    <!-- Material Design Colors -->
+    <color name="design_default_color_primary">@color/primary</color>
 </resources>

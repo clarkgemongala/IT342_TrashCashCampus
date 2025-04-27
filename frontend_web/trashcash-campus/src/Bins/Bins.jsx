@@ -1358,10 +1358,14 @@ const Bins = () => {
                             </td>
                             <td className="points-cell">+{log.pointsEarned}</td>
                             <td>{log.formattedTimestamp}</td>
-                            <td className={`status-cell status-${log.status}`}>
-                              {log.status === 'approved' ? '✅ Approved' : 
-                               log.status === 'rejected' ? '❌ Rejected' : 
-                               '⏳ Pending'}
+                            <td className={`status-cell`}>
+                              {log.status === 'approved' ? (
+                                <span className="status-badge approved">✅ Approved</span>
+                              ) : log.status === 'rejected' ? (
+                                <span className="status-badge rejected">❌ Rejected</span>
+                              ) : (
+                                <span className="status-badge pending">⏳ Pending</span>
+                              )}
                             </td>
                             <td>
                               {log.status === 'pending' ? (

@@ -58,7 +58,7 @@ const Navigation = () => {
   const navLinks = [
     { path: '/dashboard', label: 'Dashboard', icon: <FontAwesomeIcon icon={faHome} />, access: 'all' },
     { path: '/rewards', label: 'Rewards', icon: <FontAwesomeIcon icon={faAward} />, access: 'all' },
-    { path: '/bins', label: 'Find Bins', icon: <FontAwesomeIcon icon={faTrashAlt} />, access: 'all' },
+    { path: '/bins', label: 'QR Bins', icon: <FontAwesomeIcon icon={faTrashAlt} />, access: 'all' },
     { path: '/users', label: 'Users', icon: <FontAwesomeIcon icon={faUsers} />, access: 'admin' },
     
     { path: '/admin-management', label: 'Admin Management', icon: <FontAwesomeIcon icon={faUserShield} />, access: 'admin' },

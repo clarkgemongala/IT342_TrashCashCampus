@@ -55,6 +55,9 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.6.1")
     implementation ("androidx.cardview:cardview:1.0.0")
     
+    // Material Design components for bottom navigation
+    implementation ("com.google.android.material:material:1.10.0")
+    
     // For QR code scanning
     implementation ("com.github.yuriy-budiyev:code-scanner:2.3.2")
     implementation ("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
