@@ -27,7 +27,8 @@ public class WebConfig implements WebMvcConfigurer {
                     "http://localhost:5173",
                     "http://10.0.2.2:8080",
                     "https://it342-trashcashcampus.onrender.com",
-                    "https://trashcashcampus-testenvironment--trashcash-campus.netlify.app"
+                    "https://trashcashcampus-testenvironment--trashcash-campus.netlify.app",
+                    "https://trashcash-campus.netlify.app"
                 )
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD")
                 .allowedHeaders("*")

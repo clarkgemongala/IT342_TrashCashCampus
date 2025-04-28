@@ -14,7 +14,7 @@ import java.util.logging.Logger;
 
 @RestController
 @RequestMapping("/recycling")
-@CrossOrigin(origins = {"http://localhost:5173", "http://10.0.2.2:8080", "http://10.0.2.2", "https://trashcashcampus-testenvironment--trashcash-campus.netlify.app"})
+@CrossOrigin(origins = {"http://localhost:5173", "http://10.0.2.2:8080", "http://10.0.2.2", "https://trashcashcampus-testenvironment--trashcash-campus.netlify.app", "https://trashcash-campus.netlify.app"})
 public class RecyclingController {
 
     private static final Logger logger = Logger.getLogger(RecyclingController.class.getName());
