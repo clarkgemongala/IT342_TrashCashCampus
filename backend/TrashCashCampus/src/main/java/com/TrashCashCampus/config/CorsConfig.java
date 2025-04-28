@@ -13,10 +13,11 @@ public class CorsConfig {
             @Override
             public void addCorsMappings(CorsRegistry registry) {
                 // Configure CORS for API endpoints
-                registry.addMapping("/api/**")
+                registry.addMapping("/**")
                         .allowedOrigins(
-                            "http://localhost:5173", // Web frontend
-                            "http://10.0.2.2:8080"   // Android emulator accessing localhost
+                            "http://localhost:5173", // Web frontend during development
+                            "http://10.0.2.2:8080",  // Android emulator accessing localhost
+                            "https://it342-trashcashcampus.onrender.com" // Production web app
                         )
                         .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD")
                         .allowedHeaders("*")

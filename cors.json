@@ -1,8 +1,8 @@
 [
   {
-    "origin": ["http://localhost:5173"],
-    "method": ["GET", "HEAD", "OPTIONS"],
+    "origin": ["http://localhost:5173", "https://it342-trashcashcampus.onrender.com"],
+    "method": ["GET", "HEAD", "POST", "PUT", "DELETE", "OPTIONS"],
     "maxAgeSeconds": 3600,
-    "responseHeader": ["Content-Type", "Content-Length", "Content-Encoding", "Access-Control-Allow-Origin"]
+    "responseHeader": ["Content-Type", "Content-Length", "Content-Encoding", "Access-Control-Allow-Origin", "Authorization"]
   }
 ] 
