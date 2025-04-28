@@ -137,10 +137,16 @@ public class RewardRepository {
     }
     
     public long count() {
+        if (!firebaseService.isFirebaseInitialized()) {
+            System.out.println("Firebase is in degraded mode, returning 0 for count");
+            return 0;
+        }
+        
         try {
             return firebaseService.getAllDocuments(COLLECTION_NAME).size();
         } catch (ExecutionException | InterruptedException e) {
-            throw new RuntimeException("Failed to count rewards", e);
+            System.err.println("Failed to count rewards: " + e.getMessage());
+            return 0;
         }
     }
     
@@ -160,13 +166,13 @@ public class RewardRepository {
                 return;
             }
             
-            // Create default rewards
+            // Create default rewards using proper constructors
             Reward[] defaultRewards = {
-                new Reward("CIT Recycling Tote Bag", 150),
-                new Reward("Eco-friendly Water Bottle", 200),
-                new Reward("CIT Sustainability T-Shirt", 250),
-                new Reward("Campus Canteen Discount (10%)", 100),
-                new Reward("Book Store Discount (15%)", 300)
+                createReward("CIT Recycling Tote Bag", 150),
+                createReward("Eco-friendly Water Bottle", 200),
+                createReward("CIT Sustainability T-Shirt", 250),
+                createReward("Campus Canteen Discount (10%)", 100),
+                createReward("Book Store Discount (15%)", 300)
             };
             
             for (Reward reward : defaultRewards) {
@@ -177,5 +183,15 @@ public class RewardRepository {
         } catch (Exception e) {
             System.err.println("Failed to seed rewards: " + e.getMessage());
         }
+    }
+    
+    /**
+     * Helper method to create a reward with name and points cost
+     */
+    private Reward createReward(String name, int pointsCost) {
+        Reward reward = new Reward();
+        reward.setName(name);
+        reward.setPointsCost(pointsCost);
+        return reward;
     }
 }
