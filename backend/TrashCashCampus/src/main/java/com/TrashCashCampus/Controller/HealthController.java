@@ -15,18 +15,8 @@ public class HealthController {
     @GetMapping
     public ResponseEntity<Map<String, String>> healthCheck() {
         Map<String, String> response = new HashMap<>();
-        response.put("status", "UP");
-        response.put("message", "Backend service is running");
-        return ResponseEntity.ok(response);
-    }
-    
-    /**
-     * Simple ping endpoint used by mobile app to check backend availability
-     */
-    @GetMapping("/ping")
-    public ResponseEntity<Map<String, String>> ping() {
-        Map<String, String> response = new HashMap<>();
-        response.put("status", "UP");
+        response.put("status", "ok");
+        response.put("message", "Server is running");
         return ResponseEntity.ok(response);
     }
 } 

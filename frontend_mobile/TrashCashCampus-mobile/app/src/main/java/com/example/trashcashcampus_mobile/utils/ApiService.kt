@@ -65,7 +65,7 @@ interface ApiService {
     ): Response<Map<String, Any>>
 
     // Ping endpoint to check if server is available
-    @GET("/api/health/ping")
+    @GET("/api/health")
     suspend fun ping(): Response<Void>
 
     // Pickup Location endpoints
