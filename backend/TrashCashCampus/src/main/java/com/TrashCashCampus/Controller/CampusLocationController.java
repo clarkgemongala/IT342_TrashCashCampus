@@ -9,8 +9,8 @@ import java.util.List;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/locations")
-@CrossOrigin(origins = {"http://localhost:5173", "http://10.0.2.2:8080", "http://10.0.2.2"})
+@RequestMapping("/api/campus-locations")
+@CrossOrigin(origins = {"http://localhost:5173", "http://10.0.2.2:8080", "http://10.0.2.2", "https://trashcashcampus-web.onrender.com"})
 public class CampusLocationController {
 
     private final CampusLocationService campusLocationService;
