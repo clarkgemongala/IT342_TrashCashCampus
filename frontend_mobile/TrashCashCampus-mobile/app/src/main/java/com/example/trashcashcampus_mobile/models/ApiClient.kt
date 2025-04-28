@@ -31,7 +31,7 @@ class ApiClient {
         private const val USER_ENDPOINT = "$SERVER_BASE_URL/api/users"
         private const val SCAN_ENDPOINT = "$SERVER_BASE_URL/bins/scan"
         private const val RECYCLING_ENDPOINT = "$SERVER_BASE_URL/recycling/submit"
-        private const val REWARDS_ENDPOINT = "$SERVER_BASE_URL/rewards"
+        private const val REWARDS_ENDPOINT = "$SERVER_BASE_URL/api/rewards"
         private const val LOCATIONS_ENDPOINT = "$SERVER_BASE_URL/locations"
         private const val LOCATION_QR_ENDPOINT = "$SERVER_BASE_URL/bins/location"
         

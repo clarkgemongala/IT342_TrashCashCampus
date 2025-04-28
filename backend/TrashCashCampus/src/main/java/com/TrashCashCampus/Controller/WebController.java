@@ -13,7 +13,7 @@ public class WebController {
     /**
      * Redirect all frontend routes to the deployed frontend application
      */
-    @GetMapping(value = {"", "/", "/login", "/dashboard", "/bins", "/rewards", "/users", "/admin-management"})
+    @GetMapping(value = {"", "/", "/login", "/dashboard", "/bins", "/users", "/admin-management"})
     public ResponseEntity<Void> redirectToFrontend() {
         HttpHeaders headers = new HttpHeaders();
         headers.add("Location", "https://it342-trashcashcampus.onrender.com");
