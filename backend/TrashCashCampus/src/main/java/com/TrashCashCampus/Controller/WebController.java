@@ -7,11 +7,10 @@ import org.springframework.web.bind.annotation.GetMapping;
 public class WebController {
 
     /**
-     * Forward requests that should be handled by the frontend router
-     * to index.html so the client-side routing can handle them
+     * Redirect all frontend routes to the deployed frontend application
      */
     @GetMapping(value = {"", "/", "/login", "/dashboard", "/bins", "/rewards", "/users", "/admin-management"})
-    public String forwardToIndex() {
-        return "index";
+    public String redirectToFrontend() {
+        return "redirect:https://it342-trashcashcampus.onrender.com";
     }
 } 
