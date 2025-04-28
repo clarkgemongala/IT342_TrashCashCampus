@@ -22,6 +22,11 @@ public class TrashRepository {
     private FirebaseService firebaseService;
     
     public List<TrashEntity> findAll() {
+        if (!firebaseService.isFirebaseInitialized()) {
+            System.out.println("Firebase is in degraded mode, returning empty trash list");
+            return new ArrayList<>();
+        }
+        
         try {
             List<Map<String, Object>> documents = firebaseService.getAllDocuments(COLLECTION_NAME);
             List<TrashEntity> users = new ArrayList<>();
@@ -37,11 +42,17 @@ public class TrashRepository {
             
             return users;
         } catch (ExecutionException | InterruptedException e) {
-            throw new RuntimeException("Failed to fetch users", e);
+            System.err.println("Failed to fetch users: " + e.getMessage());
+            return new ArrayList<>(); // Return empty list instead of throwing exception
         }
     }
     
     public Optional<TrashEntity> findById(String id) {
+        if (!firebaseService.isFirebaseInitialized()) {
+            System.out.println("Firebase is in degraded mode, returning empty result");
+            return Optional.empty();
+        }
+        
         try {
             Map<String, Object> doc = firebaseService.getDocument(COLLECTION_NAME, id);
             if (doc == null) {
@@ -56,11 +67,17 @@ public class TrashRepository {
             
             return Optional.of(user);
         } catch (ExecutionException | InterruptedException e) {
-            throw new RuntimeException("Failed to fetch user with id: " + id, e);
+            System.err.println("Failed to fetch user with id: " + id + " - " + e.getMessage());
+            return Optional.empty(); // Return empty Optional instead of throwing exception
         }
     }
     
     public Optional<TrashEntity> findByEmail(String email) {
+        if (!firebaseService.isFirebaseInitialized()) {
+            System.out.println("Firebase is in degraded mode, returning empty result");
+            return Optional.empty();
+        }
+        
         try {
             // Since Firestore doesn't have direct query by field in our FirebaseService,
             // we'll get all documents and filter in memory (not ideal for production)
@@ -80,11 +97,17 @@ public class TrashRepository {
             
             return Optional.empty();
         } catch (ExecutionException | InterruptedException e) {
-            throw new RuntimeException("Failed to find user by email: " + email, e);
+            System.err.println("Failed to find user by email: " + email + " - " + e.getMessage());
+            return Optional.empty(); // Return empty Optional instead of throwing exception
         }
     }
     
     public TrashEntity save(TrashEntity user) {
+        if (!firebaseService.isFirebaseInitialized()) {
+            System.out.println("Firebase is in degraded mode, returning entity as-is without saving");
+            return user;
+        }
+        
         try {
             Map<String, Object> data = new HashMap<>();
             data.put("username", user.getUsername());
@@ -102,15 +125,22 @@ public class TrashRepository {
             
             return user;
         } catch (ExecutionException | InterruptedException e) {
-            throw new RuntimeException("Failed to save user", e);
+            System.err.println("Failed to save user: " + e.getMessage());
+            return user; // Return the user object as-is instead of throwing exception
         }
     }
     
     public void deleteById(String id) {
+        if (!firebaseService.isFirebaseInitialized()) {
+            System.out.println("Firebase is in degraded mode, skipping delete operation");
+            return;
+        }
+        
         try {
             firebaseService.deleteDocument(COLLECTION_NAME, id);
         } catch (ExecutionException | InterruptedException e) {
-            throw new RuntimeException("Failed to delete user with id: " + id, e);
+            System.err.println("Failed to delete user with id: " + id + " - " + e.getMessage());
+            // Don't throw exception
         }
     }
 }

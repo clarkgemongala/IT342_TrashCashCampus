@@ -21,13 +21,28 @@ To deploy this application on Render:
    - **Branch**: `main` (or your deployment branch)
 
 4. Configure the following environment variables:
-   - `FIREBASE_CREDENTIALS`: Copy the entire JSON content from the Firebase credentials file
+   - `FIREBASE_CONFIG`: Copy the entire Firebase service account JSON content as a minified single line string (see below for details)
    - `SPRING_PROFILES_ACTIVE`: `prod`
    - `PORT`: `8080` (Render will override this automatically)
 
 5. Set advanced settings:
    - Set Auto-Deploy to true for CI/CD
    - Configure health check path: `/api/health`
+
+### Firebase Configuration Using Environment Variables
+
+For security reasons, we store Firebase credentials as an environment variable rather than a file:
+
+1. Obtain your Firebase Service Account JSON file from the Firebase Console
+2. Minify the JSON content into a single line (remove all line breaks)
+   - You can use a JSON minifier tool or copy it into one line manually
+   - Ensure that the `\n` escapes in the private key are properly double-escaped as `\\n`
+3. Add this minified JSON string as the `FIREBASE_CONFIG` environment variable in Render
+
+Example of properly formatted environment variable value:
+```
+{"type":"service_account","project_id":"your-project-id","private_key_id":"somekeyid","private_key":"-----BEGIN PRIVATE KEY-----\\nMIIEvgIBADANBgkqhkiG9w0BA...\\n-----END PRIVATE KEY-----\\n","client_email":"firebase-adminsdk-abc@your-project-id.iam.gserviceaccount.com",...}
+```
 
 ### Project Structure
 
@@ -67,10 +82,12 @@ IT342_TrashCashCampus/backend/TrashCashCampus/
    ```
    cd IT342_TrashCashCampus/backend/TrashCashCampus
    ```
-3. Place your Firebase credentials JSON file in:
-   ```
-   src/main/resources/trashcashcampusmobile-firebase-adminsdk-fbsvc-0a3b17cdcd.json
-   ```
+3. Set up Firebase credentials using one of these methods:
+   - **Option 1 (Recommended for production)**: Set the `FIREBASE_CONFIG` environment variable with the minified JSON content
+   - **Option 2 (Development only)**: Place your Firebase credentials JSON file in:
+     ```
+     src/main/resources/trashcashcampusmobile-firebase-adminsdk-fbsvc-0a3b17cdcd.json
+     ```
 4. Run the application:
    ```
    ./mvnw spring-boot:run

@@ -1,6 +1,7 @@
 package com.TrashCashCampus.Repository;
 
 import com.TrashCashCampus.Entity.CampusLocation;
+import com.TrashCashCampus.Service.FirebaseService;
 import org.springframework.stereotype.Repository;
 
 import com.google.api.core.ApiFuture;
@@ -17,12 +18,22 @@ import java.util.concurrent.ExecutionException;
 public class CampusLocationRepository {
 
     private static final String COLLECTION_NAME = "campus_locations";
+    private final FirebaseService firebaseService;
+    
+    public CampusLocationRepository(FirebaseService firebaseService) {
+        this.firebaseService = firebaseService;
+    }
 
     public List<CampusLocation> findAll() {
         List<CampusLocation> locations = new ArrayList<>();
         
         try {
-            Firestore firestore = FirestoreClient.getFirestore();
+            if (!firebaseService.isFirebaseInitialized()) {
+                System.out.println("Firebase is in degraded mode, returning empty location list");
+                return locations;
+            }
+            
+            Firestore firestore = firebaseService.getFirestore();
             ApiFuture<QuerySnapshot> future = firestore.collection(COLLECTION_NAME).get();
             
             List<QueryDocumentSnapshot> documents = future.get().getDocuments();
@@ -40,7 +51,12 @@ public class CampusLocationRepository {
 
     public CampusLocation save(CampusLocation location) {
         try {
-            Firestore firestore = FirestoreClient.getFirestore();
+            if (!firebaseService.isFirebaseInitialized()) {
+                System.out.println("Firebase is in degraded mode, skipping operation");
+                return location; // Return the object as-is for degraded mode
+            }
+            
+            Firestore firestore = firebaseService.getFirestore();
             
             if (location.getId() == null || location.getId().isEmpty()) {
                 // Create new document
@@ -58,7 +74,7 @@ public class CampusLocationRepository {
             return location;
         } catch (InterruptedException | ExecutionException e) {
             System.err.println("Error saving campus location: " + e.getMessage());
-            return null;
+            return location; // Return the object as-is in case of error
         }
     }
 } 

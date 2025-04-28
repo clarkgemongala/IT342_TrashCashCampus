@@ -3,6 +3,7 @@ package com.TrashCashCampus.Service;
 import com.TrashCashCampus.Entity.CampusLocation;
 import com.TrashCashCampus.Repository.CampusLocationRepository;
 import org.springframework.stereotype.Service;
+import jakarta.annotation.PostConstruct;
 
 import java.util.List;
 
@@ -10,12 +11,24 @@ import java.util.List;
 public class CampusLocationService {
 
     private final CampusLocationRepository campusLocationRepository;
+    private final FirebaseService firebaseService;
+    private boolean defaultLocationsEnsured = false;
 
-    public CampusLocationService(CampusLocationRepository campusLocationRepository) {
+    public CampusLocationService(CampusLocationRepository campusLocationRepository, FirebaseService firebaseService) {
         this.campusLocationRepository = campusLocationRepository;
-        
-        // On service initialization, make sure we have the default campus locations
-        ensureDefaultLocationsExist();
+        this.firebaseService = firebaseService;
+        // Don't call ensureDefaultLocationsExist() in constructor - will do it in @PostConstruct
+    }
+
+    @PostConstruct
+    public void init() {
+        try {
+            System.out.println("Application context refreshed, initializing default locations if needed");
+            ensureDefaultLocationsExist();
+        } catch (Exception e) {
+            System.out.println("Error initializing default locations: " + e.getMessage());
+            System.out.println("Application will continue without default locations");
+        }
     }
 
     public List<CampusLocation> getAllLocations() {
@@ -30,12 +43,27 @@ public class CampusLocationService {
      * Initialize the database with the default campus locations if not already present
      */
     private void ensureDefaultLocationsExist() {
+        // Skip if we already have handled this
+        if (defaultLocationsEnsured) {
+            return;
+        }
+        
+        // Skip if Firebase is not initialized
+        if (!firebaseService.isFirebaseInitialized()) {
+            System.out.println("Firebase is in degraded mode, skipping default location creation");
+            defaultLocationsEnsured = true;
+            return;
+        }
+        
         List<CampusLocation> existingLocations = campusLocationRepository.findAll();
         
         // Skip if we already have locations in the database
         if (!existingLocations.isEmpty()) {
+            defaultLocationsEnsured = true;
             return;
         }
+        
+        System.out.println("No existing locations found. Creating default locations...");
         
         // Initialize with the 8 campus locations specified
         CampusLocation[] defaultLocations = {
@@ -60,6 +88,10 @@ public class CampusLocationService {
         // Save each default location
         for (CampusLocation location : defaultLocations) {
             campusLocationRepository.save(location);
+            System.out.println("Created default location: " + location.getName());
         }
+        
+        System.out.println("Default locations created successfully");
+        defaultLocationsEnsured = true;
     }
 } 

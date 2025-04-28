@@ -25,6 +25,11 @@ public class ScanBinRepository {
     private FirebaseService firebaseService;
     
     public List<ScanBin> findAll() {
+        if (!firebaseService.isFirebaseInitialized()) {
+            System.out.println("Firebase is in degraded mode, returning empty scan bin list");
+            return new ArrayList<>();
+        }
+        
         try {
             List<Map<String, Object>> documents = firebaseService.getAllDocuments(COLLECTION_NAME);
             List<ScanBin> scanBins = new ArrayList<>();
@@ -37,11 +42,17 @@ public class ScanBinRepository {
             
             return scanBins;
         } catch (ExecutionException | InterruptedException e) {
-            throw new RuntimeException("Failed to fetch scan bins", e);
+            System.err.println("Failed to fetch scan bins: " + e.getMessage());
+            return new ArrayList<>(); // Return empty list instead of throwing exception
         }
     }
     
     public Optional<ScanBin> findById(String id) {
+        if (!firebaseService.isFirebaseInitialized()) {
+            System.out.println("Firebase is in degraded mode, returning empty result");
+            return Optional.empty();
+        }
+        
         try {
             Map<String, Object> doc = firebaseService.getDocument(COLLECTION_NAME, id);
             if (doc == null) {
@@ -53,11 +64,17 @@ public class ScanBinRepository {
             
             return Optional.of(scanBin);
         } catch (ExecutionException | InterruptedException e) {
-            throw new RuntimeException("Failed to fetch scan bin with id: " + id, e);
+            System.err.println("Failed to fetch scan bin with id: " + id + " - " + e.getMessage());
+            return Optional.empty(); // Return empty Optional instead of throwing exception
         }
     }
     
     public ScanBin save(ScanBin scanBin) {
+        if (!firebaseService.isFirebaseInitialized()) {
+            System.out.println("Firebase is in degraded mode, returning entity as-is without saving");
+            return scanBin;
+        }
+        
         try {
             Map<String, Object> data = new HashMap<>();
             data.put("qrCode", scanBin.getQrCode());
@@ -81,15 +98,22 @@ public class ScanBinRepository {
             
             return scanBin;
         } catch (ExecutionException | InterruptedException e) {
-            throw new RuntimeException("Failed to save scan bin", e);
+            System.err.println("Failed to save scan bin: " + e.getMessage());
+            return scanBin; // Return the scanBin object as-is instead of throwing exception
         }
     }
     
     public void deleteById(String id) {
+        if (!firebaseService.isFirebaseInitialized()) {
+            System.out.println("Firebase is in degraded mode, skipping delete operation");
+            return;
+        }
+        
         try {
             firebaseService.deleteDocument(COLLECTION_NAME, id);
         } catch (ExecutionException | InterruptedException e) {
-            throw new RuntimeException("Failed to delete scan bin with id: " + id, e);
+            System.err.println("Failed to delete scan bin with id: " + id + " - " + e.getMessage());
+            // Don't throw exception
         }
     }
     
@@ -103,19 +127,14 @@ public class ScanBinRepository {
         scanBin.setMessage((String) doc.get("message"));
         scanBin.setFact((String) doc.get("fact"));
         
-        // Extract location information
-        scanBin.setLocationName((String) doc.get("locationName"));
-        
-        // Handle timestamp conversion
-        Object timestampObj = doc.get("timestamp");
-        if (timestampObj instanceof Long) {
-            LocalDateTime timestamp = Instant.ofEpochMilli((Long) timestampObj)
-                .atZone(ZoneId.systemDefault())
-                .toLocalDateTime();
-            scanBin.setTimestamp(timestamp);
+        // Try to get locationName, falling back to binLocation for backward compatibility
+        String locationName = (String) doc.get("locationName");
+        if (locationName == null) {
+            locationName = (String) doc.get("binLocation");
         }
+        scanBin.setLocationName(locationName);
         
-        // Handle numeric type conversion
+        // Handle potential type conversion issues with numeric types from Firestore
         Object pointsEarnedObj = doc.get("pointsEarned");
         if (pointsEarnedObj instanceof Long) {
             scanBin.setPointsEarned(((Long) pointsEarnedObj).intValue());
@@ -123,6 +142,17 @@ public class ScanBinRepository {
             scanBin.setPointsEarned((Integer) pointsEarnedObj);
         } else if (pointsEarnedObj instanceof Double) {
             scanBin.setPointsEarned(((Double) pointsEarnedObj).intValue());
+        }
+        
+        // Convert timestamp to LocalDateTime
+        Object timestampObj = doc.get("timestamp");
+        if (timestampObj instanceof Long) {
+            long timestamp = (Long) timestampObj;
+            LocalDateTime dateTime = LocalDateTime.ofInstant(
+                Instant.ofEpochMilli(timestamp), 
+                ZoneId.systemDefault()
+            );
+            scanBin.setTimestamp(dateTime);
         }
         
         return scanBin;

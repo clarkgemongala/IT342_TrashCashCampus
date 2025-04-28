@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -21,6 +22,11 @@ public class RewardRepository {
     private FirebaseService firebaseService;
     
     public List<Reward> findAll() {
+        if (!firebaseService.isFirebaseInitialized()) {
+            System.out.println("Firebase is in degraded mode, returning empty rewards list");
+            return new ArrayList<>();
+        }
+        
         try {
             List<Map<String, Object>> documents = firebaseService.getAllDocuments(COLLECTION_NAME);
             List<Reward> rewards = new ArrayList<>();
@@ -45,11 +51,17 @@ public class RewardRepository {
             
             return rewards;
         } catch (ExecutionException | InterruptedException e) {
-            throw new RuntimeException("Failed to fetch rewards", e);
+            System.err.println("Failed to fetch rewards: " + e.getMessage());
+            return new ArrayList<>(); // Return empty list instead of throwing exception
         }
     }
     
     public Optional<Reward> findById(String id) {
+        if (!firebaseService.isFirebaseInitialized()) {
+            System.out.println("Firebase is in degraded mode, returning empty result");
+            return Optional.empty();
+        }
+        
         try {
             Map<String, Object> doc = firebaseService.getDocument(COLLECTION_NAME, id);
             if (doc == null) {
@@ -60,7 +72,7 @@ public class RewardRepository {
             reward.setId(id);
             reward.setName((String) doc.get("name"));
             
-            // Handle potential type conversion issues
+            // Handle potential type conversion issues with numeric types from Firestore
             Object pointsCostObj = doc.get("pointsCost");
             if (pointsCostObj instanceof Long) {
                 reward.setPointsCost(((Long) pointsCostObj).intValue());
@@ -72,16 +84,21 @@ public class RewardRepository {
             
             return Optional.of(reward);
         } catch (ExecutionException | InterruptedException e) {
-            throw new RuntimeException("Failed to fetch reward with id: " + id, e);
+            System.err.println("Failed to fetch reward with id: " + id + " - " + e.getMessage());
+            return Optional.empty(); // Return empty Optional instead of throwing exception
         }
     }
     
     public Reward save(Reward reward) {
+        if (!firebaseService.isFirebaseInitialized()) {
+            System.out.println("Firebase is in degraded mode, returning entity as-is without saving");
+            return reward;
+        }
+        
         try {
-            Map<String, Object> data = Map.of(
-                "name", reward.getName(),
-                "pointsCost", reward.getPointsCost()
-            );
+            Map<String, Object> data = new HashMap<>();
+            data.put("name", reward.getName());
+            data.put("pointsCost", reward.getPointsCost());
             
             if (reward.getId() == null || reward.getId().isEmpty()) {
                 // Create new document
@@ -94,7 +111,8 @@ public class RewardRepository {
             
             return reward;
         } catch (ExecutionException | InterruptedException e) {
-            throw new RuntimeException("Failed to save reward", e);
+            System.err.println("Failed to save reward: " + e.getMessage());
+            return reward; // Return the reward object as-is instead of throwing exception
         }
     }
     
@@ -105,10 +123,16 @@ public class RewardRepository {
     }
     
     public void deleteById(String id) {
+        if (!firebaseService.isFirebaseInitialized()) {
+            System.out.println("Firebase is in degraded mode, skipping delete operation");
+            return;
+        }
+        
         try {
             firebaseService.deleteDocument(COLLECTION_NAME, id);
         } catch (ExecutionException | InterruptedException e) {
-            throw new RuntimeException("Failed to delete reward with id: " + id, e);
+            System.err.println("Failed to delete reward with id: " + id + " - " + e.getMessage());
+            // Don't throw exception
         }
     }
     
@@ -117,6 +141,41 @@ public class RewardRepository {
             return firebaseService.getAllDocuments(COLLECTION_NAME).size();
         } catch (ExecutionException | InterruptedException e) {
             throw new RuntimeException("Failed to count rewards", e);
+        }
+    }
+    
+    /**
+     * Seeds the database with some initial rewards if the collection is empty
+     */
+    public void seedDefaultRewards() {
+        if (!firebaseService.isFirebaseInitialized()) {
+            System.out.println("Firebase is in degraded mode, skipping reward seeding");
+            return;
+        }
+        
+        try {
+            List<Reward> existingRewards = findAll();
+            if (!existingRewards.isEmpty()) {
+                System.out.println("Rewards already exist, skipping seeding");
+                return;
+            }
+            
+            // Create default rewards
+            Reward[] defaultRewards = {
+                new Reward("CIT Recycling Tote Bag", 150),
+                new Reward("Eco-friendly Water Bottle", 200),
+                new Reward("CIT Sustainability T-Shirt", 250),
+                new Reward("Campus Canteen Discount (10%)", 100),
+                new Reward("Book Store Discount (15%)", 300)
+            };
+            
+            for (Reward reward : defaultRewards) {
+                save(reward);
+            }
+            
+            System.out.println("Sample rewards seeded.");
+        } catch (Exception e) {
+            System.err.println("Failed to seed rewards: " + e.getMessage());
         }
     }
 }

@@ -24,6 +24,8 @@ import org.springframework.stereotype.Service;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.List;
@@ -35,6 +37,7 @@ public class FirebaseService {
 
     private Firestore firestore;
     private FirebaseAuth firebaseAuth;
+    private boolean firebaseInitialized = false;
     
     @Value("${firebase.credentials.path:trashcashcampusmobile-firebase-adminsdk-fbsvc-0a3b17cdcd.json}")
     private String firebaseCredentialsPath;
@@ -42,11 +45,20 @@ public class FirebaseService {
     @PostConstruct
     public void initialize() {
         try {
-            // Use Spring's ClassPathResource to load the credentials file
-            Resource resource = new ClassPathResource(firebaseCredentialsPath);
-            InputStream serviceAccount = resource.getInputStream();
+            // First try to get credentials from environment variable
+            String firebaseConfig = System.getenv("FIREBASE_CONFIG");
+            InputStream serviceAccount;
             
-            System.out.println("Loading Firebase credentials from: " + firebaseCredentialsPath);
+            if (firebaseConfig != null && !firebaseConfig.isEmpty()) {
+                // Use credentials from environment variable
+                System.out.println("Loading Firebase credentials from environment variable FIREBASE_CONFIG");
+                serviceAccount = new ByteArrayInputStream(firebaseConfig.getBytes(StandardCharsets.UTF_8));
+            } else {
+                // Fall back to loading from file
+                System.out.println("Loading Firebase credentials from file: " + firebaseCredentialsPath);
+                Resource resource = new ClassPathResource(firebaseCredentialsPath);
+                serviceAccount = resource.getInputStream();
+            }
 
             FirebaseOptions options = FirebaseOptions.builder()
                 .setCredentials(GoogleCredentials.fromStream(serviceAccount))
@@ -61,16 +73,47 @@ public class FirebaseService {
             this.firestore = FirestoreClient.getFirestore();
             this.firebaseAuth = FirebaseAuth.getInstance();
             
+            this.firebaseInitialized = true;
             System.out.println("Firebase initialized successfully");
         } catch (IOException e) {
+            this.firebaseInitialized = false;
             System.err.println("Failed to initialize Firebase: " + e.getMessage());
             e.printStackTrace();
+            System.out.println("Application will continue without Firebase functionality");
         }
+    }
+
+    // Add a method to check if Firebase is initialized
+    public boolean isFirebaseInitialized() {
+        return firebaseInitialized;
+    }
+
+    // Add a method to safely get Firestore
+    public Firestore getFirestore() {
+        if (!firebaseInitialized) {
+            System.out.println("Firebase is not initialized, returning null Firestore");
+            return null;
+        }
+        return this.firestore;
+    }
+
+    // Add a method to safely get FirebaseAuth
+    public FirebaseAuth getFirebaseAuth() {
+        if (!firebaseInitialized) {
+            System.out.println("Firebase is not initialized, returning null FirebaseAuth");
+            return null;
+        }
+        return this.firebaseAuth;
     }
 
     // Authentication methods
     
     public String createUser(String email, String password) throws FirebaseAuthException {
+        if (!firebaseInitialized) {
+            System.out.println("Firebase is in degraded mode, skipping operation");
+            return null;
+        }
+        
         CreateRequest request = new CreateRequest()
             .setEmail(email)
             .setPassword(password)
@@ -81,6 +124,11 @@ public class FirebaseService {
     }
     
     public String signIn(String email, String password) {
+        if (!firebaseInitialized) {
+            System.out.println("Firebase is in degraded mode, skipping operation");
+            return null;
+        }
+        
         // Firebase doesn't support server-side email/password authentication directly
         // This is a security issue - we need to properly validate credentials
         try {
@@ -135,16 +183,29 @@ public class FirebaseService {
     }
     
     public UserRecord getUserById(String uid) throws FirebaseAuthException {
+        if (!firebaseInitialized) {
+            System.out.println("Firebase is in degraded mode, skipping operation");
+            return null;
+        }
         return firebaseAuth.getUser(uid);
     }
     
     public UserRecord getUserByEmail(String email) throws FirebaseAuthException {
+        if (!firebaseInitialized) {
+            System.out.println("Firebase is in degraded mode, skipping operation");
+            return null;
+        }
         return firebaseAuth.getUserByEmail(email);
     }
     
     // Firestore methods
     
     public Map<String, Object> getDocument(String collection, String documentId) throws ExecutionException, InterruptedException {
+        if (!firebaseInitialized) {
+            System.out.println("Firebase is in degraded mode, skipping operation");
+            return null;
+        }
+        
         DocumentReference docRef = firestore.collection(collection).document(documentId);
         DocumentSnapshot document = docRef.get().get();
         
@@ -156,6 +217,11 @@ public class FirebaseService {
     }
     
     public String createDocument(String collection, Map<String, Object> data) throws ExecutionException, InterruptedException {
+        if (!firebaseInitialized) {
+            System.out.println("Firebase is in degraded mode, skipping operation");
+            return null;
+        }
+        
         DocumentReference docRef = firestore.collection(collection).document();
         WriteResult result = docRef.set(data).get();
         return docRef.getId();
@@ -170,6 +236,11 @@ public class FirebaseService {
      * @return The document ID
      */
     public String createDocumentWithId(String collection, String documentId, Map<String, Object> data) throws ExecutionException, InterruptedException {
+        if (!firebaseInitialized) {
+            System.out.println("Firebase is in degraded mode, skipping operation");
+            return null;
+        }
+        
         // Log document details for debugging
         System.out.println("Creating document in collection: " + collection + " with ID: " + documentId);
         System.out.println("Document has " + data.size() + " fields");
@@ -200,12 +271,22 @@ public class FirebaseService {
     }
     
     public String updateDocument(String collection, String documentId, Map<String, Object> data) throws ExecutionException, InterruptedException {
+        if (!firebaseInitialized) {
+            System.out.println("Firebase is in degraded mode, skipping operation");
+            return null;
+        }
+        
         DocumentReference docRef = firestore.collection(collection).document(documentId);
         WriteResult result = docRef.update(data).get();
         return result.getUpdateTime().toString();
     }
     
     public List<Map<String, Object>> getAllDocuments(String collection) throws ExecutionException, InterruptedException {
+        if (!firebaseInitialized) {
+            System.out.println("Firebase is in degraded mode, skipping operation");
+            return new ArrayList<>();
+        }
+        
         CollectionReference colRef = firestore.collection(collection);
         QuerySnapshot querySnapshot = colRef.get().get();
         
@@ -220,6 +301,11 @@ public class FirebaseService {
     }
     
     public void deleteDocument(String collection, String documentId) throws ExecutionException, InterruptedException {
+        if (!firebaseInitialized) {
+            System.out.println("Firebase is in degraded mode, skipping operation");
+            return;
+        }
+        
         DocumentReference docRef = firestore.collection(collection).document(documentId);
         docRef.delete().get();
     }
