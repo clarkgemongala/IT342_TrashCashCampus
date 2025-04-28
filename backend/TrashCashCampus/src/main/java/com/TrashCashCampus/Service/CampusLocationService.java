@@ -3,11 +3,13 @@ package com.TrashCashCampus.Service;
 import com.TrashCashCampus.Entity.CampusLocation;
 import com.TrashCashCampus.Repository.CampusLocationRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.context.annotation.DependsOn;
 import jakarta.annotation.PostConstruct;
 
 import java.util.List;
 
 @Service
+@DependsOn("firebaseService")
 public class CampusLocationService {
 
     private final CampusLocationRepository campusLocationRepository;
