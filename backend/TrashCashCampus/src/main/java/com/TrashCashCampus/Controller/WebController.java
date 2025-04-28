@@ -10,8 +10,8 @@ public class WebController {
      * Forward requests that should be handled by the frontend router
      * to index.html so the client-side routing can handle them
      */
-    @GetMapping(value = {"/", "/login", "/dashboard", "/bins", "/rewards", "/users", "/admin-management"})
+    @GetMapping(value = {"", "/", "/login", "/dashboard", "/bins", "/rewards", "/users", "/admin-management"})
     public String forwardToIndex() {
-        return "forward:/index.html";
+        return "index";
     }
 } 
