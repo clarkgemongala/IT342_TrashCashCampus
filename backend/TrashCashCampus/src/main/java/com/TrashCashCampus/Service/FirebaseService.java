@@ -20,8 +20,10 @@ import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Service;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Map;
@@ -30,6 +32,7 @@ import java.util.List;
 import java.util.ArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.locks.ReentrantLock;
+import java.nio.charset.StandardCharsets;
 
 @Service
 public class FirebaseService {
@@ -40,8 +43,14 @@ public class FirebaseService {
     private boolean initialized = false;
     private boolean inDegradedMode = false;
     
+    private final Environment environment;
+    
     @Value("${firebase.credentials.path:trashcashcampusmobile-firebase-adminsdk-fbsvc-0a3b17cdcd.json}")
     private String firebaseCredentialsPath;
+
+    public FirebaseService(Environment environment) {
+        this.environment = environment;
+    }
 
     @PostConstruct
     public void initialize() {
@@ -58,20 +67,29 @@ public class FirebaseService {
             }
             
             try {
-                // Use Spring's ClassPathResource to load the credentials file
-                Resource resource = new ClassPathResource(firebaseCredentialsPath);
+                // First check if Firebase credentials are provided as an environment variable
+                String firebaseCredentialsJson = environment.getProperty("FIREBASE_CREDENTIALS");
+                InputStream serviceAccount;
                 
-                // Check if the resource exists before trying to open it
-                if (!resource.exists()) {
-                    System.err.println("Firebase credentials file not found: " + firebaseCredentialsPath);
-                    enterDegradedMode("Credentials file not found");
-                    return;
+                if (firebaseCredentialsJson != null && !firebaseCredentialsJson.isEmpty()) {
+                    // Use credentials from environment variable
+                    System.out.println("Using Firebase credentials from environment variable");
+                    serviceAccount = new ByteArrayInputStream(firebaseCredentialsJson.getBytes(StandardCharsets.UTF_8));
+                } else {
+                    // Use Spring's ClassPathResource to load the credentials file
+                    Resource resource = new ClassPathResource(firebaseCredentialsPath);
+                    
+                    // Check if the resource exists before trying to open it
+                    if (!resource.exists()) {
+                        System.err.println("Firebase credentials file not found: " + firebaseCredentialsPath);
+                        enterDegradedMode("Credentials file not found");
+                        return;
+                    }
+                    
+                    System.out.println("Loading Firebase credentials from file: " + firebaseCredentialsPath);
+                    serviceAccount = resource.getInputStream();
                 }
                 
-                InputStream serviceAccount = resource.getInputStream();
-                
-                System.out.println("Loading Firebase credentials from: " + firebaseCredentialsPath);
-    
                 FirebaseOptions options = FirebaseOptions.builder()
                     .setCredentials(GoogleCredentials.fromStream(serviceAccount))
                     .build();
