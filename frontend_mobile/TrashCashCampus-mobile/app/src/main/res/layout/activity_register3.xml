@@ -111,7 +111,6 @@
                 android:layout_height="3dp"
                 android:background="#DDDDDD"
                 app:layout_constraintStart_toStartOf="@+id/vCircleEmail"
-                app:layout_constraintEnd_toEndOf="@+id/vCirclePass"
                 app:layout_constraintTop_toTopOf="@+id/vCircleEmail"
                 app:layout_constraintBottom_toBottomOf="@+id/vCircleEmail" />
 
