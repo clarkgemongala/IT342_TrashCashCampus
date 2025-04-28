@@ -61,6 +61,16 @@ public class DegradedModeService {
         return new ArrayList<>(serviceFailures.values());
     }
     
+    /**
+     * Records a failed operation to track service degradation patterns
+     * 
+     * @param operationName Name of the operation that failed
+     */
+    public void recordFailedOperation(String operationName) {
+        log.warn("Failed operation recorded: {}", operationName);
+        // Could be enhanced to count failures and trigger degraded mode after threshold
+    }
+    
     private String generateKey() {
         return "service-" + System.currentTimeMillis();
     }

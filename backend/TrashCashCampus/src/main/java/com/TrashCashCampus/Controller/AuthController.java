@@ -18,6 +18,8 @@ import com.TrashCashCampus.dto.LoginResponse;
 import com.TrashCashCampus.dto.RegistrationRequest;
 import com.google.firebase.auth.FirebaseAuthException;
 import com.google.firebase.auth.UserRecord;
+import com.TrashCashCampus.DTO.CreateUserDTO;
+import com.TrashCashCampus.DTO.UpdateUserDTO;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -53,13 +55,12 @@ public class AuthController {
         }
 
         try {
-            if (firebaseService.isAvailable()) {
+            if (firebaseService.isServiceAvailable()) {
                 // Firebase is available, use normal authentication
-                String uid = firebaseService.signIn(request.getEmail(), request.getPassword());
-                UserRecord user = firebaseService.getUserById(uid);
+                UserRecord user = firebaseService.getUserByEmail(request.getEmail());
                 
                 LoginResponse response = new LoginResponse();
-                response.setUserId(uid);
+                response.setUserId(user.getUid());
                 response.setEmail(user.getEmail());
                 
                 return ResponseEntity.ok(response);
@@ -109,9 +110,14 @@ public class AuthController {
         }
 
         try {
-            if (firebaseService.isAvailable()) {
+            if (firebaseService.isServiceAvailable()) {
                 // Firebase is available, use normal registration
-                String uid = firebaseService.createUser(request.getEmail(), request.getPassword());
+                CreateUserDTO userDTO = new CreateUserDTO();
+                userDTO.setEmail(request.getEmail());
+                userDTO.setPassword(request.getPassword());
+                userDTO.setDisplayName(request.getName());
+                
+                UserRecord user = firebaseService.createUser(userDTO);
                 
                 // Create user profile in Firestore
                 Map<String, Object> profile = new HashMap<>();
@@ -121,10 +127,15 @@ public class AuthController {
                 profile.put("totalPoints", 0); // Initialize with 0 points
                 profile.put("recentPoints", 0); // Initialize daily points to 0
                 profile.put("lastPointsUpdate", System.currentTimeMillis());
-                firebaseService.createDocument("users", profile);
+                
+                try {
+                    firebaseService.createDocumentWithId("users", user.getUid(), profile);
+                } catch (FirebaseService.FirestoreException e) {
+                    System.out.println("Error creating user profile: " + e.getMessage());
+                }
                 
                 Map<String, Object> response = new HashMap<>();
-                response.put("userId", uid);
+                response.put("userId", user.getUid());
                 response.put("message", "User registered successfully");
                 
                 return ResponseEntity.ok(response);
@@ -183,7 +194,7 @@ public class AuthController {
     @PostMapping("/verify")
     public ResponseEntity<?> verifyToken(@RequestHeader("Authorization") String token) {
         // In degraded mode, just return true for any token
-        if (!firebaseService.isAvailable()) {
+        if (!firebaseService.isServiceAvailable()) {
             return ResponseEntity.ok(true);
         }
         
@@ -194,7 +205,7 @@ public class AuthController {
     @PostMapping("/update-password/{userId}")
     public ResponseEntity<?> updatePassword(@PathVariable String userId, @RequestBody CredentialRequest request) {
         try {
-            if (firebaseService.isAvailable()) {
+            if (firebaseService.isServiceAvailable()) {
                 // Get user from Firebase
                 UserRecord userRecord = firebaseService.getUserById(userId);
                 
@@ -202,7 +213,16 @@ public class AuthController {
                 Map<String, Object> updates = new HashMap<>();
                 updates.put("password", request.getPassword());
                 
-                firebaseService.updateDocument("users", userId, updates);
+                // Update Firebase Auth password
+                UpdateUserDTO updateDTO = new UpdateUserDTO();
+                updateDTO.setPassword(request.getPassword());
+                firebaseService.updateUser(userId, updateDTO);
+                
+                try {
+                    firebaseService.updateDocument("users", userId, updates);
+                } catch (FirebaseService.FirestoreException e) {
+                    System.out.println("Error updating user profile: " + e.getMessage());
+                }
                 
                 Map<String, Object> response = new HashMap<>();
                 response.put("message", "Password updated successfully for user: " + userRecord.getEmail());
