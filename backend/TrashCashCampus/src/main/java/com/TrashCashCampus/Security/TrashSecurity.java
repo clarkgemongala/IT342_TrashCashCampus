@@ -3,9 +3,11 @@ package com.TrashCashCampus.Security;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration
+@EnableWebSecurity
 public class TrashSecurity {
 
 	@Bean
@@ -13,8 +15,11 @@ public class TrashSecurity {
 	    http
 	        .csrf().disable() // Disable CSRF if not needed
 	        .authorizeRequests()
-	            .requestMatchers("/**").permitAll() // Allow access to all endpoints
-	            .anyRequest().authenticated(); // Secure other endpoints
+	            .antMatchers("/**").permitAll() // Allow access to all endpoints
+	            .anyRequest().authenticated() // Secure other endpoints
+	        .and()
+	        .formLogin().disable()
+	        .httpBasic().disable();
 
 	    return http.build();
 	}
