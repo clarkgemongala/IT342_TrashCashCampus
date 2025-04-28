@@ -15,10 +15,8 @@ public class CorsConfig {
                 // Configure CORS for API endpoints
                 registry.addMapping("/api/**")
                         .allowedOrigins(
-                            "http://localhost:5173",            // Web frontend local
-                            "http://10.0.2.2:8080",             // Android emulator accessing localhost
-                            "https://it342-trashcashcampus.onrender.com", // Our deployed backend
-                            "https://trashcashcampus-web.onrender.com"    // Web frontend on Render
+                            "http://localhost:5173", // Web frontend
+                            "http://10.0.2.2:8080"   // Android emulator accessing localhost
                         )
                         .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD")
                         .allowedHeaders("*")

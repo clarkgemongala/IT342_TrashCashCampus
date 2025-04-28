@@ -13,8 +13,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.logging.Logger;
 
 @RestController
-@RequestMapping("/api/recycling")
-@CrossOrigin(origins = {"http://localhost:5173", "http://10.0.2.2:8080", "http://10.0.2.2", "https://trashcashcampus-web.onrender.com"})
+@RequestMapping("/recycling")
+@CrossOrigin(origins = {"http://localhost:5173", "http://10.0.2.2:8080", "http://10.0.2.2"})
 public class RecyclingController {
 
     private static final Logger logger = Logger.getLogger(RecyclingController.class.getName());
