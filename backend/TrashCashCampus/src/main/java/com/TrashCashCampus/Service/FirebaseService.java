@@ -17,6 +17,9 @@ import com.google.cloud.firestore.CollectionReference;
 
 import jakarta.annotation.PostConstruct;
 
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -32,13 +35,18 @@ public class FirebaseService {
 
     private Firestore firestore;
     private FirebaseAuth firebaseAuth;
+    
+    @Value("${firebase.credentials.path:trashcashcampusmobile-firebase-adminsdk-fbsvc-0a3b17cdcd.json}")
+    private String firebaseCredentialsPath;
 
     @PostConstruct
     public void initialize() {
         try {
-            // Use the service account credentials file from resources
-            InputStream serviceAccount = getClass().getClassLoader()
-                .getResourceAsStream("trashcashcampusmobile-firebase-adminsdk-fbsvc-0a3b17cdcd.json");
+            // Use Spring's ClassPathResource to load the credentials file
+            Resource resource = new ClassPathResource(firebaseCredentialsPath);
+            InputStream serviceAccount = resource.getInputStream();
+            
+            System.out.println("Loading Firebase credentials from: " + firebaseCredentialsPath);
 
             FirebaseOptions options = FirebaseOptions.builder()
                 .setCredentials(GoogleCredentials.fromStream(serviceAccount))
@@ -55,6 +63,7 @@ public class FirebaseService {
             
             System.out.println("Firebase initialized successfully");
         } catch (IOException e) {
+            System.err.println("Failed to initialize Firebase: " + e.getMessage());
             e.printStackTrace();
         }
     }
