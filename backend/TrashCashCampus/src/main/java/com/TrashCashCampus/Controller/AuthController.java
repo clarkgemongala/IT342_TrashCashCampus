@@ -35,9 +35,39 @@ public class AuthController {
             return ResponseEntity.badRequest().body(new ApiResponse("Only @cit.edu email addresses are allowed"));
         }
 
+        // Check if Firebase is initialized
+        if (!firebaseService.isFirebaseInitialized()) {
+            // For testing/development, allow a test login when Firebase is down
+            if (request.getEmail().equals("test@cit.edu") && request.getPassword().equals("Test123!")) {
+                LoginResponse response = new LoginResponse();
+                response.setUserId("test-user-id");
+                response.setEmail("test@cit.edu");
+                return ResponseEntity.ok(response);
+            }
+            
+            return ResponseEntity.status(500).body(
+                new ApiResponse("Firebase service is currently unavailable. Please try again later.")
+            );
+        }
+
         try {
             String uid = firebaseService.signIn(request.getEmail(), request.getPassword());
+            
+            // Check if UID is null (which would happen if sign in failed)
+            if (uid == null) {
+                return ResponseEntity.status(401).body(
+                    new ApiResponse("Invalid credentials or user not found")
+                );
+            }
+            
             UserRecord user = firebaseService.getUserById(uid);
+            
+            // Check if user record is null
+            if (user == null) {
+                return ResponseEntity.status(401).body(
+                    new ApiResponse("User record not found after successful authentication")
+                );
+            }
             
             LoginResponse response = new LoginResponse();
             response.setUserId(uid);
@@ -53,6 +83,13 @@ public class AuthController {
     public ResponseEntity<?> register(@RequestBody RegistrationRequest request) {
         if (!isValidEmail(request.getEmail())) {
             return ResponseEntity.badRequest().body(new ApiResponse("Only @cit.edu email addresses are allowed"));
+        }
+
+        // Check if Firebase is initialized
+        if (!firebaseService.isFirebaseInitialized()) {
+            return ResponseEntity.status(500).body(
+                new ApiResponse("Firebase service is currently unavailable. Please try again later.")
+            );
         }
 
         try {
@@ -102,6 +139,13 @@ public class AuthController {
 
     @PostMapping("/update-password/{userId}")
     public ResponseEntity<?> updatePassword(@PathVariable String userId, @RequestBody CredentialRequest request) {
+        // Check if Firebase is initialized
+        if (!firebaseService.isFirebaseInitialized()) {
+            return ResponseEntity.status(500).body(
+                new ApiResponse("Firebase service is currently unavailable. Please try again later.")
+            );
+        }
+        
         try {
             // Get user from Firebase
             UserRecord userRecord = firebaseService.getUserById(userId);
