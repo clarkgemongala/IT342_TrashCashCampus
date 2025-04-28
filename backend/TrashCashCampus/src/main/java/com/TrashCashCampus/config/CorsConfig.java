@@ -17,7 +17,8 @@ public class CorsConfig {
                         .allowedOrigins(
                             "http://localhost:5173", // Web frontend during development
                             "http://10.0.2.2:8080",  // Android emulator accessing localhost
-                            "https://it342-trashcashcampus.onrender.com" // Production web app
+                            "https://it342-trashcashcampus.onrender.com", // Production web app
+                            "https://trashcashcampus-testenvironment--trashcash-campus.netlify.app" // Netlify deploy URL
                         )
                         .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD")
                         .allowedHeaders("*")
