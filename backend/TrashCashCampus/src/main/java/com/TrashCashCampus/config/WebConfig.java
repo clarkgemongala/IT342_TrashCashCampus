@@ -26,7 +26,8 @@ public class WebConfig implements WebMvcConfigurer {
                 .allowedOrigins(
                     "http://localhost:5173",
                     "http://10.0.2.2:8080",
-                    "https://it342-trashcashcampus.onrender.com"
+                    "https://it342-trashcashcampus.onrender.com",
+                    "https://trashcashcampus-testenvironment--trashcash-campus.netlify.app"
                 )
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD")
                 .allowedHeaders("*")

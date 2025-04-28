@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/trash")
-@CrossOrigin(origins = "http://localhost:5173")
+@CrossOrigin(origins = {"http://localhost:5173", "https://trashcashcampus-testenvironment--trashcash-campus.netlify.app"})
 public class TrashController {
 
     @Autowired
