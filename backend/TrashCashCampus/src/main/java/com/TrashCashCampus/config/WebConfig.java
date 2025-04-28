@@ -5,10 +5,13 @@ import org.springframework.web.servlet.config.annotation.PathMatchConfigurer;
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import org.springframework.context.annotation.Bean;
+import org.springframework.web.servlet.HandlerInterceptor;
 import org.springframework.web.servlet.handler.SimpleUrlHandlerMapping;
 import org.springframework.web.servlet.resource.ResourceHttpRequestHandler;
 import org.springframework.web.util.UrlPathHelper;
 
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import java.util.Collections;
 
 @Configuration
@@ -37,10 +40,17 @@ public class WebConfig implements WebMvcConfigurer {
         ResourceHttpRequestHandler handler = new ResourceHttpRequestHandler();
         
         mapping.setUrlMap(Collections.singletonMap("/", handler));
-        mapping.setInterceptors(Collections.singletonList((request, response, handler1) -> {
-            response.sendRedirect("/api/health");
-            return false;
-        }));
+        
+        // Create a proper HandlerInterceptor implementation
+        HandlerInterceptor redirectInterceptor = new HandlerInterceptor() {
+            @Override
+            public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
+                response.sendRedirect("/api/health");
+                return false;
+            }
+        };
+        
+        mapping.setInterceptors(new Object[]{redirectInterceptor});
         
         return mapping;
     }

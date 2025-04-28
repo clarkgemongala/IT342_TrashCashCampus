@@ -1,431 +1,594 @@
 package com.TrashCashCampus.Service;
 
+import com.TrashCashCampus.Config.FirebaseConfig;
+import com.TrashCashCampus.DTO.*;
+import com.TrashCashCampus.Domain.FirebaseDocument;
+import com.google.api.core.ApiFuture;
 import com.google.auth.oauth2.GoogleCredentials;
+import com.google.cloud.firestore.*;
 import com.google.firebase.FirebaseApp;
 import com.google.firebase.FirebaseOptions;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseAuthException;
 import com.google.firebase.auth.UserRecord;
-import com.google.firebase.auth.UserRecord.CreateRequest;
 import com.google.firebase.cloud.FirestoreClient;
-import com.google.cloud.firestore.Firestore;
-import com.google.cloud.firestore.DocumentReference;
-import com.google.cloud.firestore.DocumentSnapshot;
-import com.google.cloud.firestore.QuerySnapshot;
-import com.google.cloud.firestore.WriteResult;
-import com.google.cloud.firestore.CollectionReference;
-
 import jakarta.annotation.PostConstruct;
-
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.ClassPathResource;
-import org.springframework.core.io.Resource;
-import org.springframework.core.env.Environment;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
+import org.springframework.util.ResourceUtils;
 
-import java.io.ByteArrayInputStream;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Map;
-import java.util.HashMap;
-import java.util.List;
-import java.util.ArrayList;
+import java.util.*;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.locks.ReentrantLock;
-import java.nio.charset.StandardCharsets;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 @Service
+@Slf4j
 public class FirebaseService {
-
+    private final FirebaseConfig config;
+    private final DegradedModeService degradedModeService;
+    
     private Firestore firestore;
     private FirebaseAuth firebaseAuth;
-    private final ReentrantLock initLock = new ReentrantLock();
-    private boolean initialized = false;
-    private boolean inDegradedMode = false;
+    private boolean serviceAvailable = false;
     
-    private final Environment environment;
+    @Value("${firebase.retry.max-attempts:3}")
+    private int maxRetryAttempts;
     
-    @Value("${firebase.credentials.path:trashcashcampusmobile-firebase-adminsdk-fbsvc-0a3b17cdcd.json}")
-    private String firebaseCredentialsPath;
+    @Value("${firebase.retry.initial-delay-ms:1000}")
+    private int initialRetryDelayMs;
+    
+    @Value("${firebase.operation.timeout-ms:10000}")
+    private int operationTimeoutMs;
 
-    public FirebaseService(Environment environment) {
-        this.environment = environment;
+    @Autowired
+    public FirebaseService(FirebaseConfig config, DegradedModeService degradedModeService) {
+        this.config = config;
+        this.degradedModeService = degradedModeService;
     }
 
     @PostConstruct
     public void initialize() {
-        initLock.lock();
         try {
-            if (initialized) {
-                System.out.println("Firebase is already initialized, skipping initialization");
-                return;
-            }
+            log.info("Initializing Firebase...");
             
-            if (inDegradedMode) {
-                System.out.println("Firebase is in degraded mode, skipping initialization");
-                return;
-            }
-            
-            try {
-                // First check if Firebase credentials are provided as an environment variable
-                String firebaseCredentialsJson = environment.getProperty("FIREBASE_CREDENTIALS");
-                InputStream serviceAccount;
-                
-                if (firebaseCredentialsJson != null && !firebaseCredentialsJson.isEmpty()) {
-                    // Use credentials from environment variable
-                    System.out.println("Using Firebase credentials from environment variable");
-                    serviceAccount = new ByteArrayInputStream(firebaseCredentialsJson.getBytes(StandardCharsets.UTF_8));
-                } else {
-                    // Use Spring's ClassPathResource to load the credentials file
-                    Resource resource = new ClassPathResource(firebaseCredentialsPath);
-                    
-                    // Check if the resource exists before trying to open it
-                    if (!resource.exists()) {
-                        System.err.println("Firebase credentials file not found: " + firebaseCredentialsPath);
-                        enterDegradedMode("Credentials file not found");
-                        return;
-                    }
-                    
-                    System.out.println("Loading Firebase credentials from file: " + firebaseCredentialsPath);
-                    serviceAccount = resource.getInputStream();
-                }
-                
-                FirebaseOptions options = FirebaseOptions.builder()
-                    .setCredentials(GoogleCredentials.fromStream(serviceAccount))
-                    .build();
-    
-                // Initialize the Firebase app
-                if (FirebaseApp.getApps().isEmpty()) {
-                    FirebaseApp.initializeApp(options);
-                    System.out.println("Firebase app initialized");
-                } else {
-                    System.out.println("Firebase app already initialized");
-                }
-    
-                // Get Firestore and Auth instances
-                this.firestore = FirestoreClient.getFirestore();
-                this.firebaseAuth = FirebaseAuth.getInstance();
-                
-                if (this.firestore == null) {
-                    enterDegradedMode("Firestore failed to initialize");
+            if (FirebaseApp.getApps().isEmpty()) {
+                InputStream serviceAccount = getClass().getResourceAsStream(config.getServiceAccountPath());
+                if (serviceAccount == null) {
+                    String errorMsg = "Firebase credentials file not found: " + config.getServiceAccountPath();
+                    log.error(errorMsg);
+                    degradedModeService.enableDegradedMode("Firebase initialization failed: Missing credentials");
                     return;
                 }
-                
-                if (this.firebaseAuth == null) {
-                    enterDegradedMode("FirebaseAuth failed to initialize");
-                    return;
-                }
-                
-                // Test a simple Firestore operation to verify connection
+
                 try {
-                    this.firestore.collection("test").document("test").get().get();
-                    System.out.println("Firestore connection test successful");
-                } catch (Exception e) {
-                    System.err.println("Firestore connection test failed: " + e.getMessage());
-                    // Continue anyway as this might be because the collection doesn't exist
+                    FirebaseOptions options = FirebaseOptions.builder()
+                            .setCredentials(GoogleCredentials.fromStream(serviceAccount))
+                            .setDatabaseUrl(config.getDatabaseUrl())
+                            .build();
+                    FirebaseApp.initializeApp(options);
+                    log.info("Firebase App has been initialized successfully");
+                } catch (IOException e) {
+                    String errorMsg = "Error initializing Firebase: " + e.getMessage();
+                    log.error(errorMsg, e);
+                    degradedModeService.enableDegradedMode("Firebase initialization failed: " + e.getMessage());
+                    return;
                 }
-                
-                initialized = true;
-                System.out.println("Firebase initialized successfully");
-            } catch (IOException e) {
-                System.err.println("Failed to initialize Firebase: " + e.getMessage());
-                e.printStackTrace();
-                enterDegradedMode("IOException during initialization: " + e.getMessage());
-            } catch (Exception e) {
-                System.err.println("Unexpected error initializing Firebase: " + e.getMessage());
-                e.printStackTrace();
-                enterDegradedMode("Unexpected error: " + e.getMessage());
+            } else {
+                log.info("Existing Firebase App found, reusing it");
             }
-        } finally {
-            initLock.unlock();
-        }
-    }
-    
-    private void enterDegradedMode(String reason) {
-        System.err.println("Firebase entering DEGRADED MODE: " + reason);
-        System.err.println("Application will continue without Firebase functionality");
-        this.initialized = false;
-        this.inDegradedMode = true;
-    }
-    
-    // Ensure Firebase is initialized
-    private boolean ensureInitialized() {
-        if (inDegradedMode) {
-            System.out.println("Firebase is in degraded mode, skipping operation");
-            return false;
-        }
-        
-        if (!initialized || firestore == null) {
-            System.out.println("Firebase not initialized, attempting to initialize...");
-            initialize();
-        }
-        
-        return initialized;
-    }
-    
-    // Get the Firestore instance with retry logic
-    public Firestore getFirestore() {
-        if (inDegradedMode) {
-            System.out.println("Firebase is in degraded mode, Firestore is not available");
-            return null;
-        }
-        
-        if (firestore == null) {
-            initLock.lock();
+
+            // Initialize Firestore
             try {
-                System.out.println("Firestore is null, reinitializing...");
-                if (FirebaseApp.getApps().isEmpty()) {
-                    // Need to reinitialize the app
-                    initialize();
-                } else {
-                    // Just need to get Firestore
-                    try {
-                        this.firestore = FirestoreClient.getFirestore();
-                    } catch (Exception e) {
-                        System.err.println("Failed to get Firestore: " + e.getMessage());
-                        enterDegradedMode("Failed to get Firestore: " + e.getMessage());
-                    }
+                this.firestore = FirestoreOptions.getDefaultInstance().getService();
+                if (this.firestore == null) {
+                    log.error("Failed to initialize Firestore");
+                    degradedModeService.enableDegradedMode("Firebase initialization failed: Firestore unavailable");
+                    return;
                 }
-                
-                if (this.firestore == null && !inDegradedMode) {
-                    enterDegradedMode("Failed to get Firestore instance after reinitialization");
-                }
+                log.info("Firestore initialized successfully");
             } catch (Exception e) {
-                System.err.println("Error getting Firestore: " + e.getMessage());
-                e.printStackTrace();
-                enterDegradedMode("Error getting Firestore: " + e.getMessage());
-            } finally {
-                initLock.unlock();
+                log.error("Error initializing Firestore: {}", e.getMessage(), e);
+                degradedModeService.enableDegradedMode("Firebase initialization failed: Firestore error - " + e.getMessage());
+                return;
             }
+
+            // Initialize Firebase Auth
+            try {
+                this.firebaseAuth = FirebaseAuth.getInstance();
+                if (this.firebaseAuth == null) {
+                    log.error("Failed to initialize Firebase Auth");
+                    degradedModeService.enableDegradedMode("Firebase initialization failed: Auth service unavailable");
+                    return;
+                }
+                log.info("Firebase Auth initialized successfully");
+            } catch (Exception e) {
+                log.error("Error initializing Firebase Auth: {}", e.getMessage(), e);
+                degradedModeService.enableDegradedMode("Firebase initialization failed: Auth error - " + e.getMessage());
+                return;
+            }
+
+            this.serviceAvailable = true;
+            // If we reach here, we can disable degraded mode for Firebase
+            degradedModeService.disableDegradedMode("Firebase");
+            log.info("Firebase fully initialized and ready");
+        } catch (Exception e) {
+            log.error("Unexpected error during Firebase initialization: {}", e.getMessage(), e);
+            degradedModeService.enableDegradedMode("Firebase initialization failed: " + e.getMessage());
         }
-        return firestore;
     }
 
-    // Authentication methods
-    
-    public String createUser(String email, String password) throws FirebaseAuthException {
-        if (!ensureInitialized()) {
-            throw new RuntimeException("Firebase is not available");
+    /**
+     * Retry initialization if it failed previously
+     */
+    public boolean retryInitialization() {
+        if (!serviceAvailable) {
+            log.info("Retrying Firebase initialization...");
+            initialize();
         }
-        CreateRequest request = new CreateRequest()
-            .setEmail(email)
-            .setPassword(password)
-            .setEmailVerified(false);
-            
-        UserRecord userRecord = firebaseAuth.createUser(request);
-        return userRecord.getUid();
+        return serviceAvailable;
     }
-    
-    public String signIn(String email, String password) {
-        if (!ensureInitialized()) {
-            throw new RuntimeException("Firebase is not available");
+
+    /**
+     * Check if Firebase is properly initialized
+     */
+    public boolean isFirebaseInitialized() {
+        return serviceAvailable;
+    }
+
+    public boolean isServiceAvailable() {
+        return serviceAvailable;
+    }
+
+    /**
+     * Creates a new Firebase user
+     */
+    @Retryable(
+        value = {FirebaseAuthException.class, InterruptedException.class, ExecutionException.class},
+        maxAttempts = "${firebase.retry.max-attempts:3}",
+        backoff = @Backoff(delay = "${firebase.retry.initial-delay-ms:1000}"))
+    public UserRecord createUser(CreateUserDTO userDTO) throws FirebaseException {
+        if (!serviceAvailable && !retryInitialization()) {
+            log.warn("Firebase service unavailable, cannot create user");
+            degradedModeService.recordFailedOperation("createUser");
+            throw new ServiceUnavailableException("Firebase service is unavailable");
         }
-        
-        // Firebase doesn't support server-side email/password authentication directly
-        // This is a security issue - we need to properly validate credentials
+
+        log.info("Creating new user: {}", userDTO.getEmail());
+        try {
+            UserRecord.CreateRequest request = new UserRecord.CreateRequest()
+                .setEmail(userDTO.getEmail())
+                .setPassword(userDTO.getPassword())
+                .setDisplayName(userDTO.getDisplayName())
+                .setDisabled(false);
+            
+            UserRecord userRecord = firebaseAuth.createUser(request);
+            log.info("User created successfully: {}", userRecord.getUid());
+            return userRecord;
+        } catch (FirebaseAuthException e) {
+            log.error("Failed to create user: {}", e.getMessage(), e);
+            degradedModeService.recordFailedOperation("createUser");
+            throw e;
+        }
+    }
+
+    /**
+     * Retrieves a user by ID
+     */
+    @Retryable(
+        value = {FirebaseAuthException.class},
+        maxAttempts = "${firebase.retry.max-attempts:3}",
+        backoff = @Backoff(delay = "${firebase.retry.initial-delay-ms:1000}"))
+    public UserRecord getUserById(String uid) throws FirebaseAuthException {
+        if (!serviceAvailable && !retryInitialization()) {
+            log.warn("Firebase service unavailable, cannot get user by ID");
+            degradedModeService.recordFailedOperation("getUserById");
+            throw new ServiceUnavailableException("Firebase service is unavailable");
+        }
+
+        log.info("Getting user by ID: {}", uid);
+        try {
+            UserRecord userRecord = firebaseAuth.getUser(uid);
+            log.debug("User retrieved successfully: {}", userRecord.getUid());
+            return userRecord;
+        } catch (FirebaseAuthException e) {
+            log.error("Failed to get user by ID: {}", e.getMessage(), e);
+            degradedModeService.recordFailedOperation("getUserById");
+            throw e;
+        }
+    }
+
+    /**
+     * Retrieves a user by email
+     */
+    @Retryable(
+        value = {FirebaseAuthException.class},
+        maxAttempts = "${firebase.retry.max-attempts:3}",
+        backoff = @Backoff(delay = "${firebase.retry.initial-delay-ms:1000}"))
+    public UserRecord getUserByEmail(String email) throws FirebaseAuthException {
+        if (!serviceAvailable && !retryInitialization()) {
+            log.warn("Firebase service unavailable, cannot get user by email");
+            degradedModeService.recordFailedOperation("getUserByEmail");
+            throw new ServiceUnavailableException("Firebase service is unavailable");
+        }
+
+        log.info("Getting user by email: {}", email);
         try {
             UserRecord userRecord = firebaseAuth.getUserByEmail(email);
+            log.debug("User retrieved successfully: {}", userRecord.getUid());
+            return userRecord;
+        } catch (FirebaseAuthException e) {
+            log.error("Failed to get user by email: {}", e.getMessage(), e);
+            degradedModeService.recordFailedOperation("getUserByEmail");
+            throw e;
+        }
+    }
+
+    /**
+     * Updates user information
+     */
+    @Retryable(
+        value = {FirebaseAuthException.class},
+        maxAttempts = "${firebase.retry.max-attempts:3}",
+        backoff = @Backoff(delay = "${firebase.retry.initial-delay-ms:1000}"))
+    public UserRecord updateUser(String uid, UpdateUserDTO userDTO) throws FirebaseAuthException {
+        if (!serviceAvailable && !retryInitialization()) {
+            log.warn("Firebase service unavailable, cannot update user");
+            degradedModeService.recordFailedOperation("updateUser");
+            throw new ServiceUnavailableException("Firebase service is unavailable");
+        }
+
+        log.info("Updating user: {}", uid);
+        try {
+            UserRecord.UpdateRequest request = new UserRecord.UpdateRequest(uid);
             
-            // In a real production app, we would need to use Firebase Admin SDK with
-            // a custom authentication system that verifies passwords.
-            // For now, let's add a simple check against Firestore
+            if (userDTO.getEmail() != null) {
+                request.setEmail(userDTO.getEmail());
+            }
+            
+            if (userDTO.getPassword() != null) {
+                request.setPassword(userDTO.getPassword());
+            }
+            
+            if (userDTO.getDisplayName() != null) {
+                request.setDisplayName(userDTO.getDisplayName());
+            }
+            
+            if (userDTO.getDisabled() != null) {
+                request.setDisabled(userDTO.getDisabled());
+            }
+            
+            UserRecord userRecord = firebaseAuth.updateUser(request);
+            log.info("User updated successfully: {}", userRecord.getUid());
+            return userRecord;
+        } catch (FirebaseAuthException e) {
+            log.error("Failed to update user: {}", e.getMessage(), e);
+            degradedModeService.recordFailedOperation("updateUser");
+            throw e;
+        }
+    }
+
+    /**
+     * Deletes a user by ID
+     */
+    @Retryable(
+        value = {FirebaseAuthException.class},
+        maxAttempts = "${firebase.retry.max-attempts:3}",
+        backoff = @Backoff(delay = "${firebase.retry.initial-delay-ms:1000}"))
+    public void deleteUser(String uid) throws FirebaseAuthException {
+        if (!serviceAvailable && !retryInitialization()) {
+            log.warn("Firebase service unavailable, cannot delete user");
+            degradedModeService.recordFailedOperation("deleteUser");
+            throw new ServiceUnavailableException("Firebase service is unavailable");
+        }
+
+        log.info("Deleting user: {}", uid);
+        try {
+            firebaseAuth.deleteUser(uid);
+            log.info("User deleted successfully: {}", uid);
+        } catch (FirebaseAuthException e) {
+            log.error("Failed to delete user: {}", e.getMessage(), e);
+            degradedModeService.recordFailedOperation("deleteUser");
+            throw e;
+        }
+    }
+
+    /**
+     * Creates a document in Firestore
+     */
+    @Retryable(
+        value = {InterruptedException.class, ExecutionException.class, FirestoreException.class},
+        maxAttempts = "${firebase.retry.max-attempts:3}",
+        backoff = @Backoff(delay = "${firebase.retry.initial-delay-ms:1000}"))
+    public DocumentReference createDocument(String collection, Map<String, Object> data) throws FirestoreException {
+        if (!serviceAvailable && !retryInitialization()) {
+            log.warn("Firebase service unavailable, cannot create document");
+            degradedModeService.recordFailedOperation("createDocument");
+            throw new ServiceUnavailableException("Firebase service is unavailable");
+        }
+
+        log.info("Creating document in collection: {}", collection);
+        try {
+            DocumentReference docRef = firestore.collection(collection).document();
+            ApiFuture<WriteResult> result = docRef.set(data);
             
             try {
-                System.out.println("Attempting to authenticate: " + email);
-                
-                // Look up the user document in Firestore to check credentials
-                CollectionReference usersRef = getFirestore().collection("users");
-                QuerySnapshot querySnapshot = usersRef.whereEqualTo("email", email).get().get();
-                
-                if (querySnapshot.isEmpty()) {
-                    System.out.println("User not found in database: " + email);
-                    throw new RuntimeException("User not found in database");
-                }
-                
-                // Get the user document from Firestore
-                DocumentSnapshot userDoc = querySnapshot.getDocuments().get(0);
-                
-                // Check if the password is stored in Firestore
-                // Note: In a production app, passwords should be hashed, never stored in plain text
-                if (userDoc.contains("password")) {
-                    String storedPassword = userDoc.getString("password");
-                    if (password.equals(storedPassword)) {
-                        System.out.println("User authenticated successfully: " + email);
-                        return userRecord.getUid();
-                    }
-                } else {
-                    // For test account without migration to proper password storage yet
-                    if (email.equals("test@cit.edu") && password.equals("Test123!")) {
-                        System.out.println("Test account authenticated successfully");
-                        return userRecord.getUid();
-                    }
-                }
-                
-                // Authentication failed - password doesn't match
-                System.out.println("Authentication failed for: " + email + " - Invalid password");
-                throw new RuntimeException("Invalid credentials");
-            } catch (Exception e) {
-                System.out.println("Authentication error: " + e.getMessage());
-                throw new RuntimeException("Authentication failed: " + e.getMessage(), e);
+                result.get(operationTimeoutMs, TimeUnit.MILLISECONDS);
+                log.info("Document created successfully with ID: {}", docRef.getId());
+                return docRef;
+            } catch (TimeoutException e) {
+                log.error("Timeout creating document: {}", e.getMessage(), e);
+                degradedModeService.recordFailedOperation("createDocument");
+                throw new FirestoreException("Timeout while creating document", e);
             }
-        } catch (FirebaseAuthException e) {
-            System.out.println("Firebase Auth Exception: " + e.getMessage());
-            throw new RuntimeException("Authentication failed: User not found", e);
+        } catch (InterruptedException | ExecutionException e) {
+            log.error("Failed to create document: {}", e.getMessage(), e);
+            degradedModeService.recordFailedOperation("createDocument");
+            throw new FirestoreException("Error creating document", e);
         }
     }
-    
-    public UserRecord getUserById(String uid) throws FirebaseAuthException {
-        if (!ensureInitialized()) {
-            throw new RuntimeException("Firebase is not available");
-        }
-        return firebaseAuth.getUser(uid);
-    }
-    
-    public UserRecord getUserByEmail(String email) throws FirebaseAuthException {
-        if (!ensureInitialized()) {
-            throw new RuntimeException("Firebase is not available");
-        }
-        return firebaseAuth.getUserByEmail(email);
-    }
-    
-    // Firestore methods
-    
-    public Map<String, Object> getDocument(String collection, String documentId) throws ExecutionException, InterruptedException {
-        if (!ensureInitialized()) {
-            return new HashMap<>(); // Return empty map in degraded mode
-        }
-        
-        Firestore db = getFirestore();
-        if (db == null) {
-            return new HashMap<>(); // Return empty map if Firestore is not available
-        }
-        
-        DocumentReference docRef = db.collection(collection).document(documentId);
-        DocumentSnapshot document = docRef.get().get();
-        
-        if (document.exists()) {
-            return document.getData();
-        } else {
-            return null;
-        }
-    }
-    
-    public String createDocument(String collection, Map<String, Object> data) throws ExecutionException, InterruptedException {
-        if (!ensureInitialized()) {
-            return "firebase-unavailable"; // Return placeholder ID in degraded mode
-        }
-        
-        Firestore db = getFirestore();
-        if (db == null) {
-            return "firebase-unavailable"; // Return placeholder ID
-        }
-        
-        DocumentReference docRef = db.collection(collection).document();
-        WriteResult result = docRef.set(data).get();
-        return docRef.getId();
-    }
-    
+
     /**
-     * Creates a document with a specified ID
-     * 
-     * @param collection The collection to add the document to
-     * @param documentId The document ID to use
-     * @param data The data to store in the document
-     * @return The document ID
+     * Creates a document with a specific ID in Firestore
      */
-    public String createDocumentWithId(String collection, String documentId, Map<String, Object> data) throws ExecutionException, InterruptedException {
-        if (!ensureInitialized()) {
-            return documentId; // Return the same ID in degraded mode
+    @Retryable(
+        value = {InterruptedException.class, ExecutionException.class, FirestoreException.class},
+        maxAttempts = "${firebase.retry.max-attempts:3}",
+        backoff = @Backoff(delay = "${firebase.retry.initial-delay-ms:1000}"))
+    public DocumentReference createDocumentWithId(String collection, String documentId, Map<String, Object> data) throws FirestoreException {
+        if (!serviceAvailable && !retryInitialization()) {
+            log.warn("Firebase service unavailable, cannot create document with ID");
+            degradedModeService.recordFailedOperation("createDocumentWithId");
+            throw new ServiceUnavailableException("Firebase service is unavailable");
         }
-        
-        Firestore db = getFirestore();
-        if (db == null) {
-            return documentId; // Return the same ID
+
+        log.info("Creating document with ID: {} in collection: {}", documentId, collection);
+        try {
+            DocumentReference docRef = firestore.collection(collection).document(documentId);
+            ApiFuture<WriteResult> result = docRef.set(data);
+            
+            try {
+                result.get(operationTimeoutMs, TimeUnit.MILLISECONDS);
+                log.info("Document created successfully with ID: {}", docRef.getId());
+                return docRef;
+            } catch (TimeoutException e) {
+                log.error("Timeout creating document with ID: {}", e.getMessage(), e);
+                degradedModeService.recordFailedOperation("createDocumentWithId");
+                throw new FirestoreException("Timeout while creating document", e);
+            }
+        } catch (InterruptedException | ExecutionException e) {
+            log.error("Failed to create document with ID: {}", e.getMessage(), e);
+            degradedModeService.recordFailedOperation("createDocumentWithId");
+            throw new FirestoreException("Error creating document with ID", e);
         }
-        
-        // Log document details for debugging
-        System.out.println("Creating document in collection: " + collection + " with ID: " + documentId);
-        System.out.println("Document has " + data.size() + " fields");
-        
-        // Check if imageBase64 field exists and log its size
-        if (data.containsKey("imageBase64")) {
-            String imageData = (String) data.get("imageBase64");
-            System.out.println("Document contains imageBase64 field with length: " + 
-                (imageData != null ? imageData.length() : 0));
-        } else {
-            System.out.println("Document does NOT contain imageBase64 field");
-        }
-        
-        // Check for other photo-related fields
-        if (data.containsKey("photoRef")) {
-            System.out.println("Document contains photoRef: " + data.get("photoRef"));
-        }
-        if (data.containsKey("photoPreview")) {
-            System.out.println("Document contains photoPreview with length: " + 
-                ((String)data.get("photoPreview")).length());
-        }
-        
-        // Create the document in Firestore
-        DocumentReference docRef = db.collection(collection).document(documentId);
-        WriteResult result = docRef.set(data).get();
-        System.out.println("Document created successfully at: " + result.getUpdateTime());
-        return documentId;
     }
-    
-    public String updateDocument(String collection, String documentId, Map<String, Object> data) throws ExecutionException, InterruptedException {
-        if (!ensureInitialized()) {
-            return "firebase-unavailable"; // Return placeholder update time in degraded mode
+
+    /**
+     * Updates a document in Firestore
+     */
+    @Retryable(
+        value = {InterruptedException.class, ExecutionException.class, FirestoreException.class},
+        maxAttempts = "${firebase.retry.max-attempts:3}",
+        backoff = @Backoff(delay = "${firebase.retry.initial-delay-ms:1000}"))
+    public DocumentSnapshot updateDocument(String collection, String documentId, Map<String, Object> data) throws FirestoreException {
+        if (!serviceAvailable && !retryInitialization()) {
+            log.warn("Firebase service unavailable, cannot update document");
+            degradedModeService.recordFailedOperation("updateDocument");
+            throw new ServiceUnavailableException("Firebase service is unavailable");
         }
-        
-        Firestore db = getFirestore();
-        if (db == null) {
-            return "firebase-unavailable"; // Return placeholder update time
+
+        log.info("Updating document: {} in collection: {}", documentId, collection);
+        try {
+            DocumentReference docRef = firestore.collection(collection).document(documentId);
+            ApiFuture<WriteResult> result = docRef.update(data);
+            
+            try {
+                result.get(operationTimeoutMs, TimeUnit.MILLISECONDS);
+                log.info("Document updated successfully: {}", documentId);
+                
+                // Get and return the updated document
+                ApiFuture<DocumentSnapshot> documentSnapshot = docRef.get();
+                return documentSnapshot.get(operationTimeoutMs, TimeUnit.MILLISECONDS);
+            } catch (TimeoutException e) {
+                log.error("Timeout updating document: {}", e.getMessage(), e);
+                degradedModeService.recordFailedOperation("updateDocument");
+                throw new FirestoreException("Timeout while updating document", e);
+            }
+        } catch (InterruptedException | ExecutionException e) {
+            log.error("Failed to update document: {}", e.getMessage(), e);
+            degradedModeService.recordFailedOperation("updateDocument");
+            throw new FirestoreException("Error updating document", e);
         }
-        
-        DocumentReference docRef = db.collection(collection).document(documentId);
-        WriteResult result = docRef.update(data).get();
-        return result.getUpdateTime().toString();
     }
-    
-    public List<Map<String, Object>> getAllDocuments(String collection) throws ExecutionException, InterruptedException {
-        if (!ensureInitialized()) {
-            return new ArrayList<>(); // Return empty list in degraded mode
+
+    /**
+     * Gets a document from Firestore
+     */
+    @Retryable(
+        value = {InterruptedException.class, ExecutionException.class, FirestoreException.class},
+        maxAttempts = "${firebase.retry.max-attempts:3}",
+        backoff = @Backoff(delay = "${firebase.retry.initial-delay-ms:1000}"))
+    public DocumentSnapshot getDocument(String collection, String documentId) throws FirestoreException {
+        if (!serviceAvailable && !retryInitialization()) {
+            log.warn("Firebase service unavailable, cannot get document");
+            degradedModeService.recordFailedOperation("getDocument");
+            throw new ServiceUnavailableException("Firebase service is unavailable");
         }
-        
-        Firestore db = getFirestore();
-        if (db == null) {
-            return new ArrayList<>(); // Return empty list
+
+        log.info("Getting document: {} from collection: {}", documentId, collection);
+        try {
+            DocumentReference docRef = firestore.collection(collection).document(documentId);
+            ApiFuture<DocumentSnapshot> documentSnapshot = docRef.get();
+            
+            try {
+                DocumentSnapshot snapshot = documentSnapshot.get(operationTimeoutMs, TimeUnit.MILLISECONDS);
+                if (snapshot.exists()) {
+                    log.info("Document retrieved successfully: {}", documentId);
+                } else {
+                    log.info("Document not found: {}", documentId);
+                }
+                return snapshot;
+            } catch (TimeoutException e) {
+                log.error("Timeout getting document: {}", e.getMessage(), e);
+                degradedModeService.recordFailedOperation("getDocument");
+                throw new FirestoreException("Timeout while retrieving document", e);
+            }
+        } catch (InterruptedException | ExecutionException e) {
+            log.error("Failed to get document: {}", e.getMessage(), e);
+            degradedModeService.recordFailedOperation("getDocument");
+            throw new FirestoreException("Error retrieving document", e);
         }
-        
-        CollectionReference colRef = db.collection(collection);
-        QuerySnapshot querySnapshot = colRef.get().get();
-        
-        List<Map<String, Object>> documents = new ArrayList<>();
-        querySnapshot.getDocuments().forEach(doc -> {
-            Map<String, Object> data = doc.getData();
-            data.put("id", doc.getId());
-            documents.add(data);
-        });
-        
-        return documents;
     }
-    
-    public void deleteDocument(String collection, String documentId) throws ExecutionException, InterruptedException {
-        if (!ensureInitialized()) {
-            return; // Do nothing in degraded mode
+
+    /**
+     * Gets all documents from a collection in Firestore
+     */
+    @Retryable(
+        value = {InterruptedException.class, ExecutionException.class, FirestoreException.class},
+        maxAttempts = "${firebase.retry.max-attempts:3}",
+        backoff = @Backoff(delay = "${firebase.retry.initial-delay-ms:1000}"))
+    public List<DocumentSnapshot> getAllDocuments(String collection) throws FirestoreException {
+        if (!serviceAvailable && !retryInitialization()) {
+            log.warn("Firebase service unavailable, cannot get all documents");
+            degradedModeService.recordFailedOperation("getAllDocuments");
+            throw new ServiceUnavailableException("Firebase service is unavailable");
         }
-        
-        Firestore db = getFirestore();
-        if (db == null) {
-            return; // Do nothing
+
+        log.info("Getting all documents from collection: {}", collection);
+        try {
+            ApiFuture<QuerySnapshot> future = firestore.collection(collection).get();
+            
+            try {
+                QuerySnapshot querySnapshot = future.get(operationTimeoutMs, TimeUnit.MILLISECONDS);
+                List<DocumentSnapshot> documents = querySnapshot.getDocuments();
+                log.info("Retrieved {} documents from collection: {}", documents.size(), collection);
+                return documents;
+            } catch (TimeoutException e) {
+                log.error("Timeout getting all documents: {}", e.getMessage(), e);
+                degradedModeService.recordFailedOperation("getAllDocuments");
+                throw new FirestoreException("Timeout while retrieving all documents", e);
+            }
+        } catch (InterruptedException | ExecutionException e) {
+            log.error("Failed to get all documents: {}", e.getMessage(), e);
+            degradedModeService.recordFailedOperation("getAllDocuments");
+            throw new FirestoreException("Error retrieving all documents", e);
         }
-        
-        DocumentReference docRef = db.collection(collection).document(documentId);
-        docRef.delete().get();
     }
-    
-    // Check if Firebase is available
-    public boolean isAvailable() {
-        return initialized && !inDegradedMode;
+
+    /**
+     * Deletes a document from Firestore
+     */
+    @Retryable(
+        value = {InterruptedException.class, ExecutionException.class, FirestoreException.class},
+        maxAttempts = "${firebase.retry.max-attempts:3}",
+        backoff = @Backoff(delay = "${firebase.retry.initial-delay-ms:1000}"))
+    public void deleteDocument(String collection, String documentId) throws FirestoreException {
+        if (!serviceAvailable && !retryInitialization()) {
+            log.warn("Firebase service unavailable, cannot delete document");
+            degradedModeService.recordFailedOperation("deleteDocument");
+            throw new ServiceUnavailableException("Firebase service is unavailable");
+        }
+
+        log.info("Deleting document: {} from collection: {}", documentId, collection);
+        try {
+            DocumentReference docRef = firestore.collection(collection).document(documentId);
+            ApiFuture<WriteResult> result = docRef.delete();
+            
+            try {
+                result.get(operationTimeoutMs, TimeUnit.MILLISECONDS);
+                log.info("Document deleted successfully: {}", documentId);
+            } catch (TimeoutException e) {
+                log.error("Timeout deleting document: {}", e.getMessage(), e);
+                degradedModeService.recordFailedOperation("deleteDocument");
+                throw new FirestoreException("Timeout while deleting document", e);
+            }
+        } catch (InterruptedException | ExecutionException e) {
+            log.error("Failed to delete document: {}", e.getMessage(), e);
+            degradedModeService.recordFailedOperation("deleteDocument");
+            throw new FirestoreException("Error deleting document", e);
+        }
+    }
+
+    @Retryable(value = {Exception.class}, maxAttempts = maxRetryAttempts, 
+               backoff = @Backoff(delay = initialRetryDelayMs))
+    public List<Map<String, Object>> getCollection(String collection) throws ExecutionException, InterruptedException, TimeoutException {
+        if (!serviceAvailable) {
+            if (!retryInitialization()) {
+                throw new IllegalStateException("Firebase is not initialized");
+            }
+        }
+
+        try {
+            log.info("Retrieving documents from collection: {}", collection);
+            List<Map<String, Object>> documents = new ArrayList<>();
+            ApiFuture<QuerySnapshot> future = firestore.collection(collection).get();
+            QuerySnapshot querySnapshot = future.get(operationTimeoutMs, TimeUnit.MILLISECONDS);
+            
+            for (DocumentSnapshot document : querySnapshot.getDocuments()) {
+                Map<String, Object> data = document.getData();
+                data.put("id", document.getId());
+                documents.add(data);
+            }
+            
+            log.info("Retrieved {} documents from collection {}", documents.size(), collection);
+            return documents;
+        } catch (InterruptedException | ExecutionException | TimeoutException e) {
+            log.error("Error retrieving documents from collection: {}", e.getMessage(), e);
+            throw e;
+        }
+    }
+
+    @Retryable(value = {Exception.class}, maxAttempts = maxRetryAttempts, 
+               backoff = @Backoff(delay = initialRetryDelayMs))
+    public List<FirebaseDocument> getCollectionAsDocuments(String collection) throws ExecutionException, InterruptedException, TimeoutException {
+        if (!serviceAvailable) {
+            if (!retryInitialization()) {
+                throw new IllegalStateException("Firebase is not initialized");
+            }
+        }
+
+        try {
+            log.info("Retrieving documents from collection: {}", collection);
+            List<FirebaseDocument> documents = new ArrayList<>();
+            ApiFuture<QuerySnapshot> future = firestore.collection(collection).get();
+            QuerySnapshot querySnapshot = future.get(operationTimeoutMs, TimeUnit.MILLISECONDS);
+            
+            for (DocumentSnapshot document : querySnapshot.getDocuments()) {
+                Map<String, Object> data = document.getData();
+                documents.add(new FirebaseDocument(document.getId(), data));
+            }
+            
+            log.info("Retrieved {} documents from collection {}", documents.size(), collection);
+            return documents;
+        } catch (InterruptedException | ExecutionException | TimeoutException e) {
+            log.error("Error retrieving documents from collection: {}", e.getMessage(), e);
+            throw e;
+        }
+    }
+
+    public static class ServiceUnavailableException extends RuntimeException {
+        public ServiceUnavailableException(String message) {
+            super(message);
+        }
+    }
+
+    /**
+     * Custom exception for Firestore operations
+     */
+    public static class FirestoreException extends Exception {
+        public FirestoreException(String message) {
+            super(message);
+        }
+        
+        public FirestoreException(String message, Throwable cause) {
+            super(message, cause);
+        }
     }
 } 
