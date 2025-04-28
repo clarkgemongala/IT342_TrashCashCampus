@@ -29,19 +29,28 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.locks.ReentrantLock;
 
 @Service
 public class FirebaseService {
 
     private Firestore firestore;
     private FirebaseAuth firebaseAuth;
+    private final ReentrantLock initLock = new ReentrantLock();
+    private boolean initialized = false;
     
     @Value("${firebase.credentials.path:trashcashcampusmobile-firebase-adminsdk-fbsvc-0a3b17cdcd.json}")
     private String firebaseCredentialsPath;
 
     @PostConstruct
     public void initialize() {
+        initLock.lock();
         try {
+            if (initialized) {
+                System.out.println("Firebase is already initialized, skipping initialization");
+                return;
+            }
+            
             // Use Spring's ClassPathResource to load the credentials file
             Resource resource = new ClassPathResource(firebaseCredentialsPath);
             InputStream serviceAccount = resource.getInputStream();
@@ -55,22 +64,84 @@ public class FirebaseService {
             // Initialize the Firebase app
             if (FirebaseApp.getApps().isEmpty()) {
                 FirebaseApp.initializeApp(options);
+                System.out.println("Firebase app initialized");
+            } else {
+                System.out.println("Firebase app already initialized");
             }
 
             // Get Firestore and Auth instances
             this.firestore = FirestoreClient.getFirestore();
             this.firebaseAuth = FirebaseAuth.getInstance();
             
+            if (this.firestore == null) {
+                throw new IllegalStateException("Firestore failed to initialize");
+            }
+            
+            if (this.firebaseAuth == null) {
+                throw new IllegalStateException("FirebaseAuth failed to initialize");
+            }
+            
+            // Test a simple Firestore operation to verify connection
+            try {
+                this.firestore.collection("test").document("test").get().get();
+                System.out.println("Firestore connection test successful");
+            } catch (Exception e) {
+                System.err.println("Firestore connection test failed: " + e.getMessage());
+                // Continue anyway as this might be because the collection doesn't exist
+            }
+            
+            initialized = true;
             System.out.println("Firebase initialized successfully");
         } catch (IOException e) {
             System.err.println("Failed to initialize Firebase: " + e.getMessage());
             e.printStackTrace();
+            initialized = false;
+            throw new RuntimeException("Firebase initialization failed", e);
+        } finally {
+            initLock.unlock();
         }
+    }
+    
+    // Ensure Firebase is initialized
+    private void ensureInitialized() {
+        if (!initialized || firestore == null) {
+            System.out.println("Firebase not initialized, attempting to initialize...");
+            initialize();
+        }
+    }
+    
+    // Get the Firestore instance with retry logic
+    public Firestore getFirestore() {
+        if (firestore == null) {
+            initLock.lock();
+            try {
+                System.out.println("Firestore is null, reinitializing...");
+                if (FirebaseApp.getApps().isEmpty()) {
+                    // Need to reinitialize the app
+                    initialize();
+                } else {
+                    // Just need to get Firestore
+                    this.firestore = FirestoreClient.getFirestore();
+                }
+                
+                if (this.firestore == null) {
+                    throw new IllegalStateException("Failed to get Firestore instance after reinitialization");
+                }
+            } catch (Exception e) {
+                System.err.println("Error getting Firestore: " + e.getMessage());
+                e.printStackTrace();
+                throw new RuntimeException("Failed to get Firestore instance", e);
+            } finally {
+                initLock.unlock();
+            }
+        }
+        return firestore;
     }
 
     // Authentication methods
     
     public String createUser(String email, String password) throws FirebaseAuthException {
+        ensureInitialized();
         CreateRequest request = new CreateRequest()
             .setEmail(email)
             .setPassword(password)
@@ -81,6 +152,7 @@ public class FirebaseService {
     }
     
     public String signIn(String email, String password) {
+        ensureInitialized();
         // Firebase doesn't support server-side email/password authentication directly
         // This is a security issue - we need to properly validate credentials
         try {
@@ -94,7 +166,7 @@ public class FirebaseService {
                 System.out.println("Attempting to authenticate: " + email);
                 
                 // Look up the user document in Firestore to check credentials
-                CollectionReference usersRef = firestore.collection("users");
+                CollectionReference usersRef = getFirestore().collection("users");
                 QuerySnapshot querySnapshot = usersRef.whereEqualTo("email", email).get().get();
                 
                 if (querySnapshot.isEmpty()) {
@@ -135,17 +207,24 @@ public class FirebaseService {
     }
     
     public UserRecord getUserById(String uid) throws FirebaseAuthException {
+        ensureInitialized();
         return firebaseAuth.getUser(uid);
     }
     
     public UserRecord getUserByEmail(String email) throws FirebaseAuthException {
+        ensureInitialized();
         return firebaseAuth.getUserByEmail(email);
     }
     
     // Firestore methods
     
     public Map<String, Object> getDocument(String collection, String documentId) throws ExecutionException, InterruptedException {
-        DocumentReference docRef = firestore.collection(collection).document(documentId);
+        Firestore db = getFirestore();
+        if (db == null) {
+            throw new IllegalStateException("Firestore is not initialized");
+        }
+        
+        DocumentReference docRef = db.collection(collection).document(documentId);
         DocumentSnapshot document = docRef.get().get();
         
         if (document.exists()) {
@@ -156,7 +235,12 @@ public class FirebaseService {
     }
     
     public String createDocument(String collection, Map<String, Object> data) throws ExecutionException, InterruptedException {
-        DocumentReference docRef = firestore.collection(collection).document();
+        Firestore db = getFirestore();
+        if (db == null) {
+            throw new IllegalStateException("Firestore is not initialized");
+        }
+        
+        DocumentReference docRef = db.collection(collection).document();
         WriteResult result = docRef.set(data).get();
         return docRef.getId();
     }
@@ -170,6 +254,11 @@ public class FirebaseService {
      * @return The document ID
      */
     public String createDocumentWithId(String collection, String documentId, Map<String, Object> data) throws ExecutionException, InterruptedException {
+        Firestore db = getFirestore();
+        if (db == null) {
+            throw new IllegalStateException("Firestore is not initialized");
+        }
+        
         // Log document details for debugging
         System.out.println("Creating document in collection: " + collection + " with ID: " + documentId);
         System.out.println("Document has " + data.size() + " fields");
@@ -193,20 +282,30 @@ public class FirebaseService {
         }
         
         // Create the document in Firestore
-        DocumentReference docRef = firestore.collection(collection).document(documentId);
+        DocumentReference docRef = db.collection(collection).document(documentId);
         WriteResult result = docRef.set(data).get();
         System.out.println("Document created successfully at: " + result.getUpdateTime());
         return documentId;
     }
     
     public String updateDocument(String collection, String documentId, Map<String, Object> data) throws ExecutionException, InterruptedException {
-        DocumentReference docRef = firestore.collection(collection).document(documentId);
+        Firestore db = getFirestore();
+        if (db == null) {
+            throw new IllegalStateException("Firestore is not initialized");
+        }
+        
+        DocumentReference docRef = db.collection(collection).document(documentId);
         WriteResult result = docRef.update(data).get();
         return result.getUpdateTime().toString();
     }
     
     public List<Map<String, Object>> getAllDocuments(String collection) throws ExecutionException, InterruptedException {
-        CollectionReference colRef = firestore.collection(collection);
+        Firestore db = getFirestore();
+        if (db == null) {
+            throw new IllegalStateException("Firestore is not initialized");
+        }
+        
+        CollectionReference colRef = db.collection(collection);
         QuerySnapshot querySnapshot = colRef.get().get();
         
         List<Map<String, Object>> documents = new ArrayList<>();
@@ -220,7 +319,12 @@ public class FirebaseService {
     }
     
     public void deleteDocument(String collection, String documentId) throws ExecutionException, InterruptedException {
-        DocumentReference docRef = firestore.collection(collection).document(documentId);
+        Firestore db = getFirestore();
+        if (db == null) {
+            throw new IllegalStateException("Firestore is not initialized");
+        }
+        
+        DocumentReference docRef = db.collection(collection).document(documentId);
         docRef.delete().get();
     }
 } 
