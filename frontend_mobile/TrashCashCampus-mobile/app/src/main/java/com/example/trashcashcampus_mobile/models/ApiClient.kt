@@ -24,9 +24,8 @@ class ApiClient {
     companion object {
         private const val TAG = "ApiClient"
         
-        // Server API URL - change to your backend server address
-        // Using the same IP address that works with login functionality
-        private const val SERVER_BASE_URL = "http://192.168.0.194:8080" 
+        // Server API URL - using render production URL
+        private const val SERVER_BASE_URL = "https://it342-trashcashcampus.onrender.com" 
         
         // API endpoints
         private const val USER_ENDPOINT = "$SERVER_BASE_URL/api/users"

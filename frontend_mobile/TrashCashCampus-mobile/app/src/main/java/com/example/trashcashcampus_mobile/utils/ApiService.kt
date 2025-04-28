@@ -83,11 +83,11 @@ interface ApiService {
         // For real device testing on same WiFi network, use your computer's actual IP address
         private const val EMULATOR_URL = "http://10.0.2.2:8080/"
         private const val LOCAL_DEVICE_URL = "http://192.168.0.194:8080/" // Your actual computer's IP
-        private const val PRODUCTION_URL = "https://trashcashcampus-backend.herokuapp.com/" // Example production URL
+        private const val PRODUCTION_URL = "https://it342-trashcashcampus.onrender.com/" // Production URL
         
         // Change this to switch between environments
-        // Currently using the local device URL for real device testing
-        private const val BASE_URL = LOCAL_DEVICE_URL
+        // Using production URL for render hosting
+        private const val BASE_URL = PRODUCTION_URL
         
         // Shorter timeout for faster feedback when backend is unavailable
         private const val CONNECTION_TIMEOUT_SECONDS = 15L

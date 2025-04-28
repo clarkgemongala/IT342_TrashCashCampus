@@ -1,8 +1,8 @@
 // API service for TrashCash Campus
 // This replaces direct Firebase connections with backend API calls
 
-const API_URL = "http://localhost:8080/api";
-const BASE_URL = "http://localhost:8080";
+const API_URL = "https://it342-trashcashcampus.onrender.com/api";
+const BASE_URL = "https://it342-trashcashcampus.onrender.com";
 
 // Backend connection check
 export const pingBackend = async () => {
