@@ -434,4 +434,72 @@ public class FirebaseService {
         // In a real implementation, you might want to use JavaMail, SendGrid, Mailgun, etc.
         // to send additional custom emails beyond what Firebase provides.
     }
+
+    /**
+     * Creates a Firebase Auth verification check endpoint
+     * This method should be called from a controller endpoint after email verification
+     * 
+     * @param oobCode The out-of-band code from the verification email
+     * @return The email if verification is successful, null otherwise
+     */
+    public String checkActionCode(String oobCode) {
+        if (!firebaseInitialized) {
+            System.out.println("Firebase is in degraded mode, skipping operation");
+            return null;
+        }
+        
+        try {
+            // Check the action code to get the email
+            com.google.firebase.auth.ActionCodeDetails response = 
+                firebaseAuth.checkActionCode(oobCode);
+            
+            if (response != null && response.getEmail() != null) {
+                String email = response.getEmail();
+                
+                if (email != null && !email.isEmpty()) {
+                    // If this is a verification action, apply it
+                    firebaseAuth.applyActionCode(oobCode);
+                    System.out.println("Successfully applied action code for email: " + email);
+                    
+                    // NOW is when we should actually set isEmailVerified to true in Firestore
+                    try {
+                        // Get user by email to get the UID
+                        UserRecord user = firebaseAuth.getUserByEmail(email);
+                        String uid = user.getUid();
+                        
+                        // Update Firestore document with verification status
+                        Map<String, Object> updates = new HashMap<>();
+                        updates.put("isEmailVerified", true);
+                        
+                        try {
+                            // First try to update by UID
+                            updateDocument("users", uid, updates);
+                            System.out.println("Updated isEmailVerified to true for user: " + email);
+                        } catch (Exception e) {
+                            System.out.println("Error updating by UID, trying by email: " + e.getMessage());
+                            
+                            // Find by email as fallback
+                            Map<String, Object> userDoc = findUserByEmail(email);
+                            if (userDoc != null && userDoc.containsKey("docId")) {
+                                String docId = (String) userDoc.get("docId");
+                                updateDocument("users", docId, updates);
+                                System.out.println("Updated isEmailVerified to true for user found by email: " + email);
+                            } else {
+                                System.out.println("Could not find user document to update verification status");
+                            }
+                        }
+                    } catch (Exception e) {
+                        System.out.println("Error updating verification status: " + e.getMessage());
+                    }
+                    
+                    return email;
+                }
+            }
+            
+            return null;
+        } catch (Exception e) {
+            System.out.println("Error checking action code: " + e.getMessage());
+            return null;
+        }
+    }
 } 

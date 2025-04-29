@@ -156,70 +156,77 @@ public class AuthController {
                 );
                 
                 String uid = user.getUid();
-                System.out.println("Attempting to update user document with UID: " + uid);
+                System.out.println("Sent verification email to user with UID: " + uid);
                 
-                // Update document in database (our custom isEmailVerified field)
-                // Create updates for the document
-                Map<String, Object> updates = new HashMap<>();
-                updates.put("isEmailVerified", true);
+                // We do NOT set isEmailVerified to true here!
+                // It should only be set to true when the user clicks the verification link
                 
+                // However, we can ensure the user document exists properly
                 try {
-                    // First try to update using the UID as document ID
-                    firebaseService.updateDocument("users", uid, updates);
-                    System.out.println("Successfully updated user document with UID: " + uid);
-                } catch (Exception e) {
-                    System.out.println("Could not find document with UID, trying to find by email: " + e.getMessage());
+                    // Check if user document exists with proper ID
+                    Map<String, Object> userDoc = firebaseService.findUserByEmail(email);
                     
-                    // If that fails, try to find the user by email in Firestore
-                    try {
-                        // Search for user by email
-                        Map<String, Object> userDoc = firebaseService.findUserByEmail(email);
+                    if (userDoc != null && userDoc.containsKey("docId")) {
+                        String docId = (String) userDoc.get("docId");
+                        System.out.println("Found user document by email with ID: " + docId);
                         
-                        if (userDoc != null && userDoc.containsKey("docId")) {
-                            String docId = (String) userDoc.get("docId");
-                            System.out.println("Found user document by email with ID: " + docId);
+                        // If document ID doesn't match UID, create a proper document
+                        if (!docId.equals(uid)) {
+                            // Create updates for consistent fields
+                            Map<String, Object> updates = new HashMap<>();
                             
                             // Add userId field if it's missing
                             if (!userDoc.containsKey("userId")) {
                                 updates.put("userId", uid);
+                                
+                                // Update that document
+                                firebaseService.updateDocument("users", docId, updates);
+                                System.out.println("Added missing userId field to document");
                             }
                             
                             // Ensure other consistent fields
                             if (!userDoc.containsKey("fullName") && userDoc.containsKey("name")) {
                                 updates.put("fullName", userDoc.get("name"));
+                                
+                                // Update that document with fullName
+                                firebaseService.updateDocument("users", docId, updates);
+                                System.out.println("Added missing fullName field to document");
                             }
                             
-                            // Update that document
-                            firebaseService.updateDocument("users", docId, updates);
-                            System.out.println("Successfully updated user document found by email");
-                            
-                            // If the document ID is not the same as the UID, we need to fix this
-                            // by copying all data to a new document with the correct UID as ID
-                            if (!docId.equals(uid)) {
-                                try {
-                                    System.out.println("Document ID doesn't match UID, creating a proper document");
-                                    
-                                    // Get the full user data after our updates
-                                    Map<String, Object> updatedUserDoc = firebaseService.getDocument("users", docId);
-                                    updatedUserDoc.put("userId", uid);
-                                    updatedUserDoc.put("isEmailVerified", true);
-                                    
-                                    // Create a new document with the proper UID
-                                    firebaseService.createDocumentWithId("users", uid, updatedUserDoc);
-                                    
-                                    // Note: We don't delete the old document to avoid data loss
-                                    // In a production environment, you'd add a proper migration
-                                } catch (Exception migrationError) {
-                                    System.out.println("Failed to migrate user document: " + migrationError.getMessage());
-                                }
+                            try {
+                                System.out.println("Document ID doesn't match UID, creating a proper document");
+                                
+                                // Get the full user data 
+                                Map<String, Object> properUserDoc = new HashMap<>(userDoc);
+                                properUserDoc.put("userId", uid);
+                                properUserDoc.remove("docId"); // Remove this field as it's not part of the data
+                                
+                                // Make sure isEmailVerified is false
+                                properUserDoc.put("isEmailVerified", false);
+                                
+                                // Create a new document with the proper UID
+                                firebaseService.createDocumentWithId("users", uid, properUserDoc);
+                                
+                                // Note: We don't delete the old document to avoid data loss
+                            } catch (Exception migrationError) {
+                                System.out.println("Failed to migrate user document: " + migrationError.getMessage());
                             }
-                        } else {
-                            throw new Exception("Could not find user document by email");
                         }
-                    } catch (Exception e2) {
-                        System.out.println("Error finding user by email: " + e2.getMessage());
-                        throw new Exception("Failed to update user: " + e.getMessage() + " and " + e2.getMessage());
+                    } else {
+                        // No document found, create a minimal one
+                        Map<String, Object> newUserDoc = new HashMap<>();
+                        newUserDoc.put("email", email);
+                        newUserDoc.put("userId", uid);
+                        newUserDoc.put("isEmailVerified", false);
+                        newUserDoc.put("createdAt", System.currentTimeMillis());
+                        
+                        // Create a new document with the proper UID
+                        firebaseService.createDocumentWithId("users", uid, newUserDoc);
+                        System.out.println("Created new user document for email: " + email);
                     }
+                } catch (Exception e) {
+                    System.out.println("Error managing user document: " + e.getMessage());
+                    // Continue anyway - the verification email was sent
                 }
             } else {
                 // This is a password reset request
