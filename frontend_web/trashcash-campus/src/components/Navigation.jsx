@@ -1,8 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { motion, AnimatePresence } from 'framer-motion';
-import { showNotification } from './Notification';
+import './Navigation.css';
 import trashCashLogo from '../assets/trashcash-logo.png';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
@@ -13,43 +12,8 @@ import {
   faChartBar, 
   faUserShield,
   faUser,
-  faSignOutAlt,
-  faChevronDown
+  faSignOutAlt
 } from '@fortawesome/free-solid-svg-icons';
-
-const navVariants = {
-  hidden: { opacity: 0, y: -20 },
-  visible: { 
-    opacity: 1, 
-    y: 0,
-    transition: {
-      duration: 0.3,
-      ease: "easeOut"
-    }
-  }
-};
-
-const dropdownVariants = {
-  hidden: { opacity: 0, scale: 0.95, y: -10 },
-  visible: { 
-    opacity: 1, 
-    scale: 1, 
-    y: 0,
-    transition: {
-      duration: 0.2,
-      ease: "easeOut"
-    }
-  },
-  exit: {
-    opacity: 0,
-    scale: 0.95,
-    y: -10,
-    transition: {
-      duration: 0.2,
-      ease: "easeIn"
-    }
-  }
-};
 
 const Navigation = () => {
   const { currentUser, signOut, isAdmin } = useAuth();
@@ -62,10 +26,8 @@ const Navigation = () => {
   const handleSignOut = async () => {
     try {
       await signOut();
-      showNotification("Successfully signed out", "success");
       navigate('/login');
     } catch (error) {
-      showNotification("Error signing out", "error");
       console.error('Error signing out:', error);
     }
   };
@@ -108,145 +70,90 @@ const Navigation = () => {
   );
 
   return (
-    <motion.nav
-      initial="hidden"
-      animate="visible"
-      variants={navVariants}
-      className="fixed top-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-b border-gray-200 z-50 shadow-sm"
-    >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
-          <div className="flex items-center">
-            <Link to="/dashboard" className="flex items-center">
-              <img 
-                src={trashCashLogo} 
-                alt="TrashCash Logo" 
-                className="h-10 w-auto"
-              />
-              <span className="ml-2 text-xl font-semibold text-primary">TrashCash Campus</span>
-            </Link>
-          </div>
+    <nav className="navigation">
+      <div className="nav-container">
+        <div className="nav-brand">
+          <img 
+            src={trashCashLogo} 
+            alt="TrashCash Logo" 
+            style={{height: '40px', display: 'block'}} 
+          />
+          <h1>TrashCash Campus</h1>
+        </div>
 
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-4">
+        <div className="nav-right">
+          {/* Desktop navigation */}
+          <ul className="nav-links desktop-nav">
             {filteredLinks.map((link) => (
-              <Link
-                key={link.path}
-                to={link.path}
-                className={`nav-link ${location.pathname === link.path ? 'active' : ''}`}
-              >
-                <span className="mr-2">{link.icon}</span>
-                {link.label}
-              </Link>
+              <li key={link.path} className={location.pathname === link.path ? 'active' : ''}>
+                <Link to={link.path}>
+                  <span className="nav-icon">{link.icon}</span>
+                  <span className="nav-label">{link.label}</span>
+                </Link>
+              </li>
             ))}
+          </ul>
 
-            {/* User Dropdown */}
-            <div className="relative" ref={userDropdownRef}>
-              <button
-                onClick={toggleUserDropdown}
-                className="flex items-center space-x-2 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors duration-200"
-              >
-                <FontAwesomeIcon icon={faUser} className="text-gray-600" />
-                <span className="text-sm font-medium text-gray-700">
-                  {currentUser?.email?.split('@')[0]}
-                </span>
-                <FontAwesomeIcon 
-                  icon={faChevronDown} 
-                  className={`text-gray-500 transition-transform duration-200 ${isUserDropdownOpen ? 'rotate-180' : ''}`} 
-                />
-              </button>
-
-              <AnimatePresence>
+          {/* User section with dropdown */}
+          <div className="user-section" ref={userDropdownRef}>
+            {currentUser && (
+              <>
+                <button className="user-icon-button" onClick={toggleUserDropdown}>
+                  <FontAwesomeIcon icon={faUser} />
+                </button>
                 {isUserDropdownOpen && (
-                  <motion.div
-                    variants={dropdownVariants}
-                    initial="hidden"
-                    animate="visible"
-                    exit="exit"
-                    className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg py-1 border border-gray-200"
-                  >
-                    <div className="px-4 py-2 border-b border-gray-100">
-                      <p className="text-sm text-gray-500">Signed in as</p>
-                      <p className="text-sm font-medium text-gray-900 truncate">
-                        {currentUser?.email}
-                      </p>
+                  <div className="user-dropdown">
+                    <div className="user-email">
+                      {currentUser.displayName || currentUser.email}
                     </div>
-                    <button
-                      onClick={handleSignOut}
-                      className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors duration-200 flex items-center space-x-2"
-                    >
-                      <FontAwesomeIcon icon={faSignOutAlt} />
+                    <button className="sign-out-button" onClick={handleSignOut}>
+                      <FontAwesomeIcon icon={faSignOutAlt} className="sign-out-icon" />
                       <span>Sign Out</span>
                     </button>
-                  </motion.div>
+                  </div>
                 )}
-              </AnimatePresence>
-            </div>
+              </>
+            )}
           </div>
 
-          {/* Mobile Menu Button */}
-          <div className="md:hidden flex items-center">
-            <button
-              onClick={toggleMobileMenu}
-              className="p-2 rounded-lg hover:bg-gray-100 transition-colors duration-200"
-            >
-              <svg
-                className="h-6 w-6 text-gray-600"
-                fill="none"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth="2"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                {isMobileMenuOpen ? (
-                  <path d="M6 18L18 6M6 6l12 12" />
-                ) : (
-                  <path d="M4 6h16M4 12h16M4 18h16" />
-                )}
-              </svg>
-            </button>
-          </div>
+          {/* Mobile menu button */}
+          <button className="mobile-menu-button" onClick={toggleMobileMenu}>
+            {isMobileMenuOpen ? '✕' : '☰'}
+          </button>
         </div>
       </div>
 
-      {/* Mobile Navigation */}
-      <AnimatePresence>
-        {isMobileMenuOpen && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="md:hidden bg-white/95 backdrop-blur-sm border-t border-gray-200 shadow-lg"
-          >
-            <div className="px-2 pt-2 pb-3 space-y-1">
-              {filteredLinks.map((link) => (
-                <Link
-                  key={link.path}
-                  to={link.path}
-                  className={`block px-3 py-2 rounded-lg text-base font-medium transition-colors duration-200 ${
-                    location.pathname === link.path
-                      ? 'bg-primary text-white'
-                      : 'text-gray-700 hover:bg-gray-100'
-                  }`}
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
-                  <span className="mr-2">{link.icon}</span>
-                  {link.label}
-                </Link>
-              ))}
-              <button
-                onClick={handleSignOut}
-                className="w-full text-left px-3 py-2 text-base font-medium text-red-600 hover:bg-red-50 rounded-lg transition-colors duration-200 flex items-center space-x-2"
-              >
-                <FontAwesomeIcon icon={faSignOutAlt} />
-                <span>Sign Out</span>
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </motion.nav>
+      {/* Mobile navigation */}
+      {isMobileMenuOpen && (
+        <ul className="nav-links mobile-nav">
+          {filteredLinks.map((link) => (
+            <li 
+              key={link.path} 
+              className={location.pathname === link.path ? 'active' : ''}
+              onClick={() => setIsMobileMenuOpen(false)}
+            >
+              <Link to={link.path}>
+                <span className="nav-icon">{link.icon}</span>
+                <span className="nav-label">{link.label}</span>
+              </Link>
+            </li>
+          ))}
+          <li className="mobile-user-section">
+            {currentUser && (
+              <>
+                <div className="user-name">
+                  {currentUser.displayName || currentUser.email}
+                </div>
+                <button className="sign-out-button" onClick={handleSignOut}>
+                  <FontAwesomeIcon icon={faSignOutAlt} className="sign-out-icon" />
+                  <span>Sign Out</span>
+                </button>
+              </>
+            )}
+          </li>
+        </ul>
+      )}
+    </nav>
   );
 };
 

@@ -1,32 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { db } from '../firebase';
-import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
 import { useAuth } from '../contexts/AuthContext';
+import { db } from '../firebase';
+import { collection, query, where, getDocs, limit, orderBy, doc, getDoc } from 'firebase/firestore';
+import Navigation from '../components/Navigation';
+import BackendStatus from '../components/BackendStatus';
 import './Dashboard.css';
-
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: {
-      duration: 0.3,
-      when: "beforeChildren",
-      staggerChildren: 0.1
-    }
-  }
-};
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: {
-    opacity: 1,
-    y: 0,
-    transition: {
-      duration: 0.3
-    }
-  }
-};
 
 const Dashboard = () => {
   const { currentUser } = useAuth();
@@ -52,15 +30,15 @@ const Dashboard = () => {
         const userRef = collection(db, 'users');
         const userQuery = query(userRef, where('uid', '==', currentUser.uid));
         const userSnapshot = await getDocs(userQuery);
-        
+
         if (!userSnapshot.empty) {
           const userData = userSnapshot.docs[0].data();
           
           // Calculate environmental impact
           const impactSaved = {
-            trees: (userData.totalRecycled || 0) * 0.1,
-            water: (userData.totalRecycled || 0) * 100,
-            co2: (userData.totalRecycled || 0) * 2.5
+            trees: (userData.totalRecycled || 0) * 0.1, // Approx 10 items = 1 tree
+            water: (userData.totalRecycled || 0) * 100, // Liters of water
+            co2: (userData.totalRecycled || 0) * 2.5 // kg of CO2
           };
           
           // Determine rank based on points
@@ -80,46 +58,62 @@ const Dashboard = () => {
           });
         }
 
-        // Fetch recent activities
-        const activitiesRef = collection(db, 'recyclingActivities');
-        const activitiesQuery = query(
-          activitiesRef,
-          orderBy('timestamp', 'desc'),
-          limit(5)
-        );
-        
-        const activitiesSnapshot = await getDocs(activitiesQuery);
-        const activities = await Promise.all(
-          activitiesSnapshot.docs.map(async (doc) => {
-            const data = doc.data();
-            if (data.userId && !data.userEmail) {
-              try {
-                const userRef = doc(db, 'users', data.userId);
-                const userSnap = await getDocs(userRef);
-                if (userSnap.empty) {
-                  console.error("User data not found for activity:", data.userId);
-                  return null;
-                }
-                const userData = userSnap.docs[0].data();
-                return {
-                  id: doc.id,
-                  ...data,
-                  userEmail: userData.email || 'Unknown User'
-                };
-              } catch (err) {
-                console.error("Error fetching user for activity:", err);
-                return null;
+        // Fetch recent recycling activities
+        try {
+          const activitiesRef = collection(db, 'recyclingActivities');
+          
+          // Query to get all recent recycling activities from all bins
+          const activitiesQuery = query(
+            activitiesRef,
+            orderBy('timestamp', 'desc'),
+            limit(5)
+          );
+          
+          const activitiesSnapshot = await getDocs(activitiesQuery);
+          let activities = activitiesSnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          
+          // For each activity, if we don't have the user email, try to fetch it
+          const activitiesWithUser = await Promise.all(
+            activities.map(async (activity) => {
+              // If we already have the userEmail, just return the activity
+              if (activity.userEmail) {
+                return activity;
               }
-            }
-            return {
-              id: doc.id,
-              ...data,
-              userEmail: data.userEmail || 'Unknown User'
-            };
-          })
-        );
-        
-        setRecentActivities(activities.filter(Boolean));
+              
+              // If we have the userId but no userEmail, try to fetch the user data
+              if (activity.userId) {
+                try {
+                  const userRef = doc(db, 'users', activity.userId);
+                  const userSnap = await getDoc(userRef);
+                  
+                  if (userSnap.exists()) {
+                    // Add the user email to the activity
+                    return {
+                      ...activity,
+                      userEmail: userSnap.data().email || 'Unknown User'
+                    };
+                  }
+                } catch (err) {
+                  console.error("Error fetching user for activity:", err);
+                }
+              }
+              
+              // If we couldn't get the user email, return activity with default
+              return {
+                ...activity,
+                userEmail: 'Unknown User'
+              };
+            })
+          );
+          
+          setRecentActivities(activitiesWithUser);
+        } catch (activityError) {
+          console.error('Error fetching activities:', activityError);
+          setRecentActivities([]); // Set empty array on error
+        }
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
       } finally {
@@ -130,8 +124,10 @@ const Dashboard = () => {
     fetchUserData();
   }, [currentUser]);
 
+  // Format timestamp to readable date
   const formatDate = (timestamp) => {
     if (!timestamp) return 'Unknown';
+    
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
     return date.toLocaleDateString('en-US', {
       month: 'short',
@@ -142,109 +138,117 @@ const Dashboard = () => {
     });
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center">
-          <div className="loading"></div>
-          <p className="text-text-light">Loading your recycling data...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <motion.div
-      variants={containerVariants}
-      initial="hidden"
-      animate="visible"
-      className="dashboard-container"
-    >
+    <div className="dashboard-container">
+      <Navigation />
+      
       <main className="dashboard-content">
-        <motion.div variants={itemVariants} className="dashboard-header">
+        <div className="dashboard-header">
           <h1 className="dashboard-title">Dashboard</h1>
-          <p className="dashboard-subtitle">Track your recycling impact and activities</p>
-        </motion.div>
-
-        {/* Stats Section */}
-        <motion.section variants={itemVariants} className="stats-section">
-          <div className="stat-card">
-            <h3>Total Points</h3>
-            <p className="stat-value">{stats.totalPoints}</p>
-          </div>
-          
-          <div className="stat-card">
-            <h3>Items Recycled</h3>
-            <p className="stat-value">{stats.totalRecycled}</p>
-          </div>
-          
-          <div className="stat-card">
-            <h3>Your Rank</h3>
-            <p className="stat-value">{stats.rank}</p>
-          </div>
-        </motion.section>
-
-        {/* Environmental Impact */}
-        <motion.section variants={itemVariants} className="impact-section">
-          <h2>Your Environmental Impact</h2>
-          <div className="impact-cards">
-            <div className="impact-card">
-              <div className="impact-icon">🌳</div>
-              <p className="impact-value">{stats.impactSaved.trees.toFixed(1)}</p>
-              <p className="impact-label">Trees Saved</p>
-            </div>
+          <BackendStatus />
+        </div>
+        
+        {loading ? (
+          <div className="loading">Loading your recycling data...</div>
+        ) : (
+          <>
+            {/* User stats section */}
+            <section className="stats-section">
+              <div className="stat-card">
+                <h3>Total Points</h3>
+                <div className="stat-value">{stats.totalPoints}</div>
+              </div>
+              
+              <div className="stat-card">
+                <h3>Items Recycled</h3>
+                <div className="stat-value">{stats.totalRecycled}</div>
+              </div>
+              
+              <div className="stat-card">
+                <h3>Your Rank</h3>
+                <div className="stat-value">{stats.rank}</div>
+              </div>
+            </section>
             
-            <div className="impact-card">
-              <div className="impact-icon">💧</div>
-              <p className="impact-value">{stats.impactSaved.water.toFixed(0)}</p>
-              <p className="impact-label">Liters of Water Conserved</p>
-            </div>
-            
-            <div className="impact-card">
-              <div className="impact-icon">☁️</div>
-              <p className="impact-value">{stats.impactSaved.co2.toFixed(1)}</p>
-              <p className="impact-label">kg of CO2 Emissions Reduced</p>
-            </div>
-          </div>
-        </motion.section>
-
-        {/* Recent Activities */}
-        <motion.section variants={itemVariants} className="activities-section">
-          <h2>Recent Activities</h2>
-          {recentActivities.length === 0 ? (
-            <div className="no-activities">
-              <p>No recent recycling activities found!</p>
-              <p>Start recycling to earn points and see your activities here.</p>
-            </div>
-          ) : (
-            <div className="activities-list">
-              {recentActivities.map((activity) => (
-                <div key={activity.id} className="activity-card">
-                  <div className="activity-icon">
-                    {activity.wasteType === 'paper' ? '📄' :
-                     activity.wasteType === 'plastic' ? '🥤' :
-                     activity.wasteType === 'glass' ? '🍶' :
-                     activity.wasteType === 'metal' ? '🥫' : '♻️'}
-                  </div>
-                  <div className="activity-details">
-                    <p className="activity-title">
-                      {activity.userEmail} recycled {activity.wasteType} at {activity.binLocation || 'Unknown Location'}
-                    </p>
-                    <p className="activity-subtitle">
-                      {formatDate(activity.timestamp)}
-                    </p>
-                  </div>
-                  <div className="activity-points">
-                    <p className="bin-info">{activity.binName || activity.binId || 'Unknown Bin'}</p>
-                    <p className="points-earned">+{activity.pointsEarned || 0} pts</p>
-                  </div>
+            {/* Environmental impact section */}
+            <section className="impact-section">
+              <h2>Your Environmental Impact</h2>
+              <div className="impact-cards">
+                <div className="impact-card">
+                  <div className="impact-icon">🌳</div>
+                  <div className="impact-value">{stats.impactSaved.trees.toFixed(1)}</div>
+                  <div className="impact-label">Trees Saved</div>
+              </div>
+              
+                <div className="impact-card">
+                  <div className="impact-icon">💧</div>
+                  <div className="impact-value">{stats.impactSaved.water.toFixed(0)}</div>
+                  <div className="impact-label">Liters of Water Conserved</div>
+              </div>
+              
+                <div className="impact-card">
+                  <div className="impact-icon">☁️</div>
+                  <div className="impact-value">{stats.impactSaved.co2.toFixed(1)}</div>
+                  <div className="impact-label">kg of CO2 Emissions Reduced</div>
                 </div>
-              ))}
-            </div>
-          )}
-        </motion.section>
+              </div>
+            </section>
+            
+            {/* Recent activities section */}
+            <section className="activities-section">
+              <h2>Recent Recycling Activities</h2>
+              
+              {recentActivities.length === 0 ? (
+                <div className="no-activities">
+                  <p>No recent recycling activities found!</p>
+                  <p>Start recycling to earn points and see activities here.</p>
+                </div>
+              ) : (
+                <div className="activities-list">
+                  {recentActivities.map((activity) => (
+                    <div key={activity.id} className="activity-card">
+                      <div className="activity-icon">
+                        {activity.wasteType === 'paper' ? '📄' :
+                         activity.wasteType === 'plastic' ? '🥤' :
+                         activity.wasteType === 'glass' ? '🍶' :
+                         activity.wasteType === 'metal' ? '🥫' : '♻️'}
+                      </div>
+                      <div className="activity-details">
+                        <div className="activity-title">
+                          {activity.userEmail || 'Unknown User'} recycled {activity.wasteType} at {activity.binLocation || 'Unknown Location'}
+                        </div>
+                        <div className="activity-subtitle">
+                          Bin: {activity.binName || activity.binId || 'Unknown Bin'}
+                        </div>
+                        <div className="activity-date">{formatDate(activity.timestamp)}</div>
+                      </div>
+                      <div className="activity-points">
+                        <div className="bin-info">
+                          {(() => {
+                            const binType = activity.binType || 
+                              (activity.wasteType === 'organic' ? 'organic' :
+                               activity.wasteType === 'plastic' || activity.wasteType === 'paper' || 
+                               activity.wasteType === 'glass' || activity.wasteType === 'metal' ? 'recyclable' : 'unknown');
+                            
+                            const binLabel = binType === 'organic' ? 'Biodegradable' : 
+                                             binType === 'non-recyclable' ? 'Non-Biodegradable' : 
+                                             binType === 'recyclable' ? 'Recyclable' : 
+                                             activity.binName || 'Bin';
+                            
+                            return <span className={`bin-type ${binType}`}>{binLabel}</span>;
+                          })()}
+                        </div>
+                        <div className="points-earned">+{activity.pointsEarned || 0} pts</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          </>
+        )}
       </main>
-    </motion.div>
+    </div>
   );
 };
 
