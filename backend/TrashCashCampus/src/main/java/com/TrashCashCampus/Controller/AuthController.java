@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.CrossOrigin;
 
@@ -155,71 +156,61 @@ public class AuthController {
                     "Please verify your email address by clicking this link: " + link
                 );
                 
+                // Note: We no longer need to update isEmailVerified here since the user
+                // will click the verification link which will update Firebase Auth's emailVerified flag
+                
                 String uid = user.getUid();
-                System.out.println("Attempting to update user document with UID: " + uid);
+                System.out.println("Email verification link sent to user with UID: " + uid);
                 
-                // Update document in database (our custom isEmailVerified field)
-                // Create updates for the document
-                Map<String, Object> updates = new HashMap<>();
-                updates.put("isEmailVerified", true);
-                
+                // Ensure we have a properly structured user document
                 try {
-                    // First try to update using the UID as document ID
-                    firebaseService.updateDocument("users", uid, updates);
-                    System.out.println("Successfully updated user document with UID: " + uid);
-                } catch (Exception e) {
-                    System.out.println("Could not find document with UID, trying to find by email: " + e.getMessage());
+                    // Try to ensure user has a document with the user's UID as the document ID
+                    Map<String, Object> userDoc = firebaseService.findUserByEmail(email);
                     
-                    // If that fails, try to find the user by email in Firestore
-                    try {
-                        // Search for user by email
-                        Map<String, Object> userDoc = firebaseService.findUserByEmail(email);
+                    if (userDoc != null) {
+                        String docId = (String) userDoc.get("docId");
+                        System.out.println("Found user document with ID: " + docId);
                         
-                        if (userDoc != null && userDoc.containsKey("docId")) {
-                            String docId = (String) userDoc.get("docId");
-                            System.out.println("Found user document by email with ID: " + docId);
-                            
-                            // Add userId field if it's missing
-                            if (!userDoc.containsKey("userId")) {
-                                updates.put("userId", uid);
-                            }
-                            
-                            // Ensure other consistent fields
-                            if (!userDoc.containsKey("fullName") && userDoc.containsKey("name")) {
-                                updates.put("fullName", userDoc.get("name"));
-                            }
-                            
-                            // Update that document
-                            firebaseService.updateDocument("users", docId, updates);
-                            System.out.println("Successfully updated user document found by email");
-                            
-                            // If the document ID is not the same as the UID, we need to fix this
-                            // by copying all data to a new document with the correct UID as ID
-                            if (!docId.equals(uid)) {
-                                try {
-                                    System.out.println("Document ID doesn't match UID, creating a proper document");
-                                    
-                                    // Get the full user data after our updates
-                                    Map<String, Object> updatedUserDoc = firebaseService.getDocument("users", docId);
-                                    updatedUserDoc.put("userId", uid);
-                                    updatedUserDoc.put("isEmailVerified", true);
-                                    
-                                    // Create a new document with the proper UID
-                                    firebaseService.createDocumentWithId("users", uid, updatedUserDoc);
-                                    
-                                    // Note: We don't delete the old document to avoid data loss
-                                    // In a production environment, you'd add a proper migration
-                                } catch (Exception migrationError) {
-                                    System.out.println("Failed to migrate user document: " + migrationError.getMessage());
+                        // If docId doesn't match UID, create a proper document
+                        if (!docId.equals(uid)) {
+                            try {
+                                System.out.println("Document ID doesn't match UID, creating a proper document");
+                                
+                                // Add userId field if missing
+                                if (!userDoc.containsKey("userId")) {
+                                    userDoc.put("userId", uid);
                                 }
+                                
+                                // Ensure other consistent fields
+                                if (!userDoc.containsKey("fullName") && userDoc.containsKey("name")) {
+                                    userDoc.put("fullName", userDoc.get("name"));
+                                }
+                                
+                                // Remove the docId field as it's not a real field
+                                userDoc.remove("docId");
+                                
+                                // Create a new document with the proper UID
+                                firebaseService.createDocumentWithId("users", uid, userDoc);
+                                System.out.println("Created proper user document with UID as document ID");
+                            } catch (Exception migrationError) {
+                                System.out.println("Failed to migrate user document: " + migrationError.getMessage());
                             }
-                        } else {
-                            throw new Exception("Could not find user document by email");
                         }
-                    } catch (Exception e2) {
-                        System.out.println("Error finding user by email: " + e2.getMessage());
-                        throw new Exception("Failed to update user: " + e.getMessage() + " and " + e2.getMessage());
+                    } else {
+                        System.out.println("No existing user document found, creating one");
+                        
+                        // Create a basic user document if none exists
+                        Map<String, Object> newUserDoc = new HashMap<>();
+                        newUserDoc.put("email", email);
+                        newUserDoc.put("userId", uid);
+                        newUserDoc.put("isEmailVerified", false);
+                        newUserDoc.put("createdAt", System.currentTimeMillis());
+                        
+                        firebaseService.createDocumentWithId("users", uid, newUserDoc);
                     }
+                } catch (Exception e) {
+                    System.out.println("Error ensuring proper user document: " + e.getMessage());
+                    // Continue - this is not fatal
                 }
             } else {
                 // This is a password reset request
@@ -282,6 +273,66 @@ public class AuthController {
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(new ApiResponse("Password update failed: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Endpoint to check email verification status and update Firestore
+     * This is mainly for testing but can also be used to synchronize status
+     */
+    @GetMapping("/check-verification/{email}")
+    public ResponseEntity<?> checkVerification(@PathVariable String email) {
+        if (!isValidEmail(email)) {
+            return ResponseEntity.badRequest().body(new ApiResponse("Only @cit.edu email addresses are allowed"));
+        }
+        
+        try {
+            boolean updated = firebaseService.checkAndUpdateVerificationStatus(email);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("email", email);
+            response.put("status", updated ? "updated" : "no_change_needed");
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(new ApiResponse("Error checking verification: " + e.getMessage()));
+        }
+    }
+    
+    /**
+     * Endpoint to handle verification action code
+     * This can be used as a callback URL for verification emails
+     */
+    @GetMapping("/action")
+    public ResponseEntity<?> handleAction(@RequestParam("mode") String mode, 
+                                        @RequestParam("oobCode") String oobCode,
+                                        @RequestParam(value = "continueUrl", required = false) String continueUrl) {
+        try {
+            if ("verifyEmail".equals(mode)) {
+                String email = firebaseService.checkActionCode(oobCode);
+                
+                if (email != null) {
+                    Map<String, Object> response = new HashMap<>();
+                    response.put("email", email);
+                    response.put("verified", true);
+                    
+                    // If continueUrl is provided, the client should redirect there
+                    if (continueUrl != null && !continueUrl.isEmpty()) {
+                        response.put("continueUrl", continueUrl);
+                    }
+                    
+                    return ResponseEntity.ok(response);
+                } else {
+                    return ResponseEntity.badRequest().body(new ApiResponse("Invalid verification code"));
+                }
+            } else if ("resetPassword".equals(mode)) {
+                // Could implement password reset handling here
+                return ResponseEntity.ok(new ApiResponse("Password reset link is valid"));
+            } else {
+                return ResponseEntity.badRequest().body(new ApiResponse("Unsupported action mode: " + mode));
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(new ApiResponse("Error handling action: " + e.getMessage()));
         }
     }
 
