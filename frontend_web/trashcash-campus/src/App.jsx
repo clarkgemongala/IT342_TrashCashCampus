@@ -8,6 +8,7 @@ import User from './User/User';
 import Bins from './Bins/Bins';
 import Rewards from './Rewards/Rewards';
 import AdminManagement from './AdminManagement/AdminManagement';
+import Navigation from './components/Navigation';
 import './App.css';
 
 const pageTransition = {
@@ -19,15 +20,18 @@ const pageTransition = {
 // Layout wrapper component
 const Layout = ({ children }) => {
   return (
-    <motion.div
-      initial="initial"
-      animate="animate"
-      exit="exit"
-      variants={pageTransition}
-      className="min-h-screen bg-gray-50"
-    >
-      {children}
-    </motion.div>
+    <div className="min-h-screen bg-background">
+      <Navigation />
+      <motion.div
+        initial="initial"
+        animate="animate"
+        exit="exit"
+        variants={pageTransition}
+        className="pt-16" // Add padding-top to account for fixed navbar
+      >
+        {children}
+      </motion.div>
+    </div>
   );
 };
 
@@ -37,8 +41,8 @@ const ProtectedRoute = ({ adminOnly = false }) => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500"></div>
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
       </div>
     );
   }
@@ -51,39 +55,33 @@ const ProtectedRoute = ({ adminOnly = false }) => {
     return <Navigate to="/dashboard" replace />;
   }
 
-  return (
-    <Layout>
-      <Outlet />
-    </Layout>
-  );
+  return <Outlet />;
 };
 
 function AppRoutes() {
   return (
     <AnimatePresence mode="wait">
       <Routes>
-        <Route path="/login" element={
-          <Layout>
-            <Login />
-          </Layout>
-        } />
-        
-        {/* Protected routes */}
-        <Route element={<ProtectedRoute />}>
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/bins" element={<Bins />} />
-          <Route path="/rewards" element={<Rewards />} />
+        <Route element={<Layout />}>
+          <Route path="/login" element={<Login />} />
+          
+          {/* Protected routes */}
+          <Route element={<ProtectedRoute />}>
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/bins" element={<Bins />} />
+            <Route path="/rewards" element={<Rewards />} />
+          </Route>
+          
+          {/* Admin-only routes */}
+          <Route element={<ProtectedRoute adminOnly={true} />}>
+            <Route path="/users" element={<User />} />
+            <Route path="/admin-management" element={<AdminManagement />} />
+          </Route>
+          
+          {/* Redirect to login by default */}
+          <Route path="/" element={<Navigate to="/login" replace />} />
+          <Route path="*" element={<Navigate to="/login" replace />} />
         </Route>
-        
-        {/* Admin-only routes */}
-        <Route element={<ProtectedRoute adminOnly={true} />}>
-          <Route path="/users" element={<User />} />
-          <Route path="/admin-management" element={<AdminManagement />} />
-        </Route>
-        
-        {/* Redirect to login by default */}
-        <Route path="/" element={<Navigate to="/login" replace />} />
-        <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </AnimatePresence>
   );
@@ -91,12 +89,14 @@ function AppRoutes() {
 
 function App() {
   return (
-    <AuthProvider>
-      <Router>
-        <NotificationProvider />
-        <AppRoutes />
-      </Router>
-    </AuthProvider>
+    <div className="app-container">
+      <AuthProvider>
+        <Router>
+          <NotificationProvider />
+          <AppRoutes />
+        </Router>
+      </AuthProvider>
+    </div>
   );
 }
 

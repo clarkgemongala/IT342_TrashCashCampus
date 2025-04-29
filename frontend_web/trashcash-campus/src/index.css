@@ -13,12 +13,20 @@
     --text-light: #4B4B4B;
   }
 
-  html {
-    @apply antialiased;
+  html, body, #root {
+    @apply min-h-screen;
   }
 
   body {
     @apply bg-background text-text font-sans leading-normal;
+  }
+
+  #root {
+    @apply flex flex-col;
+  }
+
+  .app-container {
+    @apply flex flex-col min-h-screen bg-background;
   }
 
   h1, h2, h3, h4, h5, h6 {

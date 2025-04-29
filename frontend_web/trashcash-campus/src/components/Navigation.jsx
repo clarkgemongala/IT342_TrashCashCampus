@@ -112,7 +112,7 @@ const Navigation = () => {
       initial="hidden"
       animate="visible"
       variants={navVariants}
-      className="fixed top-0 left-0 right-0 bg-white border-b border-gray-200 z-50"
+      className="fixed top-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-b border-gray-200 z-50 shadow-sm"
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
@@ -217,7 +217,7 @@ const Navigation = () => {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className="md:hidden bg-white border-t border-gray-200"
+            className="md:hidden bg-white/95 backdrop-blur-sm border-t border-gray-200 shadow-lg"
           >
             <div className="px-2 pt-2 pb-3 space-y-1">
               {filteredLinks.map((link) => (
