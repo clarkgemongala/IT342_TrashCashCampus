@@ -85,12 +85,18 @@ object ApiClient {
         }
     }
     
-    suspend fun requestPasswordReset(context: Context, email: String): Map<String, Any>? {
+    suspend fun requestPasswordReset(context: Context, email: String, isVerification: Boolean = false): Map<String, Any>? {
         return try {
-            val response = api.requestPasswordReset(mapOf("email" to email))
-            handleResponse(context, response, "Password reset request")
+            val requestBody = if (isVerification) {
+                mapOf("email" to email, "isVerification" to "true")
+            } else {
+                mapOf("email" to email)
+            }
+            
+            val response = api.requestPasswordReset(requestBody)
+            handleResponse(context, response, if (isVerification) "Email verification request" else "Password reset request")
         } catch (e: Exception) {
-            handleError(context, e, "requesting password reset")
+            handleError(context, e, if (isVerification) "requesting email verification" else "requesting password reset")
             null
         }
     }

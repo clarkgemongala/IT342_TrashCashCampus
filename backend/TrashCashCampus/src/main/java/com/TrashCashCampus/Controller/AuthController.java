@@ -105,6 +105,7 @@ public class AuthController {
             profile.put("totalPoints", 0); // Initialize with 0 points
             profile.put("recentPoints", 0); // Initialize daily points to 0
             profile.put("lastPointsUpdate", System.currentTimeMillis());
+            profile.put("isEmailVerified", false); // Use isEmailVerified instead of isVerified
             firebaseService.createDocument("users", profile);
             
             Map<String, Object> response = new HashMap<>();
@@ -125,11 +126,40 @@ public class AuthController {
             return ResponseEntity.badRequest().body(new ApiResponse("Only @cit.edu email addresses are allowed"));
         }
 
-        // Here you would implement password reset logic using Firebase
-        Map<String, Object> response = new HashMap<>();
-        response.put("message", "Password reset email sent");
-        
-        return ResponseEntity.ok(response);
+        // Check if this is a verification request or password reset
+        Boolean isVerification = request.containsKey("isVerification") ? 
+                               Boolean.parseBoolean(request.get("isVerification")) : false;
+
+        try {
+            // Get user by email
+            UserRecord user = firebaseService.getUserByEmail(email);
+            
+            if (user == null) {
+                return ResponseEntity.badRequest().body(new ApiResponse("User not found"));
+            }
+            
+            // If this is a verification request, update the isVerified field in Firestore
+            if (isVerification) {
+                // Find the user document in Firestore
+                Map<String, Object> updates = new HashMap<>();
+                updates.put("isEmailVerified", true);
+                
+                // Update user in Firestore - we're using the UID as the document ID
+                firebaseService.updateDocument("users", user.getUid(), updates);
+            }
+            
+            // Here you would implement actual email sending logic
+            // For now, we just return success
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", isVerification ? 
+                "Verification email sent" : "Password reset email sent");
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(
+                new ApiResponse((isVerification ? "Verification" : "Password reset") + 
+                " request failed: " + e.getMessage()));
+        }
     }
 
     @PostMapping("/verify")
