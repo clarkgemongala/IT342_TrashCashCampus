@@ -71,6 +71,9 @@ function Login() {
     config: config.gentle
   });
   
+  const [showAlert, setShowAlert] = useState(false);
+  const [alertMessage, setAlertMessage] = useState('');
+  
   // Redirect if already logged in
   useEffect(() => {
     if (currentUser) {
@@ -149,6 +152,22 @@ function Login() {
     return '';
   };
 
+  // Function to show alert notification
+  const displayAlert = (message) => {
+    setAlertMessage(message);
+    setShowAlert(true);
+    
+    // Auto dismiss after 5 seconds
+    setTimeout(() => {
+      setShowAlert(false);
+    }, 5000);
+  };
+  
+  // Function to manually close the alert
+  const closeAlert = () => {
+    setShowAlert(false);
+  };
+
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
     
@@ -156,6 +175,7 @@ function Login() {
     setEmailError('');
     setPasswordError('');
     setBackendError('');
+    setShowAlert(false);
     
     // Validate email before submission
     const errorMsg = validateEmail(email);
@@ -192,23 +212,22 @@ function Login() {
     } catch (error) {
       console.error('Login error:', error);
       
-      // Handle error safely with defaults in case error object is malformed
-      if (error?.message) {
+      if (error.message) {
         if (error.message.includes('Invalid credentials')) {
-          setPasswordError('Invalid email or password');
+          displayAlert('Invalid email or password');
         } else if (error.message.includes('Only administrators')) {
-          setPasswordError('Only administrators can log in to this application');
+          displayAlert('Only administrators can log in to this application');
         } else if (error.message.includes('User profile not found')) {
-          setPasswordError('User profile not found. Please contact an administrator.');
+          displayAlert('User profile not found. Please contact an administrator.');
         } else {
-          setPasswordError(error.message || 'Authentication failed');
+          displayAlert(error.message);
         }
-      } else if (error?.code === 'auth/too-many-requests') {
-        setPasswordError('Too many failed attempts. Please try again later.');
-      } else if (error?.code === 'auth/user-not-found' || error?.code === 'auth/wrong-password') {
-        setPasswordError('Invalid email or password');
+      } else if (error.code === 'auth/too-many-requests') {
+        displayAlert('Too many failed attempts. Please try again later.');
+      } else if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+        displayAlert('Invalid email or password');
       } else {
-        setPasswordError('Authentication failed. Please check your credentials.');
+        displayAlert('Authentication failed. Please check your credentials.');
       }
     } finally {
       setLoading(false);
@@ -258,6 +277,20 @@ function Login() {
 
   return (
     <div className="login-container">
+      {/* Alert Notification */}
+      {showAlert && (
+        <div className="alert-notification">
+          <span className="alert-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="8" x2="12" y2="12"></line>
+              <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+          </span>
+          {alertMessage}
+          <button className="alert-close" onClick={closeAlert}>×</button>
+        </div>
+      )}
       <div className="login-image-section">
         <video className="background-video" autoPlay loop muted>
           <source src={recyclingVideo} type="video/mp4" />
