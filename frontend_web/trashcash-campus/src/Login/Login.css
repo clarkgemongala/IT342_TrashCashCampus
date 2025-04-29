@@ -1,3 +1,12 @@
+/* Ensure proper page rendering after navigation */
+body {
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  background-color: #f8f9fa;
+  font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
+}
+
 .login-container {
   display: flex;
   width: 100%;
@@ -6,6 +15,7 @@
   position: relative;
   font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
   background-color: #f8f9fa;
+  opacity: 1 !important; /* Ensure visibility */
 }
 
 .login-image-section {

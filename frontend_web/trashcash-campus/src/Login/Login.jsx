@@ -74,6 +74,22 @@ function Login() {
   const [showAlert, setShowAlert] = useState(false);
   const [alertMessage, setAlertMessage] = useState('');
   
+  // Reset body styles and ensure proper page rendering on component mount
+  useEffect(() => {
+    // Reset any styles that might cause the white screen issue
+    document.body.style.backgroundColor = '';
+    document.body.style.overflow = 'auto';
+    
+    // Force layout recalculation 
+    document.body.offsetHeight;
+    
+    return () => {
+      // Clean up when component unmounts
+      document.body.style.backgroundColor = '';
+      document.body.style.overflow = '';
+    };
+  }, []);
+  
   // Redirect if already logged in
   useEffect(() => {
     if (currentUser) {

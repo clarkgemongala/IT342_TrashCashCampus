@@ -33,7 +33,13 @@ const Navigation = () => {
       // Delay signout for animation
       setTimeout(async () => {
         await signOut();
-        navigate('/login');
+        
+        // Reset any app-wide styling that might be causing issues
+        document.body.style.backgroundColor = '';
+        document.body.style.overflow = '';
+        
+        // Force a reload instead of navigate to ensure clean state
+        window.location.href = '/login';
       }, 300);
     } catch (error) {
       console.error('Error signing out:', error);
