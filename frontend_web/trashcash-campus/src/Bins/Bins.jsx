@@ -22,7 +22,6 @@ import { ref, getDownloadURL, listAll, deleteObject } from 'firebase/storage';
 import Navigation from '../components/Navigation';
 import QRScanner from '../components/QRScanner';
 import CorsErrorInfo from '../components/CorsErrorInfo';
-import Notification from '../components/Notification';
 import { QRCodeSVG } from 'qrcode.react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCheck, faTimes } from '@fortawesome/free-solid-svg-icons';
@@ -225,7 +224,6 @@ const Bins = () => {
   const [verifyingEntry, setVerifyingEntry] = useState(false);
   const [locationLogs, setLocationLogs] = useState([]);
   const [activeLogTab, setActiveLogTab] = useState(0);
-  const [notification, setNotification] = useState(null);
   
   // Define our list of Cebu IT campus building names once at the component level
   const cebuITBuildings = [
@@ -1932,13 +1930,13 @@ const Bins = () => {
       await batch.commit();
       
       console.log("Campus locations have been initialized successfully!");
-      showNotification("Campus locations have been initialized successfully!", "success");
+      alert("Campus locations have been initialized successfully!");
       
       // Return the locations for bin initialization
       return campusLocations;
     } catch (error) {
       console.error("Error initializing campus locations:", error);
-      showNotification(`Error initializing campus locations: ${error.message}`, "error");
+      alert(`Error initializing campus locations: ${error.message}`);
       return [];
     } finally {
       setFixingBinLocations(false);
@@ -1961,7 +1959,7 @@ const Bins = () => {
           
           if (snapshot.empty) {
             console.warn("No campus locations found in database");
-            showNotification("No campus locations available. Please initialize campus locations first.", "error");
+            alert("No campus locations available. Please initialize campus locations first.");
             return;
           }
           
@@ -1973,7 +1971,7 @@ const Bins = () => {
           console.log(`Fetched ${campusLocations.length} campus locations from database`);
         } catch (error) {
           console.error("Error fetching campus locations:", error);
-          showNotification("Failed to fetch campus locations. Please try again.", "error");
+          alert("Failed to fetch campus locations. Please try again.");
           return;
         }
       }
@@ -2081,14 +2079,14 @@ const Bins = () => {
       await batch.commit();
       
       console.log("Bins have been initialized successfully!");
-      showNotification("Bins have been initialized successfully!", "success");
+      alert("Bins have been initialized successfully!");
       
       // Fetch the updated bins to refresh the UI
       fetchBins();
       
     } catch (error) {
       console.error("Error initializing bins:", error);
-      showNotification(`Error initializing bins: ${error.message}`, "error");
+      alert(`Error initializing bins: ${error.message}`);
     }
   };
 
@@ -2588,11 +2586,6 @@ const Bins = () => {
     }
   };
 
-  const showNotification = (message, type = 'success') => {
-    setNotification({ message, type });
-    setTimeout(() => setNotification(null), 3000);
-  };
-
   return (
     <div className="bins-container">
       {fixingBinLocations && (
@@ -2607,14 +2600,6 @@ const Bins = () => {
       */}
 
       <Navigation />
-      
-      {notification && (
-        <Notification
-          message={notification.message}
-          type={notification.type}
-          onClose={() => setNotification(null)}
-        />
-      )}
       
       {/* CORS Error Banner */}
       <div className="cors-error-banner">
