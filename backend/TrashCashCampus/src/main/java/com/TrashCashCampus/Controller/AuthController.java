@@ -183,12 +183,11 @@ public class AuthController {
             
             String link = firebaseService.getFirebaseAuth().generateEmailVerificationLink(email, actionCodeSettings);
             
-            // In a production app, you would send this link via an email service
-            // For now, just log it - you'll need to implement email sending separately
-            System.out.println("Verification link for " + email + ": " + link);
+            // Actually send the email using our sendVerificationEmail method
+            firebaseService.sendVerificationEmail(email, link);
             
             Map<String, Object> response = new HashMap<>();
-            response.put("message", "Email verification link generated. Please check your email.");
+            response.put("message", "Email verification link sent to " + email + ". Please check your inbox and spam folder.");
             
             return ResponseEntity.ok(response);
         } catch (Exception e) {

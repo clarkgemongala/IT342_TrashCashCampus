@@ -139,10 +139,11 @@ public class FirebaseService {
             
             String link = firebaseAuth.generateEmailVerificationLink(email, actionCodeSettings);
             System.out.println("Email verification link generated: " + link);
-            System.out.println("Firebase will send verification email to: " + email);
             
-            // Note: In a production environment, you should send this link via email
-            // Firebase Admin SDK doesn't send emails automatically, only generates the link
+            // Actually send the verification email
+            sendVerificationEmail(email, link);
+            
+            System.out.println("Verification email sent to: " + email);
         } catch (FirebaseAuthException e) {
             System.out.println("Failed to generate verification email: " + e.getMessage());
             // Continue with user creation even if email link generation fails
@@ -158,59 +159,71 @@ public class FirebaseService {
      * @param verificationLink The verification link to include in the email
      */
     public void sendVerificationEmail(String email, String verificationLink) {
-        // Email configuration
-        final String senderEmail = System.getenv("EMAIL_USERNAME"); // Get from environment variable
-        final String senderPassword = System.getenv("EMAIL_PASSWORD"); // Get from environment variable
+        // Create email content
+        String subject = "TrashCash Campus - Verify Your Email";
+        String htmlContent = 
+            "<div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>" +
+            "<h2 style='color: #4CAF50;'>TrashCash Campus - Email Verification</h2>" +
+            "<p>Thank you for registering with TrashCash Campus! Please verify your email address by clicking the button below:</p>" +
+            "<div style='margin: 25px 0;'>" +
+            "<a href='" + verificationLink + "' style='background-color: #4CAF50; color: white; padding: 12px 20px; text-decoration: none; border-radius: 4px; display: inline-block;'>Verify Email</a>" +
+            "</div>" +
+            "<p>If the button doesn't work, copy and paste this link into your browser:</p>" +
+            "<p style='word-break: break-all;'><a href='" + verificationLink + "'>" + verificationLink + "</a></p>" +
+            "<p>This link will expire in 24 hours.</p>" +
+            "<p>If you didn't register for TrashCash Campus, you can ignore this email.</p>" +
+            "</div>";
         
-        if (senderEmail == null || senderPassword == null) {
-            System.err.println("Email credentials not found in environment variables. Verification email not sent.");
+        // Send the email
+        sendEmail(email, subject, htmlContent);
+    }
+    
+    /**
+     * General method to send emails via SMTP
+     * 
+     * @param to Recipient email address
+     * @param subject Email subject
+     * @param htmlContent HTML content of the email
+     */
+    public void sendEmail(String to, String subject, String htmlContent) {
+        // Get credentials from environment variables
+        final String username = System.getenv("EMAIL_USERNAME");
+        final String password = System.getenv("EMAIL_PASSWORD");
+        
+        if (username == null || password == null) {
+            System.err.println("Email credentials not configured. Set EMAIL_USERNAME and EMAIL_PASSWORD env variables.");
             return;
         }
         
-        // Set mail properties
+        // Set properties
         Properties props = new Properties();
         props.put("mail.smtp.auth", "true");
         props.put("mail.smtp.starttls.enable", "true");
-        props.put("mail.smtp.host", "smtp.gmail.com");
+        props.put("mail.smtp.host", "smtp.office365.com"); // For Outlook/Office365
         props.put("mail.smtp.port", "587");
         
-        // Create a session with authentication
+        // Create session
         Session session = Session.getInstance(props, new javax.mail.Authenticator() {
             protected PasswordAuthentication getPasswordAuthentication() {
-                return new PasswordAuthentication(senderEmail, senderPassword);
+                return new PasswordAuthentication(username, password);
             }
         });
         
         try {
-            // Create a message
+            // Create message
             Message message = new MimeMessage(session);
-            message.setFrom(new InternetAddress(senderEmail));
-            message.setRecipients(Message.RecipientType.TO, InternetAddress.parse(email));
-            message.setSubject("TrashCash Campus - Verify Your Email");
+            message.setFrom(new InternetAddress(username));
+            message.setRecipients(Message.RecipientType.TO, InternetAddress.parse(to));
+            message.setSubject(subject);
             
-            // Create email content with HTML
-            String htmlContent = 
-                "<div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>" +
-                "<h2 style='color: #4CAF50;'>TrashCash Campus - Email Verification</h2>" +
-                "<p>Thank you for registering with TrashCash Campus! Please verify your email address by clicking the button below:</p>" +
-                "<div style='margin: 25px 0;'>" +
-                "<a href='" + verificationLink + "' style='background-color: #4CAF50; color: white; padding: 12px 20px; text-decoration: none; border-radius: 4px; display: inline-block;'>Verify Email</a>" +
-                "</div>" +
-                "<p>If the button doesn't work, you can also copy and paste the following link into your browser:</p>" +
-                "<p style='word-break: break-all;'><a href='" + verificationLink + "'>" + verificationLink + "</a></p>" +
-                "<p>This link will expire in 24 hours.</p>" +
-                "<p>If you didn't register for TrashCash Campus, you can ignore this email.</p>" +
-                "</div>";
-            
-            // Set content type
+            // Set HTML content
             message.setContent(htmlContent, "text/html; charset=utf-8");
             
-            // Send the message
+            // Send message
             Transport.send(message);
-            
-            System.out.println("Verification email sent successfully to " + email);
+            System.out.println("Email sent successfully to: " + to);
         } catch (MessagingException e) {
-            System.err.println("Failed to send verification email: " + e.getMessage());
+            System.err.println("Failed to send email: " + e.getMessage());
             e.printStackTrace();
         }
     }
