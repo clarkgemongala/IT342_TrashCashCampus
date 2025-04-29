@@ -12,37 +12,44 @@
   padding: 2rem;
 }
 
-.dashboard-title {
+.dashboard-header {
   margin-bottom: 2rem;
+}
+
+.dashboard-title {
   color: #333;
   font-size: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+.dashboard-subtitle {
+  color: #666;
+  font-size: 1.1rem;
 }
 
 /* Loading state */
 .loading {
   display: flex;
-  flex-direction: column;
-  align-items: center;
   justify-content: center;
-  min-height: 100vh;
-  background-color: #f5f5f5;
-  padding: 1rem;
+  align-items: center;
+  height: 200px;
+  font-size: 1.2rem;
+  color: #666;
 }
 
 .loading-spinner {
-  width: 48px;
-  height: 48px;
-  border: 3px solid #1B4332;
+  width: 40px;
+  height: 40px;
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #1a5336;
   border-radius: 50%;
-  border-top-color: transparent;
-  margin-bottom: 1rem;
   animation: spin 1s linear infinite;
+  margin-right: 1rem;
 }
 
 @keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 /* Error and warning messages */
@@ -92,39 +99,24 @@
 
 .stat-card {
   background-color: white;
-  border-radius: 0.5rem;
+  border-radius: 8px;
   padding: 1.5rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.stat-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
-
-.stat-content {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  text-align: center;
 }
 
 .stat-card h3 {
+  margin-top: 0;
+  margin-bottom: 1rem;
   color: #666;
-  font-size: 0.875rem;
-  margin: 0 0 0.5rem 0;
+  font-size: 1rem;
+  font-weight: 500;
 }
 
 .stat-value {
-  font-size: 1.5rem;
+  font-size: 2.5rem;
   font-weight: 700;
-  color: #1B4332;
-  margin: 0;
-}
-
-.stat-icon {
-  font-size: 1.75rem;
-  color: #1B4332;
+  color: #1a5336;
 }
 
 /* Impact Section */
@@ -181,27 +173,28 @@
 /* Activities Section */
 .activities-section {
   background-color: white;
-  border-radius: 0.5rem;
+  border-radius: 8px;
   padding: 1.5rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  margin-bottom: 2rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
 .activities-section h2 {
+  margin-top: 0;
+  margin-bottom: 1.5rem;
   color: #333;
-  font-size: 1.25rem;
-  margin: 0 0 1.5rem 0;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid #e5e5e5;
-}
-
-.activities-content {
-  padding: 0.5rem 0;
+  font-size: 1.5rem;
 }
 
 .no-activities {
   text-align: center;
   padding: 2rem;
   color: #666;
+}
+
+.no-activities p:first-child {
+  font-size: 1.2rem;
+  margin-bottom: 0.5rem;
 }
 
 .activities-list {
@@ -212,69 +205,95 @@
 
 .activity-card {
   display: flex;
-  justify-content: space-between;
   align-items: center;
   padding: 1rem;
-  background-color: #f8f8f8;
-  border-radius: 0.5rem;
-  transition: background-color 0.2s ease;
+  border-radius: 8px;
+  background-color: #f7f7f7;
+  transition: background-color 0.3s ease;
 }
 
 .activity-card:hover {
   background-color: #f0f0f0;
 }
 
+.activity-icon {
+  font-size: 2rem;
+  margin-right: 1rem;
+  min-width: 40px;
+  text-align: center;
+}
+
 .activity-details {
   flex: 1;
+  overflow: hidden;
 }
 
 .activity-title {
   font-weight: 500;
-  color: #333;
-  margin: 0 0 0.25rem 0;
+  margin-bottom: 0.25rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .activity-subtitle {
-  color: #666;
-  font-size: 0.875rem;
-  margin: 0;
+  font-size: 0.85rem;
+  color: #555;
+  margin-bottom: 0.25rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.activity-date {
-  color: #666;
-  font-size: 0.875rem;
-  margin: 0;
-  margin-left: 1rem;
+.activity-points {
+  font-weight: 700;
+  color: #1a5336;
+  font-size: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  min-width: 120px;
+  text-align: right;
 }
 
-/* Responsive adjustments */
+.activity-points .bin-info {
+  font-size: 0.85rem;
+  color: #555;
+  font-weight: normal;
+  margin-bottom: 4px;
+}
+
+.activity-points .points-earned {
+  color: #1a5336;
+  font-weight: bold;
+}
+
+/* Responsive styles */
 @media (max-width: 768px) {
   .dashboard-content {
     padding: 1rem;
   }
-
-  .stats-section {
+  
+  .impact-cards {
     grid-template-columns: 1fr;
   }
-
+  
   .activity-card {
     flex-direction: column;
-    align-items: flex-start;
+    text-align: center;
   }
-
-  .activity-date {
-    margin-left: 0;
+  
+  .activity-icon {
+    margin-right: 0;
+    margin-bottom: 0.5rem;
+  }
+  
+  .activity-points {
     margin-top: 0.5rem;
+    align-items: center;
   }
-}
-
-.dashboard-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid #e0e0e0;
+  
+  .activity-points .bin-info {
+    margin-bottom: 2px;
+  }
 }
 
 /* Custom animations */
