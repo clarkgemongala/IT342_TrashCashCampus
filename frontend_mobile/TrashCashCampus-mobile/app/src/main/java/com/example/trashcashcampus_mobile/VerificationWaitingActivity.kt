@@ -45,16 +45,10 @@ class VerificationWaitingActivity : AppCompatActivity() {
     }
 
     private fun resendVerificationEmail() {
-        // Use the API client to request verification email
+        // Use the API client to request password reset (since that's what sends an email)
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                // Create a map with email and isVerification flag
-                val requestMap = mapOf(
-                    "email" to userEmail,
-                    "isVerification" to "true"
-                )
-                
-                val response = ApiClient.requestPasswordReset(this@VerificationWaitingActivity, userEmail, isVerification = true)
+                val response = ApiClient.requestPasswordReset(this@VerificationWaitingActivity, userEmail)
                 
                 withContext(Dispatchers.Main) {
                     if (response != null) {
