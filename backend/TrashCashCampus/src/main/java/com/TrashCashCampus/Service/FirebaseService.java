@@ -130,23 +130,19 @@ public class FirebaseService {
             
         UserRecord userRecord = firebaseAuth.createUser(request);
         
-        // Use Firebase's built-in email verification
         try {
+            // Generate a verification email link and let Firebase send it
             ActionCodeSettings actionCodeSettings = ActionCodeSettings.builder()
                 .setUrl("https://trashcash-campus.netlify.app/emailVerified")
                 .setHandleCodeInApp(false)
                 .build();
             
-            String link = firebaseAuth.generateEmailVerificationLink(email, actionCodeSettings);
-            System.out.println("Email verification link generated: " + link);
-            
-            // Actually send the verification email
-            sendVerificationEmail(email, link);
-            
-            System.out.println("Verification email sent to: " + email);
+            // Generate and send the verification email
+            firebaseAuth.generateEmailVerificationLink(email, actionCodeSettings);
+            System.out.println("Verification email sent to: " + email + " via Firebase");
         } catch (FirebaseAuthException e) {
-            System.out.println("Failed to generate verification email: " + e.getMessage());
-            // Continue with user creation even if email link generation fails
+            System.out.println("Failed to send verification email: " + e.getMessage());
+            // Continue with user creation even if email verification fails
         }
         
         return userRecord.getUid();

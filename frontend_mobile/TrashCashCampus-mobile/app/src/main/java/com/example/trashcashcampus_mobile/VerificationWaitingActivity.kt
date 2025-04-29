@@ -2,23 +2,31 @@ package com.example.trashcashcampus_mobile
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.AppCompatButton
 import com.example.trashcashcampus_mobile.utils.ApiClient
+import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 
 class VerificationWaitingActivity : AppCompatActivity() {
+    private val TAG = "VerificationActivity"
     private var userEmail: String = ""
     private var userId: String = ""
+    private lateinit var auth: FirebaseAuth
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_verification_waiting)
+
+        // Initialize Firebase Auth
+        auth = FirebaseAuth.getInstance()
 
         // Get the user email and ID from intent
         userEmail = intent.getStringExtra("email") ?: ""
@@ -52,36 +60,54 @@ class VerificationWaitingActivity : AppCompatActivity() {
             Toast.LENGTH_SHORT
         ).show()
         
-        // Use the API client to request a new verification email
+        // First check if we have a logged-in user or need to sign in first
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                // Request a new verification email
-                val response = ApiClient.requestEmailVerification(this@VerificationWaitingActivity, userEmail)
+                val currentUser = auth.currentUser
                 
-                withContext(Dispatchers.Main) {
-                    if (response != null) {
-                        Toast.makeText(
-                            this@VerificationWaitingActivity,
-                            "Verification email sent to $userEmail. Please check your inbox and spam folder.",
-                            Toast.LENGTH_LONG
-                        ).show()
-                    } else {
-                        Toast.makeText(
-                            this@VerificationWaitingActivity,
-                            "Failed to send verification email. Please try again later.",
-                            Toast.LENGTH_SHORT
-                        ).show()
+                if (currentUser != null && currentUser.email == userEmail) {
+                    // We already have the right user, just send verification email
+                    currentUser.sendEmailVerification().await()
+                    showSuccess()
+                } else {
+                    // Try a temporary login to send verification
+                    try {
+                        // Try accessing our backend to request verification instead
+                        val response = ApiClient.requestEmailVerification(this@VerificationWaitingActivity, userEmail)
+                        if (response != null) {
+                            showSuccess()
+                        } else {
+                            showError("Failed to send verification email through the server.")
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error sending verification email: ${e.message}", e)
+                        showError("Failed to send verification email: ${e.message}")
                     }
                 }
             } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(
-                        this@VerificationWaitingActivity,
-                        "Failed to send verification email: ${e.message}",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
+                Log.e(TAG, "Error sending verification email: ${e.message}", e)
+                showError("Failed to send verification email: ${e.message}")
             }
+        }
+    }
+    
+    private suspend fun showSuccess() {
+        withContext(Dispatchers.Main) {
+            Toast.makeText(
+                this@VerificationWaitingActivity,
+                "Verification email sent to $userEmail. Please check your inbox and spam folder.",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+    
+    private suspend fun showError(message: String) {
+        withContext(Dispatchers.Main) {
+            Toast.makeText(
+                this@VerificationWaitingActivity,
+                message,
+                Toast.LENGTH_LONG
+            ).show()
         }
     }
 }

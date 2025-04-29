@@ -175,16 +175,14 @@ public class AuthController {
         }
         
         try {
-            // Generate a verification email link
+            // Generate a verification email link and let Firebase send it
             ActionCodeSettings actionCodeSettings = ActionCodeSettings.builder()
                 .setUrl("https://trashcash-campus.netlify.app/emailVerified")
                 .setHandleCodeInApp(false)
                 .build();
             
-            String link = firebaseService.getFirebaseAuth().generateEmailVerificationLink(email, actionCodeSettings);
-            
-            // Actually send the email using our sendVerificationEmail method
-            firebaseService.sendVerificationEmail(email, link);
+            // Generate the verification link - Firebase will handle sending the email
+            firebaseService.getFirebaseAuth().generateEmailVerificationLink(email, actionCodeSettings);
             
             Map<String, Object> response = new HashMap<>();
             response.put("message", "Email verification link sent to " + email + ". Please check your inbox and spam folder.");
