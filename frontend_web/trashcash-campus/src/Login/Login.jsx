@@ -1,15 +1,16 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './Login.css';
 import trashCashLogo from '../assets/trashcash-logo.png';
 import recyclingVideo from '../assets/recycling-video.mp4';
 import { auth } from '../firebase';
-import { signOut } from 'firebase/auth';
+import { signOut, signInWithEmailAndPassword } from 'firebase/auth';
 import { useAuth } from '../contexts/AuthContext';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
+import '../styles/global.css';
 
-function Login() {
+const Login = () => {
   const navigate = useNavigate();
   const { isBackendOnline, checkBackendStatus, currentUser, signOut: contextSignOut, login, resetPassword } = useAuth();
   const [email, setEmail] = useState('');
@@ -107,66 +108,16 @@ function Login() {
     return '';
   };
 
-  const handleLoginSubmit = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    // Reset errors
-    setEmailError('');
-    setPasswordError('');
-    setBackendError('');
-    
-    // Validate email before submission
-    const errorMsg = validateEmail(email);
-    if (errorMsg) {
-      setEmailError(errorMsg);
-      return;
-    }
-    
-    // Validate password
-    if (!password.trim()) {
-      setPasswordError('Password is required');
-      return;
-    }
-    
+    setError('');
     setLoading(true);
-    
+
     try {
-      // Check if backend is online
-      if (!isBackendOnline) {
-        setBackendError('Backend service is unavailable. Please try again later.');
-        setLoading(false);
-        return;
-      }
-      
-      // Use the login method from AuthContext which handles both backend and Firebase auth
-      const loginResponse = await login(email, password);
-      
-      // If we're still executing code here, login was successful
-      console.log('Login successful');
-      
-      // Now manually navigate to dashboard since authentication was successful
-      // This is needed because Firebase Auth state change might not trigger due to our workaround
+      await signInWithEmailAndPassword(auth, email, password);
       navigate('/dashboard');
-    } catch (error) {
-      console.error('Login error:', error);
-      
-      if (error.message) {
-        if (error.message.includes('Invalid credentials')) {
-          setPasswordError('Invalid email or password');
-        } else if (error.message.includes('Only administrators')) {
-          setPasswordError('Only administrators can log in to this application');
-        } else if (error.message.includes('User profile not found')) {
-          setPasswordError('User profile not found. Please contact an administrator.');
-        } else {
-          setPasswordError(error.message);
-        }
-      } else if (error.code === 'auth/too-many-requests') {
-        setPasswordError('Too many failed attempts. Please try again later.');
-      } else if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
-        setPasswordError('Invalid email or password');
-      } else {
-        setPasswordError('Authentication failed. Please check your credentials.');
-      }
+    } catch (err) {
+      setError(err.message);
     } finally {
       setLoading(false);
     }
@@ -282,71 +233,48 @@ function Login() {
             <>
               {backendError && <div className="auth-error">{backendError}</div>}
               
-              <form onSubmit={handleLoginSubmit} className="login-form">
+              <form onSubmit={handleSubmit} className="login-form">
+                {error && (
+                  <div className="alert alert-error">
+                    {error}
+                  </div>
+                )}
+
                 <div className="form-group">
-                  <label htmlFor="email">Email</label>
+                  <label className="form-label">Email</label>
                   <input
                     type="email"
-                    id="email"
+                    className="input"
                     value={email}
                     onChange={handleEmailChange}
+                    required
                     placeholder="Enter your email"
-                    className={emailError ? 'input-error' : ''}
                   />
-                  {emailError && <div className="error-message">{emailError}</div>}
                 </div>
-                
+
                 <div className="form-group">
-                  <label htmlFor="password">Password</label>
-                  <div className="password-input-wrapper">
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      id="password"
-                      value={password}
-                      onChange={handlePasswordChange}
-                      placeholder="Enter your password"
-                      className={passwordError ? 'input-error' : ''}
-                    />
-                    <button
-                      type="button"
-                      className="toggle-password"
-                      onClick={togglePasswordVisibility}
-                      aria-label={showPassword ? 'Hide password' : 'Show password'}
-                    >
-                      {showPassword ? (
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
-                          <line x1="1" y1="1" x2="23" y2="23" />
-                        </svg>
-                      ) : (
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                          <circle cx="12" cy="12" r="3" />
-                        </svg>
-                      )}
-                    </button>
-                  </div>
-                  {passwordError && <div className="error-message">{passwordError}</div>}
+                  <label className="form-label">Password</label>
+                  <input
+                    type="password"
+                    className="input"
+                    value={password}
+                    onChange={handlePasswordChange}
+                    required
+                    placeholder="Enter your password"
+                  />
                 </div>
-                
+
                 <button
                   type="submit"
-                  className="login-button"
+                  className="button button-primary"
                   disabled={loading}
                 >
-                  {loading ? 'Logging in...' : 'Login'}
+                  {loading ? (
+                    <span className="loading-spinner" />
+                  ) : (
+                    'Sign In'
+                  )}
                 </button>
-                
-                <div className="additional-options">
-                  <button
-                    type="button"
-                    className="forgot-password"
-                    onClick={handleForgotPassword}
-                    disabled={loading}
-                  >
-                    Forgot Password?
-                  </button>
-                </div>
               </form>
               
               <div className="credential-request">
@@ -414,6 +342,6 @@ function Login() {
       )}
     </div>
   );
-}
+};
 
 export default Login;
