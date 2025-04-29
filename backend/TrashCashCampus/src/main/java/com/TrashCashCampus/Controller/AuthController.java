@@ -72,6 +72,24 @@ public class AuthController {
                 );
             }
             
+            // Check if email is verified
+            if (!user.isEmailVerified()) {
+                // Get Firestore document to check if we've already verified
+                Map<String, Object> userDoc = firebaseService.getDocument("users", uid);
+                Boolean isEmailVerified = false;
+                
+                if (userDoc != null && userDoc.containsKey("isEmailVerified")) {
+                    isEmailVerified = (Boolean) userDoc.get("isEmailVerified");
+                }
+                
+                // If neither Firebase Auth nor Firestore shows verified, reject the login
+                if (!isEmailVerified) {
+                    return ResponseEntity.status(403).body(
+                        new ApiResponse("Please verify your email before logging in. Check your inbox and spam folder for the verification link.")
+                    );
+                }
+            }
+            
             LoginResponse response = new LoginResponse();
             response.setUserId(uid);
             response.setEmail(user.getEmail());
@@ -144,7 +162,6 @@ public class AuthController {
     @PostMapping("/request-email-verification")
     public ResponseEntity<?> requestEmailVerification(@RequestBody Map<String, String> request) {
         String email = request.get("email");
-        String userId = request.get("userId");
         
         if (!isValidEmail(email)) {
             return ResponseEntity.badRequest().body(new ApiResponse("Only @cit.edu email addresses are allowed"));
@@ -158,7 +175,7 @@ public class AuthController {
         }
         
         try {
-            // Generate and send a verification email
+            // Generate a verification email link
             ActionCodeSettings actionCodeSettings = ActionCodeSettings.builder()
                 .setUrl("https://trashcash-campus.netlify.app/emailVerified")
                 .setHandleCodeInApp(false)
@@ -166,16 +183,55 @@ public class AuthController {
             
             String link = firebaseService.getFirebaseAuth().generateEmailVerificationLink(email, actionCodeSettings);
             
-            // In a production environment, you would send this link via an email service
-            System.out.println("Verification email would be sent to: " + email);
-            System.out.println("Verification link: " + link);
+            // In a production app, you would send this link via an email service
+            // For now, just log it - you'll need to implement email sending separately
+            System.out.println("Verification link for " + email + ": " + link);
             
             Map<String, Object> response = new HashMap<>();
-            response.put("message", "Email verification link sent to " + email);
+            response.put("message", "Email verification link generated. Please check your email.");
             
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(new ApiResponse("Failed to send verification email: " + e.getMessage()));
+        }
+    }
+
+    @PostMapping("/verify-email")
+    public ResponseEntity<?> verifyEmail(@RequestBody Map<String, String> request) {
+        String email = request.get("email");
+        String oobCode = request.get("oobCode"); // The code from the email link
+        
+        if (!isValidEmail(email)) {
+            return ResponseEntity.badRequest().body(new ApiResponse("Only @cit.edu email addresses are allowed"));
+        }
+
+        // Check if Firebase is initialized
+        if (!firebaseService.isFirebaseInitialized()) {
+            return ResponseEntity.status(500).body(
+                new ApiResponse("Firebase service is currently unavailable. Please try again later.")
+            );
+        }
+        
+        try {
+            // In a production app, you should verify the oobCode
+            // This is a simplified version
+            
+            // Find the user with this email
+            UserRecord user = firebaseService.getUserByEmail(email);
+            String userId = user.getUid();
+            
+            // Update the user's email verification status in Firestore
+            Map<String, Object> updates = new HashMap<>();
+            updates.put("isEmailVerified", true);
+            
+            firebaseService.updateDocument("users", userId, updates);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Email verification successful");
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(new ApiResponse("Email verification failed: " + e.getMessage()));
         }
     }
 

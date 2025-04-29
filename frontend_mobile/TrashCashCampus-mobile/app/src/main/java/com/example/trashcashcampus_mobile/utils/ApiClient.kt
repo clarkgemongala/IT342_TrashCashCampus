@@ -95,15 +95,25 @@ object ApiClient {
         }
     }
     
-    // New method to request email verification
-    suspend fun requestEmailVerification(context: Context, email: String, userId: String): Map<String, Any>? {
+    // Method to request email verification
+    suspend fun requestEmailVerification(context: Context, email: String): Map<String, Any>? {
         return try {
-            // For now, we're reusing the password reset endpoint
-            // In a production app, we should have a dedicated email verification endpoint
-            val response = api.requestEmailVerification(mapOf("email" to email, "userId" to userId))
+            // Use the dedicated email verification endpoint
+            val response = api.requestEmailVerification(mapOf("email" to email))
             handleResponse(context, response, "Email verification request")
         } catch (e: Exception) {
             handleError(context, e, "requesting email verification")
+            null
+        }
+    }
+    
+    // Method to verify email after clicking the link
+    suspend fun verifyEmail(context: Context, email: String, oobCode: String): Map<String, Any>? {
+        return try {
+            val response = api.verifyEmail(mapOf("email" to email, "oobCode" to oobCode))
+            handleResponse(context, response, "Email verification")
+        } catch (e: Exception) {
+            handleError(context, e, "verifying email")
             null
         }
     }
@@ -254,7 +264,14 @@ object ApiClient {
             // Show a user-friendly message
             val userMessage = when (errorCode) {
                 401 -> "Invalid credentials. Please check your email and password."
-                403 -> "Access denied. You don't have permission for this operation."
+                403 -> {
+                    if (errorMessage.contains("verify your email")) {
+                        // Special handling for email verification required
+                        "Please verify your email before logging in. Check your inbox and spam folder for the verification link."
+                    } else {
+                        "Access denied. You don't have permission for this operation."
+                    }
+                }
                 404 -> "Resource not found. Please try again later."
                 429 -> "Too many requests. Please try again later."
                 500, 502, 503, 504 -> "Server error. Please try again later."
@@ -265,7 +282,12 @@ object ApiClient {
             
             // For authentication errors, always throw an exception so the calling code can handle it
             if (operation == "Login") {
-                throw Exception(errorMessage)
+                // Include information about verification in exception
+                if (errorCode == 403 && errorMessage.contains("verify your email")) {
+                    throw Exception("EMAIL_VERIFICATION_REQUIRED")
+                } else {
+                    throw Exception(errorMessage)
+                }
             }
             
             null

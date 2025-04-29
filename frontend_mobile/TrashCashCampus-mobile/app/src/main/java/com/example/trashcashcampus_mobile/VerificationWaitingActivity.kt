@@ -55,9 +55,8 @@ class VerificationWaitingActivity : AppCompatActivity() {
         // Use the API client to request a new verification email
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                // For now we're using the password reset endpoint since it sends an email
-                // In a production app, we should create a dedicated endpoint for email verification
-                val response = ApiClient.requestEmailVerification(this@VerificationWaitingActivity, userEmail, userId)
+                // Request a new verification email
+                val response = ApiClient.requestEmailVerification(this@VerificationWaitingActivity, userEmail)
                 
                 withContext(Dispatchers.Main) {
                     if (response != null) {

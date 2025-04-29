@@ -94,9 +94,22 @@ class LoginActivity : AppCompatActivity() {
                     // Hide loading overlay
                     LoadingManager.hideLoading(this@LoginActivity)
                     
-                    // Authentication failed
-                    Log.e(tag, "Login failed with exception: ${e.message}")
-                    returnToMainActivity("Authentication failed. Please check your credentials.")
+                    // Check if this is an email verification required error
+                    if (e.message == "EMAIL_VERIFICATION_REQUIRED") {
+                        Log.d(tag, "Email verification required for: $email")
+                        
+                        // Navigate to verification waiting screen
+                        val verificationIntent = Intent(this@LoginActivity, VerificationWaitingActivity::class.java)
+                        verificationIntent.putExtra("email", email)
+                        startActivity(verificationIntent)
+                        
+                        // Return to MainActivity with the verification message
+                        returnToMainActivity("Please verify your email before logging in.")
+                    } else {
+                        // Authentication failed for other reasons
+                        Log.e(tag, "Login failed with exception: ${e.message}")
+                        returnToMainActivity("Authentication failed. Please check your credentials.")
+                    }
                 }
             }
         }

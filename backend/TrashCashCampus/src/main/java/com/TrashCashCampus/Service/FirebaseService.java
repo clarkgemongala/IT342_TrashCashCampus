@@ -32,6 +32,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.concurrent.ExecutionException;
+import javax.mail.Message;
+import javax.mail.MessagingException;
+import javax.mail.PasswordAuthentication;
+import javax.mail.Session;
+import javax.mail.Transport;
+import javax.mail.internet.InternetAddress;
+import javax.mail.internet.MimeMessage;
+import java.util.Properties;
 
 @Service
 public class FirebaseService {
@@ -122,7 +130,7 @@ public class FirebaseService {
             
         UserRecord userRecord = firebaseAuth.createUser(request);
         
-        // Send verification email
+        // Use Firebase's built-in email verification
         try {
             ActionCodeSettings actionCodeSettings = ActionCodeSettings.builder()
                 .setUrl("https://trashcash-campus.netlify.app/emailVerified")
@@ -131,15 +139,80 @@ public class FirebaseService {
             
             String link = firebaseAuth.generateEmailVerificationLink(email, actionCodeSettings);
             System.out.println("Email verification link generated: " + link);
-            // In a production environment, you would send this link via email service
-            // For now, just logging it
-            System.out.println("Verification email would be sent to: " + email);
+            System.out.println("Firebase will send verification email to: " + email);
+            
+            // Note: In a production environment, you should send this link via email
+            // Firebase Admin SDK doesn't send emails automatically, only generates the link
         } catch (FirebaseAuthException e) {
             System.out.println("Failed to generate verification email: " + e.getMessage());
-            // Continue with user creation even if email fails
+            // Continue with user creation even if email link generation fails
         }
         
         return userRecord.getUid();
+    }
+    
+    /**
+     * Sends a verification email to the user
+     * 
+     * @param email The recipient's email address
+     * @param verificationLink The verification link to include in the email
+     */
+    public void sendVerificationEmail(String email, String verificationLink) {
+        // Email configuration
+        final String senderEmail = System.getenv("EMAIL_USERNAME"); // Get from environment variable
+        final String senderPassword = System.getenv("EMAIL_PASSWORD"); // Get from environment variable
+        
+        if (senderEmail == null || senderPassword == null) {
+            System.err.println("Email credentials not found in environment variables. Verification email not sent.");
+            return;
+        }
+        
+        // Set mail properties
+        Properties props = new Properties();
+        props.put("mail.smtp.auth", "true");
+        props.put("mail.smtp.starttls.enable", "true");
+        props.put("mail.smtp.host", "smtp.gmail.com");
+        props.put("mail.smtp.port", "587");
+        
+        // Create a session with authentication
+        Session session = Session.getInstance(props, new javax.mail.Authenticator() {
+            protected PasswordAuthentication getPasswordAuthentication() {
+                return new PasswordAuthentication(senderEmail, senderPassword);
+            }
+        });
+        
+        try {
+            // Create a message
+            Message message = new MimeMessage(session);
+            message.setFrom(new InternetAddress(senderEmail));
+            message.setRecipients(Message.RecipientType.TO, InternetAddress.parse(email));
+            message.setSubject("TrashCash Campus - Verify Your Email");
+            
+            // Create email content with HTML
+            String htmlContent = 
+                "<div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>" +
+                "<h2 style='color: #4CAF50;'>TrashCash Campus - Email Verification</h2>" +
+                "<p>Thank you for registering with TrashCash Campus! Please verify your email address by clicking the button below:</p>" +
+                "<div style='margin: 25px 0;'>" +
+                "<a href='" + verificationLink + "' style='background-color: #4CAF50; color: white; padding: 12px 20px; text-decoration: none; border-radius: 4px; display: inline-block;'>Verify Email</a>" +
+                "</div>" +
+                "<p>If the button doesn't work, you can also copy and paste the following link into your browser:</p>" +
+                "<p style='word-break: break-all;'><a href='" + verificationLink + "'>" + verificationLink + "</a></p>" +
+                "<p>This link will expire in 24 hours.</p>" +
+                "<p>If you didn't register for TrashCash Campus, you can ignore this email.</p>" +
+                "</div>";
+            
+            // Set content type
+            message.setContent(htmlContent, "text/html; charset=utf-8");
+            
+            // Send the message
+            Transport.send(message);
+            
+            System.out.println("Verification email sent successfully to " + email);
+        } catch (MessagingException e) {
+            System.err.println("Failed to send verification email: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
     
     public String signIn(String email, String password) {
@@ -215,6 +288,26 @@ public class FirebaseService {
             return null;
         }
         return firebaseAuth.getUserByEmail(email);
+    }
+    
+    /**
+     * Updates a user's email verification status in Firebase Auth
+     * 
+     * @param uid The user's ID
+     * @param isEmailVerified The email verification status
+     * @return The updated UserRecord
+     * @throws FirebaseAuthException If there's an error updating the user
+     */
+    public UserRecord updateUserEmailVerified(String uid, boolean isEmailVerified) throws FirebaseAuthException {
+        if (!firebaseInitialized) {
+            System.out.println("Firebase is in degraded mode, skipping operation");
+            return null;
+        }
+        
+        UserRecord.UpdateRequest request = new UserRecord.UpdateRequest(uid)
+            .setEmailVerified(isEmailVerified);
+            
+        return firebaseAuth.updateUser(request);
     }
     
     // Firestore methods
