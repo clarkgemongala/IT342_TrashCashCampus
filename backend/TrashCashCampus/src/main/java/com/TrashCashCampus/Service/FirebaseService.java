@@ -365,12 +365,14 @@ public class FirebaseService {
             return null;
         }
         
-        // Configure action code settings - use default Firebase UI for verification
-        // This way users can verify their email without needing a custom frontend page
+        // Configure action code settings
         ActionCodeSettings actionCodeSettings = ActionCodeSettings.builder()
-            // Leave URL null to use Firebase's default handling
-            .setUrl("https://trashcashcampusmobile.firebaseapp.com/__/auth/action")
+            // URL you want to redirect back to. The domain (www.example.com) for this
+            // URL must be whitelisted in the Firebase Console.
+            .setUrl("https://trashcash-campus.netlify.app/verify-email-completed")
+            // This must be true for email link sign-in
             .setHandleCodeInApp(false)
+            .setDynamicLinkDomain(null)
             .build();
         
         try {
@@ -396,10 +398,11 @@ public class FirebaseService {
             return null;
         }
         
-        // Configure action code settings - use default Firebase UI for password reset
+        // Configure action code settings
         ActionCodeSettings actionCodeSettings = ActionCodeSettings.builder()
-            .setUrl("https://trashcashcampusmobile.firebaseapp.com/__/auth/action")
+            .setUrl("https://trashcash-campus.netlify.app/reset-password")
             .setHandleCodeInApp(false)
+            .setDynamicLinkDomain(null)
             .build();
         
         try {
@@ -430,108 +433,5 @@ public class FirebaseService {
         
         // In a real implementation, you might want to use JavaMail, SendGrid, Mailgun, etc.
         // to send additional custom emails beyond what Firebase provides.
-    }
-
-    /**
-     * Checks and synchronizes a user's email verification status between Firebase Auth and Firestore
-     * 
-     * @param email The email to check verification status for
-     * @return true if verification status was updated, false otherwise
-     */
-    public boolean checkAndUpdateVerificationStatus(String email) {
-        if (!firebaseInitialized) {
-            System.out.println("Firebase is in degraded mode, skipping operation");
-            return false;
-        }
-        
-        try {
-            // Get the user from Firebase Auth
-            UserRecord user = firebaseAuth.getUserByEmail(email);
-            
-            if (user == null) {
-                System.out.println("User not found in Firebase Auth: " + email);
-                return false;
-            }
-            
-            // Check if the user is verified in Firebase Auth
-            boolean isVerified = user.isEmailVerified();
-            String uid = user.getUid();
-            
-            if (isVerified) {
-                // User is verified in Firebase Auth, update Firestore
-                try {
-                    Map<String, Object> updates = new HashMap<>();
-                    updates.put("isEmailVerified", true);
-                    
-                    // Try to update using uid as document ID
-                    updateDocument("users", uid, updates);
-                    System.out.println("Updated isEmailVerified to true for user: " + email);
-                    return true;
-                } catch (Exception e) {
-                    System.out.println("Error updating verification status in Firestore: " + e.getMessage());
-                    
-                    // Try to find user by email
-                    try {
-                        Map<String, Object> userDoc = findUserByEmail(email);
-                        
-                        if (userDoc != null && userDoc.containsKey("docId")) {
-                            String docId = (String) userDoc.get("docId");
-                            Map<String, Object> updates = new HashMap<>();
-                            updates.put("isEmailVerified", true);
-                            
-                            updateDocument("users", docId, updates);
-                            System.out.println("Updated isEmailVerified to true for user found by email: " + email);
-                            return true;
-                        }
-                    } catch (Exception e2) {
-                        System.out.println("Error finding user by email: " + e2.getMessage());
-                    }
-                }
-            }
-            
-            return false;
-        } catch (Exception e) {
-            System.out.println("Error checking verification status: " + e.getMessage());
-            return false;
-        }
-    }
-    
-    /**
-     * Creates a Firebase Auth verification check endpoint
-     * This method should be called from a controller endpoint after email verification
-     * 
-     * @param oobCode The out-of-band code from the verification email
-     * @return The email if verification is successful, null otherwise
-     */
-    public String checkActionCode(String oobCode) {
-        if (!firebaseInitialized) {
-            System.out.println("Firebase is in degraded mode, skipping operation");
-            return null;
-        }
-        
-        try {
-            // Check the action code to get the email
-            com.google.firebase.auth.ActionCodeDetails response = 
-                firebaseAuth.checkActionCode(oobCode);
-            
-            if (response != null && response.getEmail() != null) {
-                String email = response.getEmail();
-                
-                if (email != null && !email.isEmpty()) {
-                    // If this is a verification action, apply it
-                    firebaseAuth.applyActionCode(oobCode);
-                    
-                    // Update Firestore document with verification status
-                    checkAndUpdateVerificationStatus(email);
-                    
-                    return email;
-                }
-            }
-            
-            return null;
-        } catch (Exception e) {
-            System.out.println("Error checking action code: " + e.getMessage());
-            return null;
-        }
     }
 } 
