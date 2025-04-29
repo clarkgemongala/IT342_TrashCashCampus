@@ -27,6 +27,8 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCheck, faTimes } from '@fortawesome/free-solid-svg-icons';
 import './Bins.css';
 import './ImagePreview.css';
+import { showNotification } from '../components/Notification';
+import { motion } from 'framer-motion';
 
 // Helper functions for formatting
 const formatWasteType = (wasteType) => {
@@ -276,6 +278,29 @@ const Bins = () => {
   const RTL_BUILDING = "RTL Building";
   const JUNIOR_HIGH = "Junior High Building";
   const NGE_BUILDING = "NGE Building";
+  
+  // Animation variants
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: { 
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1
+      }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { y: 20, opacity: 0 },
+    visible: { 
+      y: 0, 
+      opacity: 1,
+      transition: {
+        type: "spring",
+        stiffness: 100
+      }
+    }
+  };
   
   // Fetch logs when component mounts
   useEffect(() => {
@@ -591,8 +616,10 @@ const Bins = () => {
         setSelectedBin(tempBin);
         setShowTips(true);
       }
+      showNotification("QR code scanned successfully!", "success");
     } catch (error) {
       console.error('Error processing scan:', error);
+      showNotification(error.message, "error");
     }
   };
 
@@ -796,6 +823,7 @@ const Bins = () => {
         console.error("Error submitting recycling activity:", error);
         alert(`Error: ${error.message}`);
       }
+      showNotification("Waste submitted successfully!", "success");
     } catch (error) {
       console.error("Error submitting recycling activity:", error);
       alert(`Error: ${error.message}`);
@@ -2169,30 +2197,46 @@ const Bins = () => {
     if (!isAdmin) return null;
 
     return (
-      <div className="admin-tools-section">
-        <h2>Admin Tools</h2>
-        <button 
-          className="admin-button" 
-          onClick={initializeCampusLocations}
-          disabled={fixingBinLocations}
-        >
-          {fixingBinLocations ? 'Initializing...' : 'Initialize Campus Locations'}
-        </button>
-        <button
-          className="admin-button"
-          onClick={cleanupOldLogs}
-          disabled={cleaningLogs}
-        >
-          {cleaningLogs ? 'Cleaning...' : 'Clean Old Bin Logs'}
-        </button>
-        <button
-          className="admin-button"
-          onClick={fixBinLocations}
-          disabled={fixingBinLocations}
-        >
-          Fix Missing Locations
-        </button>
-      </div>
+      <motion.div
+        variants={containerVariants}
+        initial="hidden"
+        animate="visible"
+        className="bg-white rounded-xl shadow-soft p-6 mb-8"
+      >
+        <h3 className="text-xl font-semibold mb-4 text-text">Admin Tools</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <motion.button
+            variants={itemVariants}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={initializeCampusLocations}
+            className="btn btn-primary"
+            disabled={loading}
+          >
+            Initialize Campus Locations
+          </motion.button>
+          <motion.button
+            variants={itemVariants}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={cleanupOldLogs}
+            className="btn btn-secondary"
+            disabled={cleaningLogs}
+          >
+            Clean Old Bin Logs
+          </motion.button>
+          <motion.button
+            variants={itemVariants}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={fixBinLocations}
+            className="btn btn-outline"
+            disabled={fixingBinLocations}
+          >
+            Fix Missing Locations
+          </motion.button>
+        </div>
+      </motion.div>
     );
   };
 
