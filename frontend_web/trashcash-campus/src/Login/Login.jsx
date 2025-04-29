@@ -192,7 +192,8 @@ function Login() {
     } catch (error) {
       console.error('Login error:', error);
       
-      if (error.message) {
+      // Handle error safely with defaults in case error object is malformed
+      if (error?.message) {
         if (error.message.includes('Invalid credentials')) {
           setPasswordError('Invalid email or password');
         } else if (error.message.includes('Only administrators')) {
@@ -200,11 +201,11 @@ function Login() {
         } else if (error.message.includes('User profile not found')) {
           setPasswordError('User profile not found. Please contact an administrator.');
         } else {
-          setPasswordError(error.message);
+          setPasswordError(error.message || 'Authentication failed');
         }
-      } else if (error.code === 'auth/too-many-requests') {
+      } else if (error?.code === 'auth/too-many-requests') {
         setPasswordError('Too many failed attempts. Please try again later.');
-      } else if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+      } else if (error?.code === 'auth/user-not-found' || error?.code === 'auth/wrong-password') {
         setPasswordError('Invalid email or password');
       } else {
         setPasswordError('Authentication failed. Please check your credentials.');
@@ -303,7 +304,7 @@ function Login() {
           
           {!existingSession && (
             <>
-              {backendError && <animated.div style={fadeIn} className="auth-error">{backendError}</animated.div>}
+              {backendError && <div className="auth-error">{backendError}</div>}
               
               <animated.form onSubmit={handleLoginSubmit} className="login-form">
                 <div className="form-group">
@@ -324,16 +325,9 @@ function Login() {
                     />
                   </animated.div>
                   {emailError && 
-                    <animated.div 
-                      className="error-message"
-                      style={useSpring({
-                        from: { opacity: 0, height: 0 },
-                        to: { opacity: 1, height: 20 },
-                        config: config.gentle
-                      })}
-                    >
+                    <div className="error-message">
                       {emailError}
-                    </animated.div>
+                    </div>
                   }
                 </div>
                 
@@ -373,16 +367,9 @@ function Login() {
                     </button>
                   </animated.div>
                   {passwordError && 
-                    <animated.div 
-                      className="error-message"
-                      style={useSpring({
-                        from: { opacity: 0, height: 0 },
-                        to: { opacity: 1, height: 20 },
-                        config: config.gentle
-                      })}
-                    >
+                    <div className="error-message">
                       {passwordError}
-                    </animated.div>
+                    </div>
                   }
                 </div>
                 
@@ -460,16 +447,9 @@ function Login() {
                       </div>
                     </div>
                     {requestEmailError && 
-                      <animated.div 
-                        className="error-message"
-                        style={useSpring({
-                          from: { opacity: 0, height: 0 },
-                          to: { opacity: 1, height: 20 },
-                          config: config.gentle
-                        })}
-                      >
-                        <i className="error-icon">⚠️</i> {requestEmailError}
-                      </animated.div>
+                      <div className="error-message">
+                        {requestEmailError}
+                      </div>
                     }
                   </div>
                   <animated.button 
