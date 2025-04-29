@@ -8,6 +8,7 @@ import { signOut } from 'firebase/auth';
 import { useAuth } from '../contexts/AuthContext';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
+import { useSpring, animated, config } from '@react-spring/web';
 
 function Login() {
   const navigate = useNavigate();
@@ -28,6 +29,47 @@ function Login() {
   
   // Check for existing session and provide a way to sign out
   const [existingSession, setExistingSession] = useState(false);
+  
+  // Animation states
+  const [formFocus, setFormFocus] = useState(false);
+  
+  // Spring animations
+  const formAnimation = useSpring({
+    from: { opacity: 0, transform: 'translateY(30px)' },
+    to: { opacity: 1, transform: 'translateY(0)' },
+    config: config.gentle,
+    delay: 300
+  });
+  
+  const titleAnimation = useSpring({
+    from: { opacity: 0, transform: 'translateY(-20px)' },
+    to: { opacity: 1, transform: 'translateY(0)' },
+    config: config.gentle
+  });
+  
+  const fadeIn = useSpring({
+    from: { opacity: 0 },
+    to: { opacity: 1 },
+    config: { duration: 1000 }
+  });
+  
+  const overlayAnimation = useSpring({
+    from: { opacity: 0, transform: 'scale(0.9)' },
+    to: { opacity: 1, transform: 'scale(1)' },
+    config: config.gentle,
+    delay: 500
+  });
+  
+  const modalAnimation = useSpring({
+    opacity: showModal ? 1 : 0,
+    transform: showModal ? 'translateY(0)' : 'translateY(-40px)',
+    config: config.gentle
+  });
+  
+  const inputFocusProps = useSpring({
+    boxShadow: formFocus ? '0 0 0 3px rgba(26, 83, 54, 0.3)' : '0 0 0 0px rgba(26, 83, 54, 0)',
+    config: config.gentle
+  });
   
   // Redirect if already logged in
   useEffect(() => {
@@ -240,65 +282,93 @@ function Login() {
           <source src={recyclingVideo} type="video/mp4" />
           Your browser does not support the video tag.
         </video>
-        <div className="video-overlay">
-          <div className="overlay-content">
+        <animated.div style={fadeIn} className="video-overlay">
+          <animated.div style={overlayAnimation} className="overlay-content">
             <h2 className="overlay-title">TrashCash Campus</h2>
             <p className="overlay-tagline">Let's change our earth together</p>
             <div className="overlay-description">
               <p>A sustainable recycling initiative to help our campus reduce waste and promote environmental awareness.</p>
             </div>
-          </div>
-        </div>
+          </animated.div>
+        </animated.div>
       </div>
-      <div className="login-form-section">
+      <animated.div style={formAnimation} className="login-form-section">
         <div className="login-form-container">
-          <img src={trashCashLogo} alt="TrashCash Logo" className="login-logo" />
-          <h2 className="login-title">Admin Login</h2>
+          <animated.img style={titleAnimation} src={trashCashLogo} alt="TrashCash Logo" className="login-logo" />
+          <animated.h2 style={titleAnimation} className="login-title">Admin Login</animated.h2>
           
           {/* Display session notice if already logged in */}
           {existingSession && (
-            <div className="session-notice">
+            <animated.div style={fadeIn} className="session-notice">
               <p>You are already logged in.</p>
               <div className="session-actions">
-                <button 
-                  className="continue-button" 
+                <animated.button 
+                  className="continue-button glow-button" 
                   onClick={() => navigate('/dashboard')}
                   disabled={loading}
+                  whileHover={{ scale: 1.05 }}
                 >
                   Continue to Dashboard
-                </button>
-                <button 
-                  className="signout-button" 
+                </animated.button>
+                <animated.button 
+                  className="signout-button pulse-button" 
                   onClick={handleSignOut}
                   disabled={loading}
                 >
                   Sign Out
-                </button>
+                </animated.button>
               </div>
-            </div>
+            </animated.div>
           )}
           
           {!existingSession && (
             <>
-              {backendError && <div className="auth-error">{backendError}</div>}
+              {backendError && <animated.div style={fadeIn} className="auth-error">{backendError}</animated.div>}
               
-              <form onSubmit={handleLoginSubmit} className="login-form">
+              <animated.form onSubmit={handleLoginSubmit} className="login-form">
                 <div className="form-group">
                   <label htmlFor="email">Email</label>
-                  <input
-                    type="email"
-                    id="email"
-                    value={email}
-                    onChange={handleEmailChange}
-                    placeholder="Enter your email"
-                    className={emailError ? 'input-error' : ''}
-                  />
-                  {emailError && <div className="error-message">{emailError}</div>}
+                  <animated.div 
+                    className="input-wrapper"
+                    style={inputFocusProps}
+                  >
+                    <input
+                      type="email"
+                      id="email"
+                      value={email}
+                      onChange={handleEmailChange}
+                      placeholder="Enter your email"
+                      className={emailError ? 'input-error' : ''}
+                      onFocus={() => setFormFocus(true)}
+                      onBlur={() => setFormFocus(false)}
+                    />
+                    <div className="input-icon">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                        <polyline points="22,6 12,13 2,6"></polyline>
+                      </svg>
+                    </div>
+                  </animated.div>
+                  {emailError && 
+                    <animated.div 
+                      className="error-message"
+                      style={useSpring({
+                        from: { opacity: 0, height: 0 },
+                        to: { opacity: 1, height: 20 },
+                        config: config.gentle
+                      })}
+                    >
+                      {emailError}
+                    </animated.div>
+                  }
                 </div>
                 
                 <div className="form-group">
                   <label htmlFor="password">Password</label>
-                  <div className="password-input-wrapper">
+                  <animated.div 
+                    className="password-input-wrapper"
+                    style={inputFocusProps}
+                  >
                     <input
                       type={showPassword ? 'text' : 'password'}
                       id="password"
@@ -306,6 +376,8 @@ function Login() {
                       onChange={handlePasswordChange}
                       placeholder="Enter your password"
                       className={passwordError ? 'input-error' : ''}
+                      onFocus={() => setFormFocus(true)}
+                      onBlur={() => setFormFocus(false)}
                     />
                     <button
                       type="button"
@@ -325,48 +397,83 @@ function Login() {
                         </svg>
                       )}
                     </button>
-                  </div>
-                  {passwordError && <div className="error-message">{passwordError}</div>}
+                  </animated.div>
+                  {passwordError && 
+                    <animated.div 
+                      className="error-message"
+                      style={useSpring({
+                        from: { opacity: 0, height: 0 },
+                        to: { opacity: 1, height: 20 },
+                        config: config.gentle
+                      })}
+                    >
+                      {passwordError}
+                    </animated.div>
+                  }
                 </div>
                 
-                <button
+                <animated.button
                   type="submit"
                   className="login-button"
                   disabled={loading}
+                  style={useSpring({
+                    scale: loading ? 0.95 : 1,
+                    config: config.gentle
+                  })}
                 >
-                  {loading ? 'Logging in...' : 'Login'}
-                </button>
+                  {loading ? (
+                    <div className="spinner-container">
+                      <div className="spinner"></div>
+                      <span>Logging in...</span>
+                    </div>
+                  ) : 'Login'}
+                </animated.button>
                 
                 <div className="additional-options">
-                  <button
+                  <animated.button
                     type="button"
                     className="forgot-password"
                     onClick={handleForgotPassword}
                     disabled={loading}
+                    style={useSpring({
+                      scale: loading ? 0.95 : 1,
+                      config: config.gentle
+                    })}
                   >
                     Forgot Password?
-                  </button>
+                  </animated.button>
                 </div>
-              </form>
+              </animated.form>
               
-              <div className="credential-request">
+              <animated.div 
+                className="credential-request"
+                style={useSpring({
+                  from: { opacity: 0, transform: 'translateY(20px)' },
+                  to: { opacity: 1, transform: 'translateY(0)' },
+                  delay: 600,
+                  config: config.gentle
+                })}
+              >
                 <p>Don't have credentials yet?</p>
                 <button 
-                  className="request-button"
+                  className="request-button shine-button"
                   onClick={openRequestModal}
                 >
                   Request Access
                 </button>
-              </div>
+              </animated.div>
             </>
           )}
         </div>
-      </div>
+      </animated.div>
 
       {/* Request Credentials Modal */}
       {showModal && (
         <div className="modal-overlay">
-          <div className="modal-content">
+          <animated.div 
+            style={modalAnimation} 
+            className="modal-content"
+          >
             <div className="modal-header">
               <h2>{showConfirmation ? "Request Submitted" : "Request Credentials"}</h2>
               <button className="close-button" onClick={closeModal}>×</button>
@@ -390,13 +497,40 @@ function Login() {
                         <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-.4 4.25l-7.07 4.42c-.32.2-.74.2-1.06 0L4.4 8.25c-.25-.16-.4-.43-.4-.72 0-.67.73-1.07 1.3-.72L12 11l6.7-4.19c.57-.35 1.3.05 1.3.72 0 .29-.15.56-.4.72z" fill="#666"/>
                       </svg>
                     </div>
-                    {requestEmailError && <div className="error-message"><i className="error-icon">⚠️</i> {requestEmailError}</div>}
+                    {requestEmailError && 
+                      <animated.div 
+                        className="error-message"
+                        style={useSpring({
+                          from: { opacity: 0, height: 0 },
+                          to: { opacity: 1, height: 20 },
+                          config: config.gentle
+                        })}
+                      >
+                        <i className="error-icon">⚠️</i> {requestEmailError}
+                      </animated.div>
+                    }
                   </div>
-                  <button type="submit" className="submit-button">Submit Request</button>
+                  <animated.button 
+                    type="submit" 
+                    className="submit-button"
+                    style={useSpring({
+                      scale: loading ? 0.95 : 1,
+                      config: { tension: 300, friction: 10 }
+                    })}
+                  >
+                    Submit Request
+                  </animated.button>
                 </form>
               </div>
             ) : (
-              <div className="modal-body confirmation">
+              <animated.div 
+                className="modal-body confirmation"
+                style={useSpring({
+                  from: { opacity: 0, transform: 'scale(0.8)' },
+                  to: { opacity: 1, transform: 'scale(1)' },
+                  config: { mass: 1, tension: 180, friction: 12 }
+                })}
+              >
                 <div className="confirmation-icon">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="64" height="64">
                     <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" fill="#4caf50"/>
@@ -406,10 +540,19 @@ function Login() {
                   Your request has been submitted. Please wait for confirmation from an administrator.
                   You will receive an email with your credentials once approved.
                 </p>
-                <button className="close-button-centered" onClick={closeModal}>Close</button>
-              </div>
+                <animated.button 
+                  className="close-button-centered"
+                  onClick={closeModal}
+                  style={useSpring({
+                    scale: loading ? 0.95 : 1,
+                    config: { tension: 300, friction: 10 }
+                  })}
+                >
+                  Close
+                </animated.button>
+              </animated.div>
             )}
-          </div>
+          </animated.div>
         </div>
       )}
     </div>
