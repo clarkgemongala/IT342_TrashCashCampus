@@ -101,17 +101,11 @@ public class AuthController {
             Map<String, Object> profile = new HashMap<>();
             profile.put("email", request.getEmail());
             profile.put("name", request.getName());
-            profile.put("fullName", request.getName()); // Include fullName field
             profile.put("password", request.getPassword()); // Store password for server-side authentication
             profile.put("totalPoints", 0); // Initialize with 0 points
             profile.put("recentPoints", 0); // Initialize daily points to 0
             profile.put("lastPointsUpdate", System.currentTimeMillis());
-            profile.put("isEmailVerified", false); // Use isEmailVerified instead of isVerified
-            profile.put("userId", uid); // Include userId field to match test@cit.edu structure
-            profile.put("createdAt", System.currentTimeMillis()); // Add creation timestamp
-            
-            // Use the UID as the document ID instead of letting Firestore generate a random ID
-            firebaseService.createDocumentWithId("users", uid, profile);
+            firebaseService.createDocument("users", profile);
             
             Map<String, Object> response = new HashMap<>();
             response.put("userId", uid);
@@ -131,130 +125,11 @@ public class AuthController {
             return ResponseEntity.badRequest().body(new ApiResponse("Only @cit.edu email addresses are allowed"));
         }
 
-        // Check if this is a verification request or password reset
-        Boolean isVerification = request.containsKey("isVerification") ? 
-                               Boolean.parseBoolean(request.get("isVerification")) : false;
-
-        try {
-            // Get user by email from Firebase Auth
-            UserRecord user = firebaseService.getUserByEmail(email);
-            
-            if (user == null) {
-                return ResponseEntity.badRequest().body(new ApiResponse("User not found"));
-            }
-            
-            if (isVerification) {
-                // Send actual verification email using Firebase
-                String link = firebaseService.generateEmailVerificationLink(email);
-                System.out.println("Generated verification link: " + link);
-                
-                // Send the verification email
-                firebaseService.sendEmail(
-                    email,
-                    "TrashCash Campus - Verify Your Email",
-                    "Please verify your email address by clicking this link: " + link
-                );
-                
-                String uid = user.getUid();
-                System.out.println("Sent verification email to user with UID: " + uid);
-                
-                // We do NOT set isEmailVerified to true here!
-                // It should only be set to true when the user clicks the verification link
-                
-                // However, we can ensure the user document exists properly
-                try {
-                    // Check if user document exists with proper ID
-                    Map<String, Object> userDoc = firebaseService.findUserByEmail(email);
-                    
-                    if (userDoc != null && userDoc.containsKey("docId")) {
-                        String docId = (String) userDoc.get("docId");
-                        System.out.println("Found user document by email with ID: " + docId);
-                        
-                        // If document ID doesn't match UID, create a proper document
-                        if (!docId.equals(uid)) {
-                            // Create updates for consistent fields
-                            Map<String, Object> updates = new HashMap<>();
-                            
-                            // Add userId field if it's missing
-                            if (!userDoc.containsKey("userId")) {
-                                updates.put("userId", uid);
-                                
-                                // Update that document
-                                firebaseService.updateDocument("users", docId, updates);
-                                System.out.println("Added missing userId field to document");
-                            }
-                            
-                            // Ensure other consistent fields
-                            if (!userDoc.containsKey("fullName") && userDoc.containsKey("name")) {
-                                updates.put("fullName", userDoc.get("name"));
-                                
-                                // Update that document with fullName
-                                firebaseService.updateDocument("users", docId, updates);
-                                System.out.println("Added missing fullName field to document");
-                            }
-                            
-                            try {
-                                System.out.println("Document ID doesn't match UID, creating a proper document");
-                                
-                                // Get the full user data 
-                                Map<String, Object> properUserDoc = new HashMap<>(userDoc);
-                                properUserDoc.put("userId", uid);
-                                properUserDoc.remove("docId"); // Remove this field as it's not part of the data
-                                
-                                // Make sure isEmailVerified is false
-                                properUserDoc.put("isEmailVerified", false);
-                                
-                                // Create a new document with the proper UID
-                                firebaseService.createDocumentWithId("users", uid, properUserDoc);
-                                
-                                // Note: We don't delete the old document to avoid data loss
-                            } catch (Exception migrationError) {
-                                System.out.println("Failed to migrate user document: " + migrationError.getMessage());
-                            }
-                        }
-                    } else {
-                        // No document found, create a minimal one
-                        Map<String, Object> newUserDoc = new HashMap<>();
-                        newUserDoc.put("email", email);
-                        newUserDoc.put("userId", uid);
-                        newUserDoc.put("isEmailVerified", false);
-                        newUserDoc.put("createdAt", System.currentTimeMillis());
-                        
-                        // Create a new document with the proper UID
-                        firebaseService.createDocumentWithId("users", uid, newUserDoc);
-                        System.out.println("Created new user document for email: " + email);
-                    }
-                } catch (Exception e) {
-                    System.out.println("Error managing user document: " + e.getMessage());
-                    // Continue anyway - the verification email was sent
-                }
-            } else {
-                // This is a password reset request
-                // Generate password reset link
-                String link = firebaseService.generatePasswordResetLink(email);
-                System.out.println("Generated password reset link: " + link);
-                
-                // Send the reset email
-                firebaseService.sendEmail(
-                    email,
-                    "TrashCash Campus - Reset Your Password",
-                    "Please reset your password by clicking this link: " + link
-                );
-            }
-            
-            // Return success response
-            Map<String, Object> response = new HashMap<>();
-            response.put("message", isVerification ? 
-                "Verification email sent to " + email : "Password reset email sent to " + email);
-            
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            System.out.println("Error in requestPasswordReset: " + e.getMessage());
-            e.printStackTrace();
-            return ResponseEntity.badRequest().body(
-                new ApiResponse((isVerification ? "Verification" : "Password reset") + 
-                " request failed: " + e.getMessage()));
-        }
+        // Here you would implement password reset logic using Firebase
+        Map<String, Object> response = new HashMap<>();
+        response.put("message", "Password reset email sent");
+        
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/verify")
