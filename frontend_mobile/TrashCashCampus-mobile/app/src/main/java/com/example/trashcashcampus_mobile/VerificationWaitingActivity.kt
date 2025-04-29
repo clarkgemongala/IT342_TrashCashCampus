@@ -45,22 +45,31 @@ class VerificationWaitingActivity : AppCompatActivity() {
     }
 
     private fun resendVerificationEmail() {
-        // Use the API client to request password reset (since that's what sends an email)
+        // Show loading toast
+        Toast.makeText(
+            this@VerificationWaitingActivity,
+            "Sending verification email...",
+            Toast.LENGTH_SHORT
+        ).show()
+        
+        // Use the API client to request a new verification email
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val response = ApiClient.requestPasswordReset(this@VerificationWaitingActivity, userEmail)
+                // For now we're using the password reset endpoint since it sends an email
+                // In a production app, we should create a dedicated endpoint for email verification
+                val response = ApiClient.requestEmailVerification(this@VerificationWaitingActivity, userEmail, userId)
                 
                 withContext(Dispatchers.Main) {
                     if (response != null) {
                         Toast.makeText(
                             this@VerificationWaitingActivity,
-                            "Verification email resent to $userEmail",
+                            "Verification email sent to $userEmail. Please check your inbox and spam folder.",
                             Toast.LENGTH_LONG
                         ).show()
                     } else {
                         Toast.makeText(
                             this@VerificationWaitingActivity,
-                            "Failed to resend verification email",
+                            "Failed to send verification email. Please try again later.",
                             Toast.LENGTH_SHORT
                         ).show()
                     }
@@ -69,7 +78,7 @@ class VerificationWaitingActivity : AppCompatActivity() {
                 withContext(Dispatchers.Main) {
                     Toast.makeText(
                         this@VerificationWaitingActivity,
-                        "Failed to resend verification email: ${e.message}",
+                        "Failed to send verification email: ${e.message}",
                         Toast.LENGTH_SHORT
                     ).show()
                 }

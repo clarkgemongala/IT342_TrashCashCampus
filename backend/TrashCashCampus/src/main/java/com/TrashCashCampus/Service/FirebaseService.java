@@ -14,6 +14,7 @@ import com.google.cloud.firestore.DocumentSnapshot;
 import com.google.cloud.firestore.QuerySnapshot;
 import com.google.cloud.firestore.WriteResult;
 import com.google.cloud.firestore.CollectionReference;
+import com.google.firebase.auth.ActionCodeSettings;
 
 import jakarta.annotation.PostConstruct;
 
@@ -120,6 +121,24 @@ public class FirebaseService {
             .setEmailVerified(false);
             
         UserRecord userRecord = firebaseAuth.createUser(request);
+        
+        // Send verification email
+        try {
+            ActionCodeSettings actionCodeSettings = ActionCodeSettings.builder()
+                .setUrl("https://trashcash-campus.netlify.app/emailVerified")
+                .setHandleCodeInApp(false)
+                .build();
+            
+            String link = firebaseAuth.generateEmailVerificationLink(email, actionCodeSettings);
+            System.out.println("Email verification link generated: " + link);
+            // In a production environment, you would send this link via email service
+            // For now, just logging it
+            System.out.println("Verification email would be sent to: " + email);
+        } catch (FirebaseAuthException e) {
+            System.out.println("Failed to generate verification email: " + e.getMessage());
+            // Continue with user creation even if email fails
+        }
+        
         return userRecord.getUid();
     }
     

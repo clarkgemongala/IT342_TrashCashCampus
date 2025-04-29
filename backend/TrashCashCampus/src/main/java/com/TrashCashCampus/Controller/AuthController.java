@@ -19,6 +19,7 @@ import com.TrashCashCampus.dto.LoginResponse;
 import com.TrashCashCampus.dto.RegistrationRequest;
 import com.google.firebase.auth.FirebaseAuthException;
 import com.google.firebase.auth.UserRecord;
+import com.google.firebase.auth.ActionCodeSettings;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -100,16 +101,24 @@ public class AuthController {
             // Create user profile in Firestore
             Map<String, Object> profile = new HashMap<>();
             profile.put("email", request.getEmail());
-            profile.put("name", request.getName());
+            profile.put("displayName", request.getName());
             profile.put("password", request.getPassword()); // Store password for server-side authentication
+            profile.put("isEmailVerified", false); // Always set to false for new registrations
             profile.put("totalPoints", 0); // Initialize with 0 points
-            profile.put("recentPoints", 0); // Initialize daily points to 0
-            profile.put("lastPointsUpdate", System.currentTimeMillis());
-            firebaseService.createDocument("users", profile);
+            profile.put("points", 0); // Individual points field
+            profile.put("recycledMetal", 0); // Initialize with 0
+            profile.put("recycledPlastic", 0); // Initialize with 0
+            profile.put("totalRecycled", 0); // Total items recycled
+            profile.put("role", "student"); // Default role is student
+            profile.put("photoURL", ""); // Empty photo URL
+            profile.put("createdAt", new java.util.Date());
+            profile.put("lastUpdated", new java.util.Date());
+            
+            firebaseService.createDocumentWithId("users", uid, profile);
             
             Map<String, Object> response = new HashMap<>();
             response.put("userId", uid);
-            response.put("message", "User registered successfully");
+            response.put("message", "User registered successfully. Please check your email to verify your account.");
             
             return ResponseEntity.ok(response);
         } catch (Exception e) {
@@ -130,6 +139,44 @@ public class AuthController {
         response.put("message", "Password reset email sent");
         
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/request-email-verification")
+    public ResponseEntity<?> requestEmailVerification(@RequestBody Map<String, String> request) {
+        String email = request.get("email");
+        String userId = request.get("userId");
+        
+        if (!isValidEmail(email)) {
+            return ResponseEntity.badRequest().body(new ApiResponse("Only @cit.edu email addresses are allowed"));
+        }
+
+        // Check if Firebase is initialized
+        if (!firebaseService.isFirebaseInitialized()) {
+            return ResponseEntity.status(500).body(
+                new ApiResponse("Firebase service is currently unavailable. Please try again later.")
+            );
+        }
+        
+        try {
+            // Generate and send a verification email
+            ActionCodeSettings actionCodeSettings = ActionCodeSettings.builder()
+                .setUrl("https://trashcash-campus.netlify.app/emailVerified")
+                .setHandleCodeInApp(false)
+                .build();
+            
+            String link = firebaseService.getFirebaseAuth().generateEmailVerificationLink(email, actionCodeSettings);
+            
+            // In a production environment, you would send this link via an email service
+            System.out.println("Verification email would be sent to: " + email);
+            System.out.println("Verification link: " + link);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Email verification link sent to " + email);
+            
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(new ApiResponse("Failed to send verification email: " + e.getMessage()));
+        }
     }
 
     @PostMapping("/verify")

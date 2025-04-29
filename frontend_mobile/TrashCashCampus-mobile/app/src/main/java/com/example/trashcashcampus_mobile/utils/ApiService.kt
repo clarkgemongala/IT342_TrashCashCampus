@@ -22,6 +22,9 @@ interface ApiService {
     @POST("/api/auth/request-password-reset")
     suspend fun requestPasswordReset(@Body email: Map<String, String>): Response<Map<String, Any>>
 
+    @POST("/api/auth/request-email-verification")
+    suspend fun requestEmailVerification(@Body data: Map<String, String>): Response<Map<String, Any>>
+
     @POST("/api/auth/verify")
     suspend fun verifyToken(@Header("Authorization") token: String): Response<Boolean>
 

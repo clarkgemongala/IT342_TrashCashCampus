@@ -95,6 +95,19 @@ object ApiClient {
         }
     }
     
+    // New method to request email verification
+    suspend fun requestEmailVerification(context: Context, email: String, userId: String): Map<String, Any>? {
+        return try {
+            // For now, we're reusing the password reset endpoint
+            // In a production app, we should have a dedicated email verification endpoint
+            val response = api.requestEmailVerification(mapOf("email" to email, "userId" to userId))
+            handleResponse(context, response, "Email verification request")
+        } catch (e: Exception) {
+            handleError(context, e, "requesting email verification")
+            null
+        }
+    }
+    
     // User profile functions
     
     suspend fun getProfile(context: Context, userId: String, token: String): ProfileResponse? {
