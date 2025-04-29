@@ -37,6 +37,12 @@ export default function Dashboard() {
 
   useEffect(() => {
     async function fetchData() {
+      if (!currentUser) {
+        setError('No user found. Please log in.');
+        setLoading(false);
+        return;
+      }
+
       try {
         setLoading(true);
         setError('');
@@ -51,33 +57,25 @@ export default function Dashboard() {
         if (!userSnapshot.empty) {
           const userData = userSnapshot.docs[0].data();
           setUserData(userData);
+        } else {
+          console.warn('No user data found for:', currentUser.email);
         }
 
         // Fetch recent activities
         const activitiesQuery = query(
           collection(db, 'recycling_activities'),
+          where('userId', '==', currentUser.uid),
           orderBy('timestamp', 'desc'),
           limit(5)
         );
         const activitiesSnapshot = await getDocs(activitiesQuery);
         
-        const activities = [];
-        for (const doc of activitiesSnapshot.docs) {
-          const activity = doc.data();
-          // Fetch user email for each activity
-          const userDoc = await getDocs(query(
-            collection(db, 'users'),
-            where('uid', '==', activity.userId)
-          ));
-          
-          if (!userDoc.empty) {
-            activities.push({
-              ...activity,
-              id: doc.id,
-              userEmail: userDoc.docs[0].data().email
-            });
-          }
-        }
+        const activities = activitiesSnapshot.docs.map(doc => ({
+          ...doc.data(),
+          id: doc.id,
+          userEmail: currentUser.email
+        }));
+        
         setRecentActivities(activities);
       } catch (err) {
         console.error('Error fetching dashboard data:', err);
@@ -105,19 +103,30 @@ export default function Dashboard() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4">
+      <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mb-4"></div>
-        <p className="text-gray-600 text-lg">Loading your recycling dashboard...</p>
+        <p className="text-text-light text-lg">Loading your recycling dashboard...</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4">
+      <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4">
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
           <strong className="font-bold">Error!</strong>
           <span className="block sm:inline"> {error}</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-background p-4">
+        <div className="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded relative" role="alert">
+          <strong className="font-bold">Please log in</strong>
+          <span className="block sm:inline"> You need to be logged in to view this dashboard.</span>
         </div>
       </div>
     );
@@ -128,74 +137,74 @@ export default function Dashboard() {
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8"
+      className="min-h-screen bg-background p-4 sm:p-6 lg:p-8"
     >
       {/* Stats Grid */}
       <motion.div variants={itemVariants} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <div className="bg-white rounded-lg shadow p-6 hover-lift">
+        <div className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow duration-200 p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-500 text-sm">Total Recycled</p>
-              <p className="text-2xl font-bold text-gray-900">{userData?.totalRecycled || 0} kg</p>
+              <p className="text-text-light text-sm">Total Recycled</p>
+              <p className="text-2xl font-bold text-text">{userData?.totalRecycled || 0} kg</p>
             </div>
             <FaRecycle className="text-3xl text-primary" />
           </div>
         </div>
-        <div className="bg-white rounded-lg shadow p-6 hover-lift">
+        <div className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow duration-200 p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-500 text-sm">Trees Saved</p>
-              <p className="text-2xl font-bold text-gray-900">{impact.trees}</p>
+              <p className="text-text-light text-sm">Trees Saved</p>
+              <p className="text-2xl font-bold text-text">{impact.trees}</p>
             </div>
-            <FaTree className="text-3xl text-green-500" />
+            <FaTree className="text-3xl text-secondary" />
           </div>
         </div>
-        <div className="bg-white rounded-lg shadow p-6 hover-lift">
+        <div className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow duration-200 p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-500 text-sm">Water Saved</p>
-              <p className="text-2xl font-bold text-gray-900">{impact.water}L</p>
+              <p className="text-text-light text-sm">Water Saved</p>
+              <p className="text-2xl font-bold text-text">{impact.water}L</p>
             </div>
-            <FaWater className="text-3xl text-blue-500" />
+            <FaWater className="text-3xl text-accent" />
           </div>
         </div>
-        <div className="bg-white rounded-lg shadow p-6 hover-lift">
+        <div className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow duration-200 p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-gray-500 text-sm">CO₂ Reduced</p>
-              <p className="text-2xl font-bold text-gray-900">{impact.emissions}kg</p>
+              <p className="text-text-light text-sm">CO₂ Reduced</p>
+              <p className="text-2xl font-bold text-text">{impact.emissions}kg</p>
             </div>
-            <FaLeaf className="text-3xl text-green-600" />
+            <FaLeaf className="text-3xl text-primary" />
           </div>
         </div>
       </motion.div>
 
       {/* Recent Activities */}
-      <motion.div variants={itemVariants} className="bg-white rounded-lg shadow">
+      <motion.div variants={itemVariants} className="bg-white rounded-xl shadow-sm">
         <div className="p-6 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">Recent Activities</h2>
+          <h2 className="text-xl font-semibold text-text">Recent Activities</h2>
         </div>
         <div className="p-6">
           {recentActivities.length === 0 ? (
-            <p className="text-gray-500 text-center py-4">No recent activities found.</p>
+            <p className="text-text-light text-center py-4">No recent activities found.</p>
           ) : (
             <div className="space-y-4">
-              {recentActivities.map((activity, index) => (
+              {recentActivities.map((activity) => (
                 <motion.div
                   key={activity.id}
                   variants={itemVariants}
-                  className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors duration-200"
+                  className="flex items-center justify-between p-4 bg-background rounded-lg hover:bg-gray-50 transition-colors duration-200"
                 >
                   <div>
-                    <p className="text-sm font-medium text-gray-900">
+                    <p className="text-sm font-medium text-text">
                       {activity.userEmail === currentUser.email ? 'You' : activity.userEmail}
                     </p>
-                    <p className="text-sm text-gray-500">
-                      Recycled {activity.weight}kg at {activity.location}
+                    <p className="text-sm text-text-light">
+                      Recycled {activity.weight || 0}kg at {activity.location || 'Unknown Location'}
                     </p>
                   </div>
-                  <p className="text-sm text-gray-400">
-                    {format(activity.timestamp?.toDate(), 'MMM d, yyyy')}
+                  <p className="text-sm text-text-light">
+                    {activity.timestamp?.toDate ? format(activity.timestamp.toDate(), 'MMM d, yyyy') : 'Unknown Date'}
                   </p>
                 </motion.div>
               ))}
