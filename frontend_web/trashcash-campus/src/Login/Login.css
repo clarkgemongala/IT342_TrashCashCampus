@@ -187,9 +187,24 @@
   transition: all 0.3s ease;
 }
 
+.input-icon {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #666;
+  pointer-events: none;
+  width: 22px;
+  height: 22px;
+}
+
 input {
   width: 100%;
-  padding: 0.8rem 0.8rem 0.8rem 2.5rem;
+  padding: 0.8rem 0.8rem 0.8rem 2.8rem;
   border: 1px solid #e0e0e0;
   border-radius: 8px;
   font-size: 1rem;
@@ -214,21 +229,6 @@ input.input-error:focus {
   box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.25);
 }
 
-.input-icon {
-  position: absolute;
-  left: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 5;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #666;
-  pointer-events: none;
-  width: 20px;
-  height: 20px;
-}
-
 .password-input-wrapper {
   position: relative;
   border-radius: 8px;
@@ -237,14 +237,20 @@ input.input-error:focus {
 }
 
 .password-input-wrapper .input-icon {
-  left: 12px;
-  z-index: 5;
+  left: 10px;
+  z-index: 10;
 }
 
 .password-input-wrapper input {
   width: 100%;
-  padding: 0.8rem 0.8rem 0.8rem 2.5rem;
-  padding-right: 40px; /* Space for the toggle password button */
+  padding: 0.8rem 2.8rem 0.8rem 2.8rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 1rem;
+  outline: none;
+  box-sizing: border-box;
+  transition: all 0.3s ease;
+  background-color: #f9f9f9;
 }
 
 .toggle-password {
@@ -261,7 +267,7 @@ input.input-error:focus {
   justify-content: center;
   color: #666;
   transition: all 0.2s ease;
-  z-index: 6; /* Higher than the input-icon */
+  z-index: 12;
 }
 
 .login-button {
@@ -825,22 +831,22 @@ button:disabled {
 
 .modal-body .input-icon {
   position: absolute;
-  left: 12px;
+  left: 10px;
   top: 50%;
   transform: translateY(-50%);
-  z-index: 5;
+  z-index: 10;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #666;
   pointer-events: none;
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
 }
 
 .modal-body input {
   width: 100%;
-  padding: 0.8rem 0.8rem 0.8rem 2.5rem;
+  padding: 0.8rem 0.8rem 0.8rem 2.8rem;
   border: 1px solid #e0e0e0;
   border-radius: 8px;
   font-size: 1rem;
