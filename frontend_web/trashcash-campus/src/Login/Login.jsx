@@ -8,7 +8,6 @@ import { signOut, signInWithEmailAndPassword } from 'firebase/auth';
 import { useAuth } from '../contexts/AuthContext';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
-import '../styles/global.css';
 
 const Login = () => {
   const navigate = useNavigate();
