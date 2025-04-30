@@ -38,9 +38,8 @@
                 android:layout_marginTop="32dp"
                 android:text="Welcome back"
                 android:textColor="#333333"
-                android:textSize="32sp"
+                android:textSize="30sp"
                 android:textStyle="bold"
-                android:fontFamily="sans-serif-medium"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toBottomOf="@+id/ivLoginIllustration" />
@@ -49,7 +48,7 @@
                 android:id="@+id/loginLayout"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="40dp"
+                android:layout_marginTop="32dp"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintTop_toBottomOf="@+id/tvWelcome">
@@ -62,8 +61,6 @@
                     android:textColor="#333333"
                     android:textSize="16sp"
                     android:textStyle="bold"
-                    android:fontFamily="sans-serif-medium"
-                    android:layout_marginStart="4dp"
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintTop_toTopOf="parent" />
 
@@ -75,12 +72,9 @@
                     android:background="@drawable/bg_input_field_rounded"
                     android:hint="Enter your email"
                     android:inputType="textEmailAddress"
-                    android:padding="18dp"
+                    android:padding="16dp"
                     android:textColor="#333333"
-                    android:textColorHint="#CCCCCC"
-                    android:textSize="16sp"
-                    android:textCursorDrawable="@drawable/cursor_green"
-                    android:elevation="0dp"
+                    android:textColorHint="#BBBBBB"
                     app:layout_constraintEnd_toEndOf="parent"
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintTop_toBottomOf="@+id/tvEmailLabel" />
@@ -94,40 +88,39 @@
                     android:textColor="#333333"
                     android:textSize="16sp"
                     android:textStyle="bold"
-                    android:fontFamily="sans-serif-medium"
-                    android:layout_marginStart="4dp"
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintTop_toBottomOf="@+id/etEmail" />
 
-                <EditText
-                    android:id="@+id/etPassword"
+                <FrameLayout
+                    android:id="@+id/flPassword"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:background="@drawable/bg_input_field_rounded"
-                    android:hint="Enter your password"
-                    android:inputType="textPassword"
-                    android:padding="18dp"
-                    android:textColor="#333333"
-                    android:textColorHint="#CCCCCC"
-                    android:textSize="16sp"
-                    android:textCursorDrawable="@drawable/cursor_green"
-                    android:elevation="0dp"
                     app:layout_constraintEnd_toEndOf="parent"
                     app:layout_constraintStart_toStartOf="parent"
-                    app:layout_constraintTop_toBottomOf="@+id/tvPasswordLabel" />
+                    app:layout_constraintTop_toBottomOf="@+id/tvPasswordLabel">
 
-                <ImageButton
-                    android:id="@+id/btnTogglePasswordVisibility"
-                    android:layout_width="48dp"
-                    android:layout_height="0dp"
-                    android:layout_marginEnd="2dp"
-                    android:background="@null"
-                    android:contentDescription="Toggle password visibility"
-                    android:src="@drawable/ic_visibility_off"
-                    app:layout_constraintBottom_toBottomOf="@+id/etPassword"
-                    app:layout_constraintEnd_toEndOf="@+id/etPassword"
-                    app:layout_constraintTop_toTopOf="@+id/etPassword" />
+                    <EditText
+                        android:id="@+id/etPassword"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:background="@drawable/bg_input_field_rounded"
+                        android:hint="Enter your password"
+                        android:inputType="textPassword"
+                        android:padding="16dp"
+                        android:textColor="#333333"
+                        android:textColorHint="#BBBBBB" />
+
+                    <ImageButton
+                        android:id="@+id/btnTogglePasswordVisibility"
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:layout_gravity="end|center_vertical"
+                        android:layout_marginEnd="8dp"
+                        android:background="@null"
+                        android:contentDescription="Toggle password visibility"
+                        android:src="@drawable/ic_visibility_off" />
+                </FrameLayout>
 
                 <TextView
                     android:id="@+id/tvForgotPassword"
@@ -137,24 +130,20 @@
                     android:text="Forgot Password?"
                     android:textColor="#666666"
                     android:textSize="14sp"
-                    android:fontFamily="sans-serif"
                     app:layout_constraintEnd_toEndOf="parent"
-                    app:layout_constraintTop_toBottomOf="@+id/etPassword" />
+                    app:layout_constraintTop_toBottomOf="@+id/flPassword" />
 
                 <androidx.appcompat.widget.AppCompatButton
                     android:id="@+id/btnLogin"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="40dp"
+                    android:layout_marginTop="32dp"
                     android:background="@drawable/bg_button_green"
                     android:padding="16dp"
                     android:text="Login"
                     android:textAlignment="center"
                     android:textAllCaps="false"
-                    android:textColor="@color/white"
-                    android:textSize="18sp"
-                    android:fontFamily="sans-serif-medium"
-                    android:elevation="4dp"
+                    android:textColor="#333333"
                     app:layout_constraintEnd_toEndOf="parent"
                     app:layout_constraintStart_toStartOf="parent"
                     app:layout_constraintTop_toBottomOf="@+id/tvForgotPassword" />
@@ -174,18 +163,16 @@
                         android:layout_height="wrap_content"
                         android:text="Don't have an account? "
                         android:textColor="#666666"
-                        android:textSize="14sp"
-                        android:fontFamily="sans-serif" />
+                        android:textSize="14sp" />
 
                     <TextView
                         android:id="@+id/tvRegister"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text="Register"
-                        android:textColor="@color/primary"
+                        android:textColor="#FF7143"
                         android:textSize="14sp"
-                        android:textStyle="bold"
-                        android:fontFamily="sans-serif-medium" />
+                        android:textStyle="bold" />
                 </LinearLayout>
             </androidx.constraintlayout.widget.ConstraintLayout>
         </androidx.constraintlayout.widget.ConstraintLayout>

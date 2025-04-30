@@ -35,6 +35,7 @@ class LoginActivity : AppCompatActivity() {
         setContentView(R.layout.activity_login)
         
         auth = FirebaseAuth.getInstance()
+        auth.firebaseAuthSettings.setAppVerificationDisabledForTesting(true)
         db = Firebase.firestore
         
         try {
