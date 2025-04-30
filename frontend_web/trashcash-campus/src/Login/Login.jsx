@@ -23,7 +23,9 @@ function Login() {
   const [backendError, setBackendError] = useState('');
   
   // Modal states
-  const [showModal, setShowModal] = useState(false);
+  const [showQRModal, setShowQRModal] = useState(false); // QR code modal hidden by default
+  const [showLoginModal, setShowLoginModal] = useState(false); // Login modal hidden by default
+  const [showRequestModal, setShowRequestModal] = useState(false);
   const [requestEmail, setRequestEmail] = useState('');
   const [requestEmailError, setRequestEmailError] = useState('');
   const [showConfirmation, setShowConfirmation] = useState(false);
@@ -62,8 +64,20 @@ function Login() {
   });
   
   const modalAnimation = useSpring({
-    opacity: showModal ? 1 : 0,
-    transform: showModal ? 'translateY(0)' : 'translateY(-40px)',
+    opacity: showRequestModal ? 1 : 0,
+    transform: showRequestModal ? 'translateY(0)' : 'translateY(-40px)',
+    config: config.gentle
+  });
+  
+  const qrModalAnimation = useSpring({
+    opacity: showQRModal ? 1 : 0,
+    transform: showQRModal ? 'translateY(0)' : 'translateY(-40px)',
+    config: config.gentle
+  });
+  
+  const loginModalAnimation = useSpring({
+    opacity: showLoginModal ? 1 : 0,
+    transform: showLoginModal ? 'translateY(0)' : 'translateY(-40px)',
     config: config.gentle
   });
   
@@ -77,6 +91,19 @@ function Login() {
   
   // Mobile app QR code URL
   const mobileAppDownloadUrl = 'https://drive.google.com/drive/folders/1i6nzjjHB-YMLqaaz6-2FB52CwoFZ3A_l?usp=sharing';
+  
+  // Handle body overflow when modals are open
+  useEffect(() => {
+    if (showQRModal || showLoginModal || showRequestModal) {
+      document.body.classList.add('modal-open');
+    } else {
+      document.body.classList.remove('modal-open');
+    }
+    
+    return () => {
+      document.body.classList.remove('modal-open');
+    };
+  }, [showQRModal, showLoginModal, showRequestModal]);
   
   // Reset body styles and ensure proper page rendering on component mount
   useEffect(() => {
@@ -99,6 +126,8 @@ function Login() {
     if (currentUser) {
       // Instead of immediately redirecting, set a flag
       setExistingSession(true);
+      setShowQRModal(false);
+      setShowLoginModal(false);
     } else {
       setExistingSession(false);
     }
@@ -188,6 +217,25 @@ function Login() {
     setShowAlert(false);
   };
 
+  const openLoginModal = () => {
+    setShowQRModal(false);
+    setShowLoginModal(true);
+  };
+  
+  const closeLoginModal = () => {
+    setShowLoginModal(false);
+    // Reset form fields
+    setEmail('');
+    setPassword('');
+    setEmailError('');
+    setPasswordError('');
+  };
+  
+  const openQRModal = () => {
+    setShowLoginModal(false);
+    setShowQRModal(true);
+  };
+  
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
     
@@ -259,11 +307,11 @@ function Login() {
   
   const openRequestModal = (e) => {
     e.preventDefault();
-    setShowModal(true);
+    setShowRequestModal(true);
   };
   
-  const closeModal = () => {
-    setShowModal(false);
+  const closeRequestModal = () => {
+    setShowRequestModal(false);
     
     // Reset modal state after closing
     setTimeout(() => {
@@ -328,10 +376,9 @@ function Login() {
       <animated.div style={formAnimation} className="login-form-section">
         <div className="login-form-container">
           <animated.img style={titleAnimation} src={trashCashLogo} alt="TrashCash Logo" className="login-logo" />
-          <animated.h2 style={titleAnimation} className="login-title">Admin Login</animated.h2>
           
           {/* Display session notice if already logged in */}
-          {existingSession && (
+          {existingSession ? (
             <animated.div style={fadeIn} className="session-notice">
               <p>You are already logged in.</p>
               <div className="session-actions">
@@ -352,13 +399,41 @@ function Login() {
                 </animated.button>
               </div>
             </animated.div>
+          ) : (
+            <div className="login-options">
+              <animated.h2 style={titleAnimation} className="login-title">TrashCash Portal</animated.h2>
+              <div className="button-container">
+                <button 
+                  className="admin-login-button" 
+                  onClick={openLoginModal}
+                >
+                  Admin Login
+                </button>
+                <button 
+                  className="mobile-app-button" 
+                  onClick={openQRModal}
+                >
+                  Mobile App
+                </button>
+              </div>
+            </div>
           )}
-          
-          {!existingSession && (
-            <>
-              {backendError && <div className="auth-error">{backendError}</div>}
-              
-              <animated.div className="mobile-app-notice">
+        </div>
+      </animated.div>
+
+      {/* QR Code Modal for regular users */}
+      {showQRModal && !existingSession && (
+        <div className="modal-overlay">
+          <animated.div 
+            style={qrModalAnimation} 
+            className="modal-content"
+          >
+            <div className="modal-header">
+              <h2>Mobile App Access</h2>
+              <button className="close-button" onClick={() => setShowQRModal(false)}>×</button>
+            </div>
+            <div className="modal-body">
+              <div className="mobile-app-notice">
                 <h3>Are you lost little child?</h3>
                 <p>This website is for administrators only. If you think you're lost, we have a mobile application.</p>
                 
@@ -373,14 +448,127 @@ function Login() {
                   />
                 </div>
                 <p className="qr-code-instruction">Scan the QR code to download our mobile app</p>
-              </animated.div>
-            </>
-          )}
+              </div>
+            </div>
+          </animated.div>
         </div>
-      </animated.div>
+      )}
+
+      {/* Admin Login Modal */}
+      {showLoginModal && !existingSession && (
+        <div className="modal-overlay">
+          <animated.div 
+            style={loginModalAnimation} 
+            className="modal-content admin-login-modal"
+          >
+            <div className="modal-header">
+              <h2>Admin Login</h2>
+              <button className="close-button" onClick={closeLoginModal}>×</button>
+            </div>
+            <div className="modal-body">
+              {backendError && <div className="auth-error">{backendError}</div>}
+              
+              <form onSubmit={handleLoginSubmit} className="login-form">
+                <div className="form-group">
+                  <label htmlFor="email">Email</label>
+                  <animated.div 
+                    className="input-wrapper"
+                    style={inputFocusProps}
+                  >
+                    <input
+                      type="email"
+                      id="email"
+                      value={email}
+                      onChange={handleEmailChange}
+                      placeholder="Enter your email"
+                      className={emailError ? 'input-error' : ''}
+                      onFocus={() => setFormFocus(true)}
+                      onBlur={() => setFormFocus(false)}
+                    />
+                  </animated.div>
+                  {emailError && 
+                    <div className="error-message">
+                      {emailError}
+                    </div>
+                  }
+                </div>
+                
+                <div className="form-group">
+                  <label htmlFor="password">Password</label>
+                  <animated.div 
+                    className="password-input-wrapper"
+                    style={inputFocusProps}
+                  >
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      id="password"
+                      value={password}
+                      onChange={handlePasswordChange}
+                      placeholder="Enter your password"
+                      className={passwordError ? 'input-error' : ''}
+                      onFocus={() => setFormFocus(true)}
+                      onBlur={() => setFormFocus(false)}
+                    />
+                    <button
+                      type="button"
+                      className="toggle-password"
+                      onClick={togglePasswordVisibility}
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showPassword ? (
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#666666" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                          <line x1="1" y1="1" x2="23" y2="23" />
+                        </svg>
+                      ) : (
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#666666" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                          <circle cx="12" cy="12" r="3" />
+                        </svg>
+                      )}
+                    </button>
+                  </animated.div>
+                  {passwordError && 
+                    <div className="error-message">
+                      {passwordError}
+                    </div>
+                  }
+                </div>
+                
+                <animated.button
+                  type="submit"
+                  className="login-button"
+                  disabled={loading}
+                  style={useSpring({
+                    scale: loading ? 0.95 : 1,
+                    config: config.gentle
+                  })}
+                >
+                  {loading ? (
+                    <div className="spinner-container">
+                      <div className="spinner"></div>
+                      <span>Logging in...</span>
+                    </div>
+                  ) : 'Login'}
+                </animated.button>
+              </form>
+              
+              <div className="credential-request">
+                <p>Don't have credentials yet?</p>
+                <button 
+                  className="request-button shine-button"
+                  onClick={openRequestModal}
+                >
+                  Request Access
+                </button>
+              </div>
+            </div>
+          </animated.div>
+        </div>
+      )}
 
       {/* Request Credentials Modal */}
-      {showModal && (
+      {showRequestModal && (
         <div className="modal-overlay">
           <animated.div 
             style={modalAnimation} 
@@ -388,7 +576,7 @@ function Login() {
           >
             <div className="modal-header">
               <h2>{showConfirmation ? "Request Submitted" : "Request Credentials"}</h2>
-              <button className="close-button" onClick={closeModal}>×</button>
+              <button className="close-button" onClick={closeRequestModal}>×</button>
             </div>
             
             {!showConfirmation ? (
@@ -450,7 +638,7 @@ function Login() {
                 </p>
                 <animated.button 
                   className="close-button-centered"
-                  onClick={closeModal}
+                  onClick={closeRequestModal}
                   style={useSpring({
                     scale: loading ? 0.95 : 1,
                     config: { tension: 300, friction: 10 }
