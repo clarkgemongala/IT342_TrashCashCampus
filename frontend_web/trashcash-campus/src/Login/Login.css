@@ -863,3 +863,81 @@ button:disabled {
   from { opacity: 0; transform: translateX(20px); }
   to { opacity: 1; transform: translateX(0); }
 }
+
+/* Mobile App Notice Styles */
+.mobile-app-notice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  background-color: rgba(255, 255, 255, 0.95);
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  text-align: center;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.mobile-app-notice h3 {
+  font-size: 1.8rem;
+  margin-bottom: 1rem;
+  color: #1a5336;
+  font-weight: 600;
+}
+
+.mobile-app-notice p {
+  font-size: 1.1rem;
+  line-height: 1.5;
+  margin-bottom: 1.5rem;
+  color: #333;
+}
+
+.qr-code-container {
+  background-color: white;
+  padding: 1rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  margin: 1rem 0;
+  display: flex;
+  justify-content: center;
+}
+
+.qr-code-instruction {
+  font-size: 0.95rem;
+  color: #666;
+  margin-top: 1rem;
+  font-style: italic;
+}
+
+/* Animation for QR code on hover */
+.qr-code-container:hover {
+  transform: scale(1.03);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s ease;
+}
+
+/* Media queries for mobile */
+@media (max-width: 768px) {
+  .mobile-app-notice {
+    padding: 1.5rem;
+    max-width: 90%;
+  }
+  
+  .mobile-app-notice h3 {
+    font-size: 1.5rem;
+  }
+  
+  .mobile-app-notice p {
+    font-size: 1rem;
+  }
+  
+  .qr-code-container {
+    padding: 0.75rem;
+  }
+  
+  .qr-code-container svg {
+    width: 160px !important;
+    height: 160px !important;
+  }
+}

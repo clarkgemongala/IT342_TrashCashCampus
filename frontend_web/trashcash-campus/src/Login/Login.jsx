@@ -9,6 +9,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useSpring, animated, config } from '@react-spring/web';
+import { QRCodeSVG } from 'qrcode.react';
 
 function Login() {
   const navigate = useNavigate();
@@ -73,6 +74,9 @@ function Login() {
   
   const [showAlert, setShowAlert] = useState(false);
   const [alertMessage, setAlertMessage] = useState('');
+  
+  // Mobile app QR code URL
+  const mobileAppDownloadUrl = 'https://drive.google.com/drive/folders/1i6nzjjHB-YMLqaaz6-2FB52CwoFZ3A_l?usp=sharing';
   
   // Reset body styles and ensure proper page rendering on component mount
   useEffect(() => {
@@ -200,100 +204,99 @@ function Login() {
       return;
     }
     
-    // Validate password
+    // Check if password is empty
     if (!password.trim()) {
       setPasswordError('Password is required');
+      return;
+    }
+    
+    // Check backend status
+    if (!isBackendOnline) {
+      setBackendError('Backend service is unavailable. Please try again later.');
       return;
     }
     
     setLoading(true);
     
     try {
-      // Check if backend is online
-      if (!isBackendOnline) {
-        setBackendError('Backend service is unavailable. Please try again later.');
-        setLoading(false);
-        return;
-      }
-      
-      // Use the login method from AuthContext which handles both backend and Firebase auth
-      const loginResponse = await login(email, password);
-      
-      // If we're still executing code here, login was successful
-      console.log('Login successful');
-      
-      // Now manually navigate to dashboard since authentication was successful
-      // This is needed because Firebase Auth state change might not trigger due to our workaround
-      navigate('/dashboard');
-    } catch (error) {
-      console.error('Login error:', error);
-      
-      if (error.message) {
-        if (error.message.includes('Invalid credentials')) {
-          displayAlert('Invalid email or password');
-        } else if (error.message.includes('Only administrators')) {
-          displayAlert('Only administrators can log in to this application');
-        } else if (error.message.includes('User profile not found')) {
-          displayAlert('User profile not found. Please contact an administrator.');
+      // Attempt to log in with provided credentials
+      const userCredential = await login(email, password);
+      if (userCredential) {
+        // Fetch user data to check if they are an admin
+        const userDocRef = doc(db, "users", userCredential.user.uid);
+        const userDoc = await getDoc(userDocRef);
+        
+        if (userDoc.exists() && userDoc.data().role === 'admin') {
+          // Login successful, navigate to dashboard
+          navigate('/dashboard');
         } else {
-          displayAlert(error.message);
+          // Not an admin, log them out
+          await signOut(auth);
+          displayAlert('Access denied. This portal is for administrators only.');
         }
+      }
+    } catch (error) {
+      // Handle login errors
+      console.error("Login error:", error);
+      
+      // Provide user-friendly error messages
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+        displayAlert('Invalid email or password. Please try again.');
       } else if (error.code === 'auth/too-many-requests') {
-        displayAlert('Too many failed attempts. Please try again later.');
-      } else if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
-        displayAlert('Invalid email or password');
+        displayAlert('Too many failed login attempts. Please try again later or reset your password.');
       } else {
-        displayAlert('Authentication failed. Please check your credentials.');
+        displayAlert('An error occurred. Please try again later.');
       }
     } finally {
       setLoading(false);
     }
   };
-
+  
   const handleRequestEmailChange = (e) => {
     setRequestEmail(e.target.value);
     if (requestEmailError) setRequestEmailError('');
   };
-
+  
   const openRequestModal = (e) => {
     e.preventDefault();
     setShowModal(true);
   };
-
+  
   const closeModal = () => {
     setShowModal(false);
-    setRequestEmail('');
-    setRequestEmailError('');
     
-    // If we're showing confirmation, reset after closing
-    if (showConfirmation) {
+    // Reset modal state after closing
+    setTimeout(() => {
+      setRequestEmail('');
+      setRequestEmailError('');
       setShowConfirmation(false);
-    }
+    }, 300);
   };
-
+  
   const handleRequestSubmit = (e) => {
     e.preventDefault();
     
-    // Validate the request email
+    // Validate email
     const errorMsg = validateEmail(requestEmail);
     if (errorMsg) {
       setRequestEmailError(errorMsg);
       return;
     }
     
-    // Show confirmation message
+    // Here you would typically send a request to your backend
+    // For now, just show confirmation screen
     setShowConfirmation(true);
     
-    // Here you would typically send the request to your backend
-    console.log('Credential request submitted for:', requestEmail);
-    
-    // Clear the form
-    setRequestEmail('');
+    // In a real application, you would send an API request here
+    // For example:
+    // apiClient.requestAccess(requestEmail)
+    //   .then(() => setShowConfirmation(true))
+    //   .catch(error => setRequestEmailError(error.message));
   };
 
   return (
     <div className="login-container">
-      {/* Alert Notification */}
+      {/* Alert notification */}
       {showAlert && (
         <div className="alert-notification">
           <span className="alert-icon">
@@ -355,107 +358,21 @@ function Login() {
             <>
               {backendError && <div className="auth-error">{backendError}</div>}
               
-              <animated.form onSubmit={handleLoginSubmit} className="login-form">
-                <div className="form-group">
-                  <label htmlFor="email">Email</label>
-                  <animated.div 
-                    className="input-wrapper"
-                    style={inputFocusProps}
-                  >
-                    <input
-                      type="email"
-                      id="email"
-                      value={email}
-                      onChange={handleEmailChange}
-                      placeholder="Enter your email"
-                      className={emailError ? 'input-error' : ''}
-                      onFocus={() => setFormFocus(true)}
-                      onBlur={() => setFormFocus(false)}
-                    />
-                  </animated.div>
-                  {emailError && 
-                    <div className="error-message">
-                      {emailError}
-                    </div>
-                  }
-                </div>
+              <animated.div className="mobile-app-notice">
+                <h3>Are you lost little child?</h3>
+                <p>This website is for administrators only. If you think you're lost, we have a mobile application.</p>
                 
-                <div className="form-group">
-                  <label htmlFor="password">Password</label>
-                  <animated.div 
-                    className="password-input-wrapper"
-                    style={inputFocusProps}
-                  >
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      id="password"
-                      value={password}
-                      onChange={handlePasswordChange}
-                      placeholder="Enter your password"
-                      className={passwordError ? 'input-error' : ''}
-                      onFocus={() => setFormFocus(true)}
-                      onBlur={() => setFormFocus(false)}
-                    />
-                    <button
-                      type="button"
-                      className="toggle-password"
-                      onClick={togglePasswordVisibility}
-                      aria-label={showPassword ? 'Hide password' : 'Show password'}
-                    >
-                      {showPassword ? (
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#666666" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
-                          <line x1="1" y1="1" x2="23" y2="23" />
-                        </svg>
-                      ) : (
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#666666" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                          <circle cx="12" cy="12" r="3" />
-                        </svg>
-                      )}
-                    </button>
-                  </animated.div>
-                  {passwordError && 
-                    <div className="error-message">
-                      {passwordError}
-                    </div>
-                  }
+                <div className="qr-code-container">
+                  <QRCodeSVG
+                    value={mobileAppDownloadUrl}
+                    size={200}
+                    bgColor={"#ffffff"}
+                    fgColor={"#000000"}
+                    level={"H"}
+                    includeMargin={false}
+                  />
                 </div>
-                
-                <animated.button
-                  type="submit"
-                  className="login-button"
-                  disabled={loading}
-                  style={useSpring({
-                    scale: loading ? 0.95 : 1,
-                    config: config.gentle
-                  })}
-                >
-                  {loading ? (
-                    <div className="spinner-container">
-                      <div className="spinner"></div>
-                      <span>Logging in...</span>
-                    </div>
-                  ) : 'Login'}
-                </animated.button>
-              </animated.form>
-              
-              <animated.div 
-                className="credential-request"
-                style={useSpring({
-                  from: { opacity: 0, transform: 'translateY(20px)' },
-                  to: { opacity: 1, transform: 'translateY(0)' },
-                  delay: 600,
-                  config: config.gentle
-                })}
-              >
-                <p>Don't have credentials yet?</p>
-                <button 
-                  className="request-button shine-button"
-                  onClick={openRequestModal}
-                >
-                  Request Access
-                </button>
+                <p className="qr-code-instruction">Scan the QR code to download our mobile app</p>
               </animated.div>
             </>
           )}
