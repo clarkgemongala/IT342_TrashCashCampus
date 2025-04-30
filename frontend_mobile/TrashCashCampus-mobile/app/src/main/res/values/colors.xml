@@ -31,6 +31,10 @@
     <!-- Scanner Colors -->
     <color name="scanner_mask">#99000000</color>
     
+    <!-- Splash Screen Colors -->
+    <color name="splash_start_color">#0D652D</color>
+    <color name="splash_end_color">#1E8E3E</color>
+    
     <!-- Material Design Colors -->
     <color name="design_default_color_primary">@color/primary</color>
 </resources>

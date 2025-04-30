@@ -1,5 +1,7 @@
 package com.example.trashcashcampus_mobile
 
+import android.animation.AnimatorSet
+import android.animation.ObjectAnimator
 import android.content.Intent
 import android.os.Bundle
 import android.text.Editable
@@ -8,9 +10,13 @@ import android.text.TextWatcher
 import android.util.Log
 import android.view.MenuItem
 import android.view.View
+import android.view.animation.AccelerateDecelerateInterpolator
+import android.view.animation.DecelerateInterpolator
+import android.view.animation.OvershootInterpolator
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.ImageButton
+import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.result.ActivityResultLauncher
@@ -45,6 +51,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var loginLayout: ConstraintLayout
     private lateinit var fragmentContainer: FrameLayout
     private lateinit var bottomNavigation: BottomNavigationView
+    private lateinit var ivLoginIllustration: ImageView
+    private lateinit var tvWelcome: TextView
     
     // Firebase Auth
     private lateinit var auth: FirebaseAuth
@@ -104,15 +112,75 @@ class MainActivity : AppCompatActivity() {
             btnTogglePasswordVisibility = findViewById(R.id.btnTogglePasswordVisibility)
             btnLogin = findViewById(R.id.btnLogin)
             tvRegister = findViewById(R.id.tvRegister)
+            ivLoginIllustration = findViewById(R.id.ivLoginIllustration)
+            tvWelcome = findViewById(R.id.tvWelcome)
             
             // Set up listeners
             setupListeners()
             
             // Check backend connectivity
             checkBackendConnection()
+            
+            // Make sure views are visible but transparent for animation
+            ivLoginIllustration.visibility = View.VISIBLE
+            tvWelcome.visibility = View.VISIBLE
+            loginLayout.visibility = View.VISIBLE
+            
+            // Animate the login form elements
+            animateLoginElements()
         } catch (e: Exception) {
             Log.e(TAG, "Error in initializeLoginForm: ${e.message}", e)
             Toast.makeText(this, "Something went wrong. Please try again.", Toast.LENGTH_SHORT).show()
+        }
+    }
+    
+    private fun animateLoginElements() {
+        // Set initial state - move elements off screen or make them invisible
+        ivLoginIllustration.translationY = -100f
+        ivLoginIllustration.alpha = 0f
+        
+        tvWelcome.translationY = 50f
+        tvWelcome.alpha = 0f
+        
+        loginLayout.translationY = 100f
+        loginLayout.alpha = 0f
+        
+        // Animate the illustration first
+        val illustrationAnim = AnimatorSet().apply {
+            playTogether(
+                ObjectAnimator.ofFloat(ivLoginIllustration, "translationY", -100f, 0f),
+                ObjectAnimator.ofFloat(ivLoginIllustration, "alpha", 0f, 1f)
+            )
+            duration = 800
+            interpolator = DecelerateInterpolator()
+        }
+        
+        // Animate the welcome text
+        val welcomeAnim = AnimatorSet().apply {
+            playTogether(
+                ObjectAnimator.ofFloat(tvWelcome, "translationY", 50f, 0f),
+                ObjectAnimator.ofFloat(tvWelcome, "alpha", 0f, 1f)
+            )
+            duration = 600
+            interpolator = DecelerateInterpolator()
+        }
+        
+        // Animate the login form
+        val loginFormAnim = AnimatorSet().apply {
+            playTogether(
+                ObjectAnimator.ofFloat(loginLayout, "translationY", 100f, 0f),
+                ObjectAnimator.ofFloat(loginLayout, "alpha", 0f, 1f)
+            )
+            duration = 600
+            interpolator = DecelerateInterpolator()
+        }
+        
+        // Chain all animations with proper timing
+        AnimatorSet().apply {
+            play(illustrationAnim)
+            play(welcomeAnim).after(200).after(illustrationAnim)
+            play(loginFormAnim).after(150).after(welcomeAnim)
+            start()
         }
     }
     
@@ -137,6 +205,7 @@ class MainActivity : AppCompatActivity() {
     private fun loadFragment(fragment: Fragment) {
         activeFragment = fragment
         supportFragmentManager.beginTransaction()
+            .setCustomAnimations(R.anim.fade_in, R.anim.fade_out)
             .replace(R.id.fragment_container, fragment)
             .commit()
     }
@@ -218,8 +287,22 @@ class MainActivity : AppCompatActivity() {
             togglePasswordVisibility()
         }
         
-        // Set up login button
+        // Set up login button with animation
         btnLogin.setOnClickListener {
+            // Add a small scale animation when button is clicked
+            val scaleDown = ObjectAnimator.ofFloat(btnLogin, "scaleX", 1f, 0.95f).apply {
+                duration = 100
+            }
+            val scaleUp = ObjectAnimator.ofFloat(btnLogin, "scaleX", 0.95f, 1f).apply {
+                duration = 100
+            }
+            
+            AnimatorSet().apply {
+                playSequentially(scaleDown, scaleUp)
+                start()
+            }
+            
+            // Proceed with login attempt
             attemptLogin()
         }
         
@@ -227,6 +310,8 @@ class MainActivity : AppCompatActivity() {
         tvRegister.setOnClickListener {
             val intent = Intent(this, RegisterActivity::class.java)
             startActivity(intent)
+            // Add transition animation
+            overridePendingTransition(R.anim.fade_in, R.anim.fade_out)
         }
         
         // Add text watchers for error clearing
