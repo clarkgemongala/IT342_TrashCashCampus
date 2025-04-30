@@ -23,6 +23,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.AppCompatButton
 import com.example.trashcashcampus_mobile.utils.ApiClient
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.CoroutineScope
@@ -569,6 +570,12 @@ class RegisterActivity : AppCompatActivity() {
                     // Now register with our API to create the Firestore record
                     val response = ApiClient.register(this@RegisterActivity, email, password, username)
                     
+                    if (response == null) {
+                        // Backend API failed, create Firestore record directly as fallback
+                        Log.w(TAG, "Backend API registration failed, using Firestore directly as fallback")
+                        createFirestoreUserDirectly(firebaseUser.uid, email, password, username)
+                    }
+                    
                     withContext(Dispatchers.Main) {
                         // Hide loading state
                         findViewById<RelativeLayout>(R.id.progressOverlay)?.visibility = View.GONE
@@ -619,6 +626,43 @@ class RegisterActivity : AppCompatActivity() {
                     ).show()
                 }
             }
+        }
+    }
+
+    // Fallback method to create user in Firestore directly if backend API fails
+    private fun createFirestoreUserDirectly(userId: String, email: String, password: String, username: String) {
+        try {
+            val db = Firebase.firestore
+            val userRef = db.collection("users").document(userId)
+            
+            // Create user profile with exactly the same fields as the backend would
+            val userData = hashMapOf(
+                "email" to email,
+                "displayName" to username,
+                "password" to password,  // Note: In production, you should not store plain text passwords
+                "isEmailVerified" to false,
+                "totalPoints" to 0,
+                "points" to 0,
+                "recycledMetal" to 0,
+                "recycledPlastic" to 0,
+                "totalRecycled" to 0,
+                "role" to "student",
+                "photoURL" to "",
+                "createdAt" to FieldValue.serverTimestamp(),
+                "lastUpdated" to FieldValue.serverTimestamp(),
+                "uid" to userId // Adding uid field for consistency
+            )
+            
+            // Set the document with the user data
+            userRef.set(userData)
+                .addOnSuccessListener { 
+                    Log.d(TAG, "Firestore user document created successfully with ID: $userId") 
+                }
+                .addOnFailureListener { e -> 
+                    Log.e(TAG, "Error creating Firestore user document: ${e.message}", e) 
+                }
+        } catch (e: Exception) {
+            Log.e(TAG, "Exception creating Firestore user document: ${e.message}", e)
         }
     }
 

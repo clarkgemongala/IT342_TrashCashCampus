@@ -83,6 +83,9 @@ object LoadingManager {
         } catch (e: Exception) {
             // Log any errors but don't crash
             e.printStackTrace()
+            
+            // Ensure dialog reference is cleared even on error
+            loadingDialog = null
         }
     }
 } 

@@ -96,7 +96,7 @@ interface ApiService {
         private const val BASE_URL = PRODUCTION_URL
         
         // Shorter timeout for faster feedback when backend is unavailable
-        private const val CONNECTION_TIMEOUT_SECONDS = 15L
+        private const val CONNECTION_TIMEOUT_SECONDS = 30L
 
         fun create(): ApiService {
             val loggingInterceptor = HttpLoggingInterceptor { message ->

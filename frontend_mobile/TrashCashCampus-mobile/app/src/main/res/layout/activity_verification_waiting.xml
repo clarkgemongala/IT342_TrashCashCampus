@@ -59,10 +59,26 @@
         app:layout_constraintTop_toBottomOf="@+id/tvVerificationInstructions" />
 
     <androidx.appcompat.widget.AppCompatButton
-        android:id="@+id/btnResendEmail"
+        android:id="@+id/btnRefreshStatus"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginTop="32dp"
+        android:background="@drawable/bg_button_green"
+        android:padding="16dp"
+        android:text="Check Verification Status"
+        android:textAlignment="center"
+        android:textAllCaps="false"
+        android:textColor="#333333"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/tvUserEmail"
+        app:layout_constraintWidth_percent="0.9" />
+
+    <androidx.appcompat.widget.AppCompatButton
+        android:id="@+id/btnResendEmail"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
         android:background="@drawable/bg_button_green"
         android:padding="16dp"
         android:text="Resend Verification Email"
@@ -71,7 +87,7 @@
         android:textColor="#333333"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toBottomOf="@+id/tvUserEmail"
+        app:layout_constraintTop_toBottomOf="@+id/btnRefreshStatus"
         app:layout_constraintWidth_percent="0.9" />
 
     <androidx.appcompat.widget.AppCompatButton

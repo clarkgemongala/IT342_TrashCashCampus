@@ -182,7 +182,26 @@ class MainActivity : AppCompatActivity() {
                     navigateToDashboard(userId, email)
                 } else {
                     // Login failed, show error message
-                    Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+                    Log.d(TAG, "Login failed: $message")
+                    
+                    // Show specific feedback based on the error message
+                    if (message == "EMAIL_VERIFICATION_REQUIRED") {
+                        Toast.makeText(this, "Please verify your email before logging in.", Toast.LENGTH_LONG).show()
+                    } else if (message.contains("password")) {
+                        // Password-related errors
+                        Toast.makeText(this, "Invalid password. Please try again.", Toast.LENGTH_LONG).show()
+                        etPassword.requestFocus()
+                        etPassword.error = "Invalid password"
+                    } else if (message.contains("account") || message.contains("user")) {
+                        // Account/user-related errors
+                        Toast.makeText(this, "Account not found. Please check your email.", Toast.LENGTH_LONG).show()
+                        etEmail.requestFocus()
+                        etEmail.error = "Account not found"
+                    } else {
+                        // General error
+                        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+                    }
+                    
                     showLoginForm()
                 }
             } else {

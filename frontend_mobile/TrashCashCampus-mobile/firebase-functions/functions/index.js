@@ -181,3 +181,100 @@ exports.sendVerificationEmailOnCreate = functions.auth.user().onCreate(async (us
     return { success: false, error: error.message };
   }
 });
+
+// This Cloud Function listens for changes to a user's email verification status
+// and updates the corresponding Firestore document
+exports.syncEmailVerificationStatus = functions.auth
+  .user()
+  .onUpdate((change, context) => {
+    // Get the users before and after the update
+    const beforeUser = change.before;
+    const afterUser = change.after;
+
+    // Check if the email verification status has changed from false to true
+    if (!beforeUser.emailVerified && afterUser.emailVerified) {
+      const uid = afterUser.uid;
+      console.log(`User ${uid} has verified their email. Updating Firestore...`);
+
+      // Update the Firestore document
+      return admin.firestore()
+        .collection('users')
+        .doc(uid)
+        .update({
+          isEmailVerified: true,
+          lastUpdated: admin.firestore.FieldValue.serverTimestamp()
+        })
+        .then(() => {
+          console.log(`Successfully updated isEmailVerified for user ${uid} in Firestore`);
+          return null;
+        })
+        .catch(error => {
+          console.error(`Error updating isEmailVerified for user ${uid}:`, error);
+          return null;
+        });
+    }
+    
+    // No relevant change, do nothing
+    return null;
+  });
+
+// Function to check if a user's email is verified
+exports.checkEmailVerificationStatus = functions.https.onCall(async (data, context) => {
+  const userEmail = data.email;
+  const userId = data.userId;
+  
+  if (!userEmail && !userId) {
+    throw new functions.https.HttpsError(
+      'invalid-argument',
+      'Either email or userId is required.'
+    );
+  }
+
+  try {
+    let userRecord;
+    
+    // Get user record based on what's provided
+    if (userId) {
+      userRecord = await admin.auth().getUser(userId);
+    } else if (userEmail) {
+      userRecord = await admin.auth().getUserByEmail(userEmail);
+    }
+    
+    if (!userRecord) {
+      return { 
+        isVerified: false,
+        message: 'User not found' 
+      };
+    }
+    
+    // If verified in Firebase Auth, also ensure Firestore is updated
+    if (userRecord.emailVerified) {
+      try {
+        // Update Firestore record
+        await admin.firestore()
+          .collection('users')
+          .doc(userRecord.uid)
+          .update({
+            isEmailVerified: true,
+            lastUpdated: admin.firestore.FieldValue.serverTimestamp()
+          });
+        
+        console.log(`Updated isEmailVerified for user ${userRecord.uid} in Firestore via checkEmailVerificationStatus`);
+      } catch (error) {
+        console.error(`Error updating Firestore from checkEmailVerificationStatus:`, error);
+      }
+    }
+    
+    return { 
+      isVerified: userRecord.emailVerified,
+      userId: userRecord.uid,
+      message: userRecord.emailVerified ? 'Email is verified' : 'Email is not verified'
+    };
+  } catch (error) {
+    console.error("Error checking verification status:", error);
+    throw new functions.https.HttpsError(
+      'internal',
+      `Error checking verification status: ${error.message}`
+    );
+  }
+});

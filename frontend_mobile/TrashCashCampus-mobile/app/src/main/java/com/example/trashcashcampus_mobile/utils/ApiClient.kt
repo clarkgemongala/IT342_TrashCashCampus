@@ -108,9 +108,9 @@ object ApiClient {
     }
     
     // Method to verify email after clicking the link
-    suspend fun verifyEmail(context: Context, email: String, oobCode: String): Map<String, Any>? {
+    suspend fun verifyEmail(context: Context, email: String, verificationToken: String): Map<String, Any>? {
         return try {
-            val response = api.verifyEmail(mapOf("email" to email, "oobCode" to oobCode))
+            val response = api.verifyEmail(mapOf("email" to email, "verificationToken" to verificationToken))
             handleResponse(context, response, "Email verification")
         } catch (e: Exception) {
             handleError(context, e, "verifying email")
@@ -286,7 +286,7 @@ object ApiClient {
                 if (errorCode == 403 && errorMessage.contains("verify your email")) {
                     throw Exception("EMAIL_VERIFICATION_REQUIRED")
                 } else {
-                    throw Exception(errorMessage)
+                throw Exception(errorMessage)
                 }
             }
             
