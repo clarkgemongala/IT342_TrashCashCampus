@@ -28,6 +28,7 @@ import com.google.firebase.ktx.Firebase
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import java.util.Calendar
 import java.util.Date
@@ -37,6 +38,7 @@ class RegisterActivity : AppCompatActivity() {
     private val TAG = "RegisterActivity" // For logging
 
     private var currentStep = 1
+    private lateinit var auth: FirebaseAuth  // Add Firebase Auth instance
 
     // Store all user inputs for state preservation
     private var userEmail = ""
@@ -49,8 +51,8 @@ class RegisterActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         try {
-            // Initialize Firebase Auth is no longer needed
-            // auth = FirebaseAuth.getInstance()
+            // Initialize Firebase Auth
+            auth = FirebaseAuth.getInstance()
 
             // Restore state if available
             savedInstanceState?.let {
@@ -545,9 +547,6 @@ class RegisterActivity : AppCompatActivity() {
         // Show loading state
         findViewById<RelativeLayout>(R.id.progressOverlay)?.visibility = View.VISIBLE
 
-        // Initialize Firebase Auth
-        val auth = FirebaseAuth.getInstance()
-
         // Launch a coroutine to register with Firebase first, then with our API
         CoroutineScope(Dispatchers.IO).launch {
             try {
@@ -557,7 +556,15 @@ class RegisterActivity : AppCompatActivity() {
                 
                 if (firebaseUser != null) {
                     // Send verification email through Firebase
-                    firebaseUser.sendEmailVerification().await()
+                    try {
+                        // Firebase Auth's built-in verification email
+                        firebaseUser.sendEmailVerification().await()
+                        Log.d(TAG, "Firebase Auth verification email sent successfully")
+                    } catch (e: Exception) {
+                        // If built-in verification fails, the user is still created
+                        // Our Firebase function will take care of sending the verification email
+                        Log.w(TAG, "Firebase Auth verification email failed, relying on cloud function", e)
+                    }
                     
                     // Now register with our API to create the Firestore record
                     val response = ApiClient.register(this@RegisterActivity, email, password, username)

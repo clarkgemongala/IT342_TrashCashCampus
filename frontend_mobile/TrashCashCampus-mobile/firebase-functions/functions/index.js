@@ -3,12 +3,12 @@ const admin = require("firebase-admin");
 const nodemailer = require("nodemailer");
 admin.initializeApp();
 
-// Configure the email transport
+// Configure the email transport using environment variables for security
 const transporter = nodemailer.createTransport({
   service: "outlook",
   auth: {
-    user: "your-service-account@outlook.com", // Replace with your actual email
-    pass: "your-password", // Replace with your actual password
+    user: functions.config().email?.user || process.env.EMAIL_USERNAME || "your-service-account@outlook.com",
+    pass: functions.config().email?.pass || process.env.EMAIL_PASSWORD || "your-password",
   },
 });
 
@@ -25,7 +25,7 @@ exports.sendVerificationEmail = functions.firestore
       }
 
       const mailOptions = {
-        from: "TrashCash Campus <your-service-account@outlook.com>",
+        from: `TrashCash Campus <${functions.config().email?.user || process.env.EMAIL_USERNAME || "your-service-account@outlook.com"}>`,
         to: recipientEmail,
         subject: "Your TrashCash Campus Verification Code",
         html: `
@@ -55,3 +55,129 @@ exports.sendVerificationEmail = functions.firestore
         return null;
       }
     });
+
+// Custom function to send verification emails using Firebase Auth
+exports.sendCustomVerificationEmail = functions.https.onCall(async (data, context) => {
+  // Check if the request is from an authenticated user
+  if (!context.auth) {
+    throw new functions.https.HttpsError(
+      'unauthenticated',
+      'The function must be called while authenticated.'
+    );
+  }
+
+  const userEmail = data.email || context.auth.token.email;
+  
+  if (!userEmail) {
+    throw new functions.https.HttpsError(
+      'invalid-argument',
+      'Email is required.'
+    );
+  }
+
+  try {
+    // Generate a custom verification link
+    const actionCodeSettings = {
+      url: data.continueUrl || 'https://trashcash-campus.netlify.app/emailVerified',
+      handleCodeInApp: false,
+    };
+
+    // Get the user by email
+    const userRecord = await admin.auth().getUserByEmail(userEmail);
+    
+    // Check if email is already verified
+    if (userRecord.emailVerified) {
+      return { 
+        success: true, 
+        message: 'Email is already verified.' 
+      };
+    }
+
+    // Generate the verification link
+    const link = await admin.auth().generateEmailVerificationLink(
+      userEmail,
+      actionCodeSettings
+    );
+
+    // Send custom email using Outlook
+    const mailOptions = {
+      from: `TrashCash Campus <${functions.config().email?.user || process.env.EMAIL_USERNAME || "your-service-account@outlook.com"}>`,
+      to: userEmail,
+      subject: "TrashCash Campus - Verify Your Email",
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h2 style="color: #4CAF50;">TrashCash Campus - Email Verification</h2>
+          <p>Thank you for registering with TrashCash Campus! Please verify your email address by clicking the button below:</p>
+          <div style="margin: 25px 0;">
+            <a href="${link}" style="background-color: #4CAF50; color: white; padding: 12px 20px; text-decoration: none; border-radius: 4px; display: inline-block;">Verify Email</a>
+          </div>
+          <p>If the button doesn't work, copy and paste this link into your browser:</p>
+          <p style="word-break: break-all;"><a href="${link}">${link}</a></p>
+          <p>This link will expire in 24 hours.</p>
+          <p>If you didn't register for TrashCash Campus, you can ignore this email.</p>
+        </div>
+      `,
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log(`Custom verification email sent to ${userEmail}`);
+    
+    return { 
+      success: true, 
+      message: `Verification email sent to ${userEmail}` 
+    };
+  } catch (error) {
+    console.error("Error sending custom verification email:", error);
+    throw new functions.https.HttpsError(
+      'internal',
+      `Error sending verification email: ${error.message}`
+    );
+  }
+});
+
+// When a user is created in Firebase Auth, automatically send a verification email
+exports.sendVerificationEmailOnCreate = functions.auth.user().onCreate(async (user) => {
+  try {
+    if (!user.emailVerified) {
+      // Generate custom verification link
+      const actionCodeSettings = {
+        url: 'https://trashcash-campus.netlify.app/emailVerified',
+        handleCodeInApp: false,
+      };
+
+      // Generate the verification link
+      const link = await admin.auth().generateEmailVerificationLink(
+        user.email,
+        actionCodeSettings
+      );
+
+      // Send custom email using Outlook
+      const mailOptions = {
+        from: `TrashCash Campus <${functions.config().email?.user || process.env.EMAIL_USERNAME || "your-service-account@outlook.com"}>`,
+        to: user.email,
+        subject: "TrashCash Campus - Verify Your Email",
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <h2 style="color: #4CAF50;">TrashCash Campus - Email Verification</h2>
+            <p>Thank you for registering with TrashCash Campus! Please verify your email address by clicking the button below:</p>
+            <div style="margin: 25px 0;">
+              <a href="${link}" style="background-color: #4CAF50; color: white; padding: 12px 20px; text-decoration: none; border-radius: 4px; display: inline-block;">Verify Email</a>
+            </div>
+            <p>If the button doesn't work, copy and paste this link into your browser:</p>
+            <p style="word-break: break-all;"><a href="${link}">${link}</a></p>
+            <p>This link will expire in 24 hours.</p>
+            <p>If you didn't register for TrashCash Campus, you can ignore this email.</p>
+          </div>
+        `,
+      };
+
+      await transporter.sendMail(mailOptions);
+      console.log(`Automatic verification email sent to ${user.email}`);
+      return { success: true };
+    }
+    return null;
+  } catch (error) {
+    console.error("Error sending automatic verification email:", error);
+    return { success: false, error: error.message };
+  }
+});
