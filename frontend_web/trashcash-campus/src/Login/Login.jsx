@@ -10,6 +10,21 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useSpring, animated, config } from '@react-spring/web';
 import { QRCodeSVG } from 'qrcode.react';
+import { createPortal } from 'react-dom';
+
+// Modal component for portal rendering
+const Modal = ({ isOpen, onClose, children, modalClass = "" }) => {
+  if (!isOpen) return null;
+  
+  return createPortal(
+    <div className="modal-overlay">
+      <animated.div className={`modal-content ${modalClass}`}>
+        {children}
+      </animated.div>
+    </div>,
+    document.body
+  );
+};
 
 function Login() {
   const navigate = useNavigate();
@@ -107,17 +122,12 @@ function Login() {
   
   // Reset body styles and ensure proper page rendering on component mount
   useEffect(() => {
-    // Reset any styles that might cause the white screen issue
-    document.body.style.backgroundColor = '';
-    document.body.style.overflow = 'auto';
-    
     // Force layout recalculation 
     document.body.offsetHeight;
     
     return () => {
       // Clean up when component unmounts
-      document.body.style.backgroundColor = '';
-      document.body.style.overflow = '';
+      document.body.classList.remove('modal-open');
     };
   }, []);
   
@@ -218,8 +228,14 @@ function Login() {
   };
 
   const openLoginModal = () => {
+    // Prevent multiple modals from opening
     setShowQRModal(false);
-    setShowLoginModal(true);
+    setShowRequestModal(false);
+    
+    // Slight delay to ensure proper rendering
+    setTimeout(() => {
+      setShowLoginModal(true);
+    }, 10);
   };
   
   const closeLoginModal = () => {
@@ -232,8 +248,37 @@ function Login() {
   };
   
   const openQRModal = () => {
+    // Prevent multiple modals from opening
     setShowLoginModal(false);
-    setShowQRModal(true);
+    setShowRequestModal(false);
+    
+    // Slight delay to ensure proper rendering
+    setTimeout(() => {
+      setShowQRModal(true);
+    }, 10);
+  };
+  
+  const openRequestModal = (e) => {
+    e.preventDefault();
+    // Prevent multiple modals from opening
+    setShowLoginModal(false);
+    setShowQRModal(false);
+    
+    // Slight delay to ensure proper rendering
+    setTimeout(() => {
+      setShowRequestModal(true);
+    }, 10);
+  };
+  
+  const closeRequestModal = () => {
+    setShowRequestModal(false);
+    
+    // Reset modal state after closing
+    setTimeout(() => {
+      setRequestEmail('');
+      setRequestEmailError('');
+      setShowConfirmation(false);
+    }, 300);
   };
   
   const handleLoginSubmit = async (e) => {
@@ -305,22 +350,6 @@ function Login() {
     if (requestEmailError) setRequestEmailError('');
   };
   
-  const openRequestModal = (e) => {
-    e.preventDefault();
-    setShowRequestModal(true);
-  };
-  
-  const closeRequestModal = () => {
-    setShowRequestModal(false);
-    
-    // Reset modal state after closing
-    setTimeout(() => {
-      setRequestEmail('');
-      setRequestEmailError('');
-      setShowConfirmation(false);
-    }, 300);
-  };
-  
   const handleRequestSubmit = (e) => {
     e.preventDefault();
     
@@ -340,6 +369,10 @@ function Login() {
     // apiClient.requestAccess(requestEmail)
     //   .then(() => setShowConfirmation(true))
     //   .catch(error => setRequestEmailError(error.message));
+  };
+
+  const closeQRModal = () => {
+    setShowQRModal(false);
   };
 
   return (
@@ -422,235 +455,214 @@ function Login() {
       </animated.div>
 
       {/* QR Code Modal for regular users */}
-      {showQRModal && !existingSession && (
-        <div className="modal-overlay">
-          <animated.div 
-            style={qrModalAnimation} 
-            className="modal-content"
-          >
-            <div className="modal-header">
-              <h2>Mobile App Access</h2>
-              <button className="close-button" onClick={() => setShowQRModal(false)}>×</button>
-            </div>
-            <div className="modal-body">
-              <div className="mobile-app-notice">
-                <h3>Are you lost little child?</h3>
-                <p>This website is for administrators only. If you think you're lost, we have a mobile application.</p>
-                
-                <div className="qr-code-container">
-                  <QRCodeSVG
-                    value={mobileAppDownloadUrl}
-                    size={200}
-                    bgColor={"#ffffff"}
-                    fgColor={"#000000"}
-                    level={"H"}
-                    includeMargin={false}
-                  />
-                </div>
-                <p className="qr-code-instruction">Scan the QR code to download our mobile app</p>
-              </div>
-            </div>
-          </animated.div>
+      <Modal isOpen={showQRModal && !existingSession} onClose={closeQRModal} modalClass="">
+        <div className="modal-header">
+          <h2>Mobile App Access</h2>
+          <button className="close-button" onClick={closeQRModal}>×</button>
         </div>
-      )}
+        <div className="modal-body">
+          <div className="mobile-app-notice">
+            <h3>Are you lost little child?</h3>
+            <p>This website is for administrators only. If you think you're lost, we have a mobile application.</p>
+            
+            <div className="qr-code-container">
+              <QRCodeSVG
+                value={mobileAppDownloadUrl}
+                size={200}
+                bgColor={"#ffffff"}
+                fgColor={"#000000"}
+                level={"H"}
+                includeMargin={false}
+              />
+            </div>
+            <p className="qr-code-instruction">Scan the QR code to download our mobile app</p>
+          </div>
+        </div>
+      </Modal>
 
       {/* Admin Login Modal */}
-      {showLoginModal && !existingSession && (
-        <div className="modal-overlay">
-          <animated.div 
-            style={loginModalAnimation} 
-            className="modal-content admin-login-modal"
-          >
-            <div className="modal-header">
-              <h2>Admin Login</h2>
-              <button className="close-button" onClick={closeLoginModal}>×</button>
-            </div>
-            <div className="modal-body">
-              {backendError && <div className="auth-error">{backendError}</div>}
-              
-              <form onSubmit={handleLoginSubmit} className="login-form">
-                <div className="form-group">
-                  <label htmlFor="email">Email</label>
-                  <animated.div 
-                    className="input-wrapper"
-                    style={inputFocusProps}
-                  >
-                    <input
-                      type="email"
-                      id="email"
-                      value={email}
-                      onChange={handleEmailChange}
-                      placeholder="Enter your email"
-                      className={emailError ? 'input-error' : ''}
-                      onFocus={() => setFormFocus(true)}
-                      onBlur={() => setFormFocus(false)}
-                    />
-                  </animated.div>
-                  {emailError && 
-                    <div className="error-message">
-                      {emailError}
-                    </div>
-                  }
-                </div>
-                
-                <div className="form-group">
-                  <label htmlFor="password">Password</label>
-                  <animated.div 
-                    className="password-input-wrapper"
-                    style={inputFocusProps}
-                  >
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      id="password"
-                      value={password}
-                      onChange={handlePasswordChange}
-                      placeholder="Enter your password"
-                      className={passwordError ? 'input-error' : ''}
-                      onFocus={() => setFormFocus(true)}
-                      onBlur={() => setFormFocus(false)}
-                    />
-                    <button
-                      type="button"
-                      className="toggle-password"
-                      onClick={togglePasswordVisibility}
-                      aria-label={showPassword ? 'Hide password' : 'Show password'}
-                    >
-                      {showPassword ? (
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#666666" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
-                          <line x1="1" y1="1" x2="23" y2="23" />
-                        </svg>
-                      ) : (
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#666666" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                          <circle cx="12" cy="12" r="3" />
-                        </svg>
-                      )}
-                    </button>
-                  </animated.div>
-                  {passwordError && 
-                    <div className="error-message">
-                      {passwordError}
-                    </div>
-                  }
-                </div>
-                
-                <animated.button
-                  type="submit"
-                  className="login-button"
-                  disabled={loading}
-                  style={useSpring({
-                    scale: loading ? 0.95 : 1,
-                    config: config.gentle
-                  })}
-                >
-                  {loading ? (
-                    <div className="spinner-container">
-                      <div className="spinner"></div>
-                      <span>Logging in...</span>
-                    </div>
-                  ) : 'Login'}
-                </animated.button>
-              </form>
-              
-              <div className="credential-request">
-                <p>Don't have credentials yet?</p>
-                <button 
-                  className="request-button shine-button"
-                  onClick={openRequestModal}
-                >
-                  Request Access
-                </button>
-              </div>
-            </div>
-          </animated.div>
+      <Modal isOpen={showLoginModal && !existingSession} onClose={closeLoginModal} modalClass="admin-login-modal">
+        <div className="modal-header">
+          <h2>Admin Login</h2>
+          <button className="close-button" onClick={closeLoginModal}>×</button>
         </div>
-      )}
-
-      {/* Request Credentials Modal */}
-      {showRequestModal && (
-        <div className="modal-overlay">
-          <animated.div 
-            style={modalAnimation} 
-            className="modal-content"
-          >
-            <div className="modal-header">
-              <h2>{showConfirmation ? "Request Submitted" : "Request Credentials"}</h2>
-              <button className="close-button" onClick={closeRequestModal}>×</button>
+        <div className="modal-body">
+          {backendError && <div className="auth-error">{backendError}</div>}
+          
+          <form onSubmit={handleLoginSubmit} className="login-form">
+            <div className="form-group">
+              <label htmlFor="email">Email</label>
+              <animated.div 
+                className="input-wrapper"
+                style={inputFocusProps}
+              >
+                <input
+                  type="email"
+                  id="email"
+                  value={email}
+                  onChange={handleEmailChange}
+                  placeholder="Enter your email"
+                  className={emailError ? 'input-error' : ''}
+                  onFocus={() => setFormFocus(true)}
+                  onBlur={() => setFormFocus(false)}
+                />
+              </animated.div>
+              {emailError && 
+                <div className="error-message">
+                  {emailError}
+                </div>
+              }
             </div>
             
-            {!showConfirmation ? (
-              <div className="modal-body">
-                <p className="modal-instruction">Please enter your @cit.edu email address to request access credentials:</p>
-                <form onSubmit={handleRequestSubmit}>
-                  <div className="form-group">
-                    <div className="input-container">
-                      <input
-                        type="email"
-                        value={requestEmail}
-                        onChange={handleRequestEmailChange}
-                        placeholder="yourname@cit.edu"
-                        required
-                        className={requestEmailError ? "input-error" : ""}
-                      />
-                      <div className="input-icon">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1a5336" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
-                          <polyline points="22,6 12,13 2,6"></polyline>
-                        </svg>
-                      </div>
-                    </div>
-                    {requestEmailError && 
-                      <div className="error-message">
-                        {requestEmailError}
-                      </div>
-                    }
-                  </div>
-                  <animated.button 
-                    type="submit" 
-                    className="submit-button"
-                    style={useSpring({
-                      scale: loading ? 0.95 : 1,
-                      config: { tension: 300, friction: 10 }
-                    })}
-                  >
-                    Submit Request
-                  </animated.button>
-                </form>
-              </div>
-            ) : (
+            <div className="form-group">
+              <label htmlFor="password">Password</label>
               <animated.div 
-                className="modal-body confirmation"
+                className="password-input-wrapper"
+                style={inputFocusProps}
+              >
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  id="password"
+                  value={password}
+                  onChange={handlePasswordChange}
+                  placeholder="Enter your password"
+                  className={passwordError ? 'input-error' : ''}
+                  onFocus={() => setFormFocus(true)}
+                  onBlur={() => setFormFocus(false)}
+                />
+                <button
+                  type="button"
+                  className="toggle-password"
+                  onClick={togglePasswordVisibility}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#666666" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                      <line x1="1" y1="1" x2="23" y2="23" />
+                    </svg>
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#666666" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  )}
+                </button>
+              </animated.div>
+              {passwordError && 
+                <div className="error-message">
+                  {passwordError}
+                </div>
+              }
+            </div>
+            
+            <animated.button
+              type="submit"
+              className="login-button"
+              disabled={loading}
+              style={useSpring({
+                scale: loading ? 0.95 : 1,
+                config: config.gentle
+              })}
+            >
+              {loading ? (
+                <div className="spinner-container">
+                  <div className="spinner"></div>
+                  <span>Logging in...</span>
+                </div>
+              ) : 'Login'}
+            </animated.button>
+          </form>
+          
+          <div className="credential-request">
+            <p>Don't have credentials yet?</p>
+            <button 
+              className="request-button shine-button"
+              onClick={openRequestModal}
+            >
+              Request Access
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Request Credentials Modal */}
+      <Modal isOpen={showRequestModal} onClose={closeRequestModal} modalClass="">
+        <div className="modal-header">
+          <h2>{showConfirmation ? "Request Submitted" : "Request Credentials"}</h2>
+          <button className="close-button" onClick={closeRequestModal}>×</button>
+        </div>
+        
+        {!showConfirmation ? (
+          <div className="modal-body">
+            <p className="modal-instruction">Please enter your @cit.edu email address to request access credentials:</p>
+            <form onSubmit={handleRequestSubmit}>
+              <div className="form-group">
+                <div className="input-container">
+                  <input
+                    type="email"
+                    value={requestEmail}
+                    onChange={handleRequestEmailChange}
+                    placeholder="yourname@cit.edu"
+                    required
+                    className={requestEmailError ? "input-error" : ""}
+                  />
+                  <div className="input-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1a5336" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                      <polyline points="22,6 12,13 2,6"></polyline>
+                    </svg>
+                  </div>
+                </div>
+                {requestEmailError && 
+                  <div className="error-message">
+                    {requestEmailError}
+                  </div>
+                }
+              </div>
+              <animated.button 
+                type="submit" 
+                className="submit-button"
                 style={useSpring({
-                  from: { opacity: 0, transform: 'scale(0.8)' },
-                  to: { opacity: 1, transform: 'scale(1)' },
-                  config: { mass: 1, tension: 180, friction: 12 }
+                  scale: loading ? 0.95 : 1,
+                  config: { tension: 300, friction: 10 }
                 })}
               >
-                <div className="confirmation-icon">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="64" height="64">
-                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" fill="#4caf50"/>
-                  </svg>
-                </div>
-                <p className="confirmation-message">
-                  Your request has been submitted. Please wait for confirmation from an administrator.
-                  You will receive an email with your credentials once approved.
-                </p>
-                <animated.button 
-                  className="close-button-centered"
-                  onClick={closeRequestModal}
-                  style={useSpring({
-                    scale: loading ? 0.95 : 1,
-                    config: { tension: 300, friction: 10 }
-                  })}
-                >
-                  Close
-                </animated.button>
-              </animated.div>
-            )}
+                Submit Request
+              </animated.button>
+            </form>
+          </div>
+        ) : (
+          <animated.div 
+            className="modal-body confirmation"
+            style={useSpring({
+              from: { opacity: 0, transform: 'scale(0.8)' },
+              to: { opacity: 1, transform: 'scale(1)' },
+              config: { mass: 1, tension: 180, friction: 12 }
+            })}
+          >
+            <div className="confirmation-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="64" height="64">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" fill="#4caf50"/>
+              </svg>
+            </div>
+            <p className="confirmation-message">
+              Your request has been submitted. Please wait for confirmation from an administrator.
+              You will receive an email with your credentials once approved.
+            </p>
+            <animated.button 
+              className="close-button-centered"
+              onClick={closeRequestModal}
+              style={useSpring({
+                scale: loading ? 0.95 : 1,
+                config: { tension: 300, friction: 10 }
+              })}
+            >
+              Close
+            </animated.button>
           </animated.div>
-        </div>
-      )}
+        )}
+      </Modal>
     </div>
   );
 }
