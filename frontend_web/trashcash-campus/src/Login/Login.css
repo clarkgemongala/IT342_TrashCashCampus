@@ -826,7 +826,8 @@ button:disabled {
 .alert-notification {
   position: fixed;
   top: 20px;
-  right: 20px;
+  left: 50%;
+  transform: translateX(-50%);
   padding: 0.75rem 1.25rem;
   margin-bottom: 1rem;
   border: 1px solid transparent;
@@ -837,15 +838,17 @@ button:disabled {
   display: flex;
   align-items: center;
   animation: fadeInAlert 0.3s ease;
-  z-index: 1001;
+  z-index: 2000;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   min-width: 300px;
-  max-width: 350px;
+  max-width: 500px;
+  text-align: center;
 }
 
 .alert-notification .alert-icon {
   margin-right: 10px;
   font-size: 1.25rem;
+  color: #721c24;
 }
 
 .alert-notification .alert-close {
@@ -862,8 +865,8 @@ button:disabled {
 }
 
 @keyframes fadeInAlert {
-  from { opacity: 0; transform: translateX(20px); }
-  to { opacity: 1; transform: translateX(0); }
+  from { opacity: 0; transform: translate(-50%, -10px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
 }
 
 /* Mobile App Notice Styles */
@@ -1013,6 +1016,26 @@ button:disabled {
 /* Admin Login Modal Styles */
 .admin-login-modal {
   max-width: 450px;
+  background-color: white;
+  border-radius: 10px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+}
+
+.admin-login-modal .modal-header {
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #e9ecef;
+  padding: 1rem 1.5rem;
+}
+
+.admin-login-modal .modal-header h2 {
+  font-size: 1.25rem;
+  color: #333;
+  font-weight: 600;
+}
+
+.admin-login-modal .modal-body {
+  padding: 1.5rem;
 }
 
 .admin-login-modal .login-form {
@@ -1020,15 +1043,83 @@ button:disabled {
 }
 
 .admin-login-modal .form-group {
-  margin-bottom: 1.2rem;
+  margin-bottom: 1.5rem;
 }
 
 .admin-login-modal label {
   display: block;
   margin-bottom: 0.5rem;
-  color: #444;
+  color: #333;
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.admin-login-modal input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  background-color: #f5f8ff;
+}
+
+.admin-login-modal input:focus {
+  border-color: #1a5336;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(26, 83, 54, 0.1);
+}
+
+.admin-login-modal .login-button {
+  width: 100%;
+  padding: 0.75rem;
+  background-color: #1a5336;
+  border: none;
+  border-radius: 6px;
+  color: white;
+  font-weight: 500;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.admin-login-modal .login-button:hover {
+  background-color: #134025;
+}
+
+.admin-login-modal .credential-request {
+  margin-top: 1.5rem;
+  text-align: center;
+  border-top: 1px solid #eee;
+  padding-top: 1.5rem;
+}
+
+.admin-login-modal .credential-request p {
+  margin-bottom: 0.75rem;
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.admin-login-modal .request-button {
+  background: transparent;
+  border: 1px solid #1a5336;
+  color: #1a5336;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
   font-size: 0.9rem;
   font-weight: 500;
+  cursor: pointer;
+}
+
+.admin-login-modal .request-button:hover {
+  background-color: rgba(26, 83, 54, 0.05);
+}
+
+.admin-login-modal .close-button {
+  color: #666;
+  font-size: 1.5rem;
+  background: none;
+  border: none;
+  cursor: pointer;
 }
 
 /* QR Code Modal Styles */

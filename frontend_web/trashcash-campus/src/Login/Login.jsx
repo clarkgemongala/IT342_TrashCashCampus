@@ -14,11 +14,26 @@ import { createPortal } from 'react-dom';
 
 // Modal component for portal rendering
 const Modal = ({ isOpen, onClose, children, modalClass = "" }) => {
+  const modalAnimation = useSpring({
+    opacity: isOpen ? 1 : 0,
+    transform: isOpen ? 'translateY(0)' : 'translateY(-40px)',
+    config: { mass: 1, tension: 210, friction: 20 }
+  });
+  
   if (!isOpen) return null;
   
   return createPortal(
-    <div className="modal-overlay">
-      <animated.div className={`modal-content ${modalClass}`}>
+    <div className="modal-overlay" onClick={(e) => {
+      // Close when clicking outside the modal
+      if (e.target.className === 'modal-overlay') {
+        onClose();
+      }
+    }}>
+      <animated.div 
+        className={`modal-content ${modalClass}`} 
+        style={modalAnimation}
+        onClick={(e) => e.stopPropagation()}
+      >
         {children}
       </animated.div>
     </div>,
@@ -213,13 +228,21 @@ function Login() {
 
   // Function to show alert notification
   const displayAlert = (message) => {
-    setAlertMessage(message);
-    setShowAlert(true);
+    // First close any existing alert
+    setShowAlert(false);
     
-    // Auto dismiss after 5 seconds
+    // Set the new message
+    setAlertMessage(message);
+    
+    // Short delay to ensure state update before showing
     setTimeout(() => {
-      setShowAlert(false);
-    }, 5000);
+      setShowAlert(true);
+      
+      // Auto dismiss after 5 seconds
+      setTimeout(() => {
+        setShowAlert(false);
+      }, 5000);
+    }, 10);
   };
   
   // Function to manually close the alert
@@ -314,18 +337,27 @@ function Login() {
     try {
       // Attempt to log in with provided credentials
       const userCredential = await login(email, password);
-      if (userCredential) {
-        // Fetch user data to check if they are an admin
-        const userDocRef = doc(db, "users", userCredential.user.uid);
-        const userDoc = await getDoc(userDocRef);
-        
-        if (userDoc.exists() && userDoc.data().role === 'admin') {
-          // Login successful, navigate to dashboard
-          navigate('/dashboard');
-        } else {
-          // Not an admin, log them out
+      
+      if (userCredential && userCredential.user) {
+        try {
+          // Fetch user data to check if they are an admin
+          const userDocRef = doc(db, "users", userCredential.user.uid);
+          const userDoc = await getDoc(userDocRef);
+          
+          if (userDoc.exists() && userDoc.data().role === 'admin') {
+            // Login successful, clear any errors and navigate to dashboard
+            setShowAlert(false);
+            closeLoginModal();
+            navigate('/dashboard');
+          } else {
+            // Not an admin, log them out
+            await signOut(auth);
+            displayAlert('Access denied. This website is for administrators only.');
+          }
+        } catch (profileError) {
+          console.error("Error fetching user profile:", profileError);
           await signOut(auth);
-          displayAlert('Access denied. This portal is for administrators only.');
+          displayAlert('Unable to verify admin status. Please contact support.');
         }
       }
     } catch (error) {
@@ -333,12 +365,12 @@ function Login() {
       console.error("Login error:", error);
       
       // Provide user-friendly error messages
-      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password') {
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
         displayAlert('Invalid email or password. Please try again.');
       } else if (error.code === 'auth/too-many-requests') {
-        displayAlert('Too many failed login attempts. Please try again later or reset your password.');
+        displayAlert('Too many failed login attempts. Please try again later.');
       } else {
-        displayAlert('An error occurred. Please try again later.');
+        displayAlert('Login failed: ' + (error.message || 'Please try again later'));
       }
     } finally {
       setLoading(false);
