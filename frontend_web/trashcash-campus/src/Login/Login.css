@@ -826,47 +826,57 @@ button:disabled {
 .alert-notification {
   position: fixed;
   top: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 0.75rem 1.25rem;
+  right: 20px;
+  padding: 0.85rem 1.25rem;
   margin-bottom: 1rem;
-  border: 1px solid transparent;
-  border-radius: 0.25rem;
+  border-radius: 4px;
   background-color: #f8d7da;
   color: #721c24;
-  border-color: #f5c6cb;
+  border-left: 4px solid #f5c6cb;
   display: flex;
   align-items: center;
   animation: fadeInAlert 0.3s ease;
   z-index: 2000;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   min-width: 300px;
-  max-width: 500px;
-  text-align: center;
+  max-width: 380px;
+  font-size: 0.9rem;
 }
 
 .alert-notification .alert-icon {
   margin-right: 10px;
-  font-size: 1.25rem;
   color: #721c24;
+  display: flex;
+  align-items: center;
+}
+
+.alert-notification .alert-icon svg {
+  width: 20px;
+  height: 20px;
 }
 
 .alert-notification .alert-close {
   position: absolute;
-  top: 0;
-  right: 0;
-  padding: 0.75rem 1.25rem;
+  top: 6px;
+  right: 6px;
+  padding: 6px;
   color: inherit;
   background: transparent;
   border: 0;
   cursor: pointer;
-  font-size: 1.25rem;
+  font-size: 1.1rem;
   line-height: 1;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+.alert-notification .alert-close:hover {
+  opacity: 1;
 }
 
 @keyframes fadeInAlert {
-  from { opacity: 0; transform: translate(-50%, -10px); }
-  to { opacity: 1; transform: translate(-50%, 0); }
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
 }
 
 /* Mobile App Notice Styles */
@@ -1013,33 +1023,33 @@ button:disabled {
   box-shadow: none;
 }
 
-/* Admin Login Modal Styles */
+/* Admin Login Modal Styles - More Professional Look */
 .admin-login-modal {
   max-width: 450px;
   background-color: white;
-  border-radius: 10px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+  border-radius: 8px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
   overflow: hidden;
 }
 
 .admin-login-modal .modal-header {
   background-color: #f8f9fa;
   border-bottom: 1px solid #e9ecef;
-  padding: 1rem 1.5rem;
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .admin-login-modal .modal-header h2 {
   font-size: 1.25rem;
-  color: #333;
+  color: #222;
   font-weight: 600;
+  margin: 0;
 }
 
 .admin-login-modal .modal-body {
-  padding: 1.5rem;
-}
-
-.admin-login-modal .login-form {
-  margin: 0;
+  padding: 1.75rem;
 }
 
 .admin-login-modal .form-group {
@@ -1057,21 +1067,23 @@ button:disabled {
 .admin-login-modal input {
   width: 100%;
   padding: 0.75rem 1rem;
-  border: 1px solid #ddd;
+  border: 1px solid #d1d5db;
   border-radius: 6px;
   font-size: 0.95rem;
-  background-color: #f5f8ff;
+  background-color: #f9fafb;
+  transition: all 0.2s ease;
 }
 
 .admin-login-modal input:focus {
   border-color: #1a5336;
   outline: none;
   box-shadow: 0 0 0 3px rgba(26, 83, 54, 0.1);
+  background-color: #fff;
 }
 
 .admin-login-modal .login-button {
   width: 100%;
-  padding: 0.75rem;
+  padding: 0.85rem;
   background-color: #1a5336;
   border: none;
   border-radius: 6px;
@@ -1079,15 +1091,23 @@ button:disabled {
   font-weight: 500;
   font-size: 1rem;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .admin-login-modal .login-button:hover {
   background-color: #134025;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  transform: translateY(-1px);
+}
+
+.admin-login-modal .login-button:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 .admin-login-modal .credential-request {
-  margin-top: 1.5rem;
+  margin-top: 1.75rem;
   text-align: center;
   border-top: 1px solid #eee;
   padding-top: 1.5rem;
@@ -1108,18 +1128,31 @@ button:disabled {
   font-size: 0.9rem;
   font-weight: 500;
   cursor: pointer;
+  transition: all 0.2s ease;
 }
 
 .admin-login-modal .request-button:hover {
   background-color: rgba(26, 83, 54, 0.05);
+  transform: translateY(-1px);
 }
 
 .admin-login-modal .close-button {
   color: #666;
-  font-size: 1.5rem;
+  font-size: 1.25rem;
   background: none;
   border: none;
   cursor: pointer;
+  padding: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.admin-login-modal .close-button:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+  color: #333;
 }
 
 /* QR Code Modal Styles */

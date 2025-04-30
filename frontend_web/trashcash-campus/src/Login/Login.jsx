@@ -12,6 +12,32 @@ import { useSpring, animated, config } from '@react-spring/web';
 import { QRCodeSVG } from 'qrcode.react';
 import { createPortal } from 'react-dom';
 
+// AlertMessage component
+const AlertMessage = ({ message, onClose, isVisible }) => {
+  const alertAnimation = useSpring({
+    opacity: isVisible ? 1 : 0,
+    transform: isVisible ? 'translateX(0)' : 'translateX(20px)',
+    config: { tension: 280, friction: 24 }
+  });
+
+  if (!isVisible) return null;
+  
+  return createPortal(
+    <animated.div style={alertAnimation} className="alert-notification">
+      <span className="alert-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+      </span>
+      {message}
+      <button className="alert-close" onClick={onClose}>×</button>
+    </animated.div>,
+    document.body
+  );
+};
+
 // Modal component for portal rendering
 const Modal = ({ isOpen, onClose, children, modalClass = "" }) => {
   const modalAnimation = useSpring({
@@ -352,7 +378,8 @@ function Login() {
           } else {
             // Not an admin, log them out
             await signOut(auth);
-            displayAlert('Access denied. This website is for administrators only.');
+            // Use specific error message for students/non-admin users
+            displayAlert('Login failed: Only administrators can log in to this application');
           }
         } catch (profileError) {
           console.error("Error fetching user profile:", profileError);
@@ -411,17 +438,7 @@ function Login() {
     <div className="login-container">
       {/* Alert notification */}
       {showAlert && (
-        <div className="alert-notification">
-          <span className="alert-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10"></circle>
-              <line x1="12" y1="8" x2="12" y2="12"></line>
-              <line x1="12" y1="16" x2="12.01" y2="16"></line>
-            </svg>
-          </span>
-          {alertMessage}
-          <button className="alert-close" onClick={closeAlert}>×</button>
-        </div>
+        <AlertMessage message={alertMessage} onClose={closeAlert} isVisible={showAlert} />
       )}
       <div className="login-image-section">
         <video className="background-video" autoPlay loop muted>
