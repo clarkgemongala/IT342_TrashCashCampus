@@ -229,8 +229,13 @@ public class RecyclingController {
             
             if (userData != null) {
                 // Calculate new points
-                int currentPoints = ((Long) userData.getOrDefault("totalPoints", 0L)).intValue();
-                int newTotalPoints = currentPoints + points;
+                // Try to get current points from both potential field names
+                int currentTotalPoints = ((Long) userData.getOrDefault("totalPoints", 0L)).intValue();
+                int currentPoints = ((Long) userData.getOrDefault("points", 0L)).intValue();
+                
+                // Use the higher value to ensure we don't lose points
+                int currentPointsValue = Math.max(currentTotalPoints, currentPoints);
+                int newTotalPoints = currentPointsValue + points;
                 
                 // Get today's date (for daily points tracking)
                 long currentTime = System.currentTimeMillis();
@@ -243,13 +248,17 @@ public class RecyclingController {
                 boolean isNewDay = !isSameDay(lastPointsUpdate, currentTime);
                 int newDailyPoints = isNewDay ? points : currentDailyPoints + points;
                 
-                // Update user data
+                // Update user data with both points fields for compatibility
                 Map<String, Object> updates = new HashMap<>();
                 updates.put("totalPoints", newTotalPoints);
+                updates.put("points", newTotalPoints);
                 updates.put("recentPoints", newDailyPoints);
                 updates.put("lastPointsUpdate", currentTime);
                 
                 firebaseService.updateDocument("users", userId, updates);
+                
+                logger.info("Updated user " + userId + " points from " + currentPointsValue + 
+                    " to " + newTotalPoints + " (added " + points + " points)");
             }
             
             // Return success response

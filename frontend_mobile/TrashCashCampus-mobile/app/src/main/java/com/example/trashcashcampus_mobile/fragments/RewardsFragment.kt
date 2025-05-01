@@ -98,6 +98,27 @@ class RewardsFragment : Fragment() {
         userPointsListener?.remove()
     }
     
+    override fun onResume() {
+        super.onResume()
+        
+        // Check if userId is available, if not try to get it
+        if (userId.isEmpty()) {
+            getUserId()
+        }
+        
+        // Force refresh user points when returning to this fragment
+        if (userId.isNotEmpty()) {
+            // Refresh the points data
+            Log.d(TAG, "Forcing user points refresh in RewardsFragment onResume")
+            forceRefreshUserPoints()
+        }
+        
+        // Set up listener if not already active
+        if (userPointsListener == null && userId.isNotEmpty()) {
+            setupUserPointsListener()
+        }
+    }
+    
     private fun getUserId() {
         // Try to get user ID from SharedPreferences first
         val prefs = requireActivity().getSharedPreferences("TrashCashPrefs", Context.MODE_PRIVATE)
@@ -564,6 +585,66 @@ class RewardsFragment : Fragment() {
                 .setStartDelay(baseDelay + 350)
                 .start()
         }
+    }
+
+    private fun forceRefreshUserPoints() {
+        if (userId.isEmpty()) {
+            Log.e(TAG, "Cannot refresh user points - userId is empty")
+            return
+        }
+        
+        // Show loading indicator
+        showLoading(true)
+        
+        // Get fresh data from Firestore
+        db.collection("users").document(userId)
+            .get()
+            .addOnSuccessListener { document ->
+                if (document != null && document.exists()) {
+                    // Log data for debugging
+                    val userData = document.data
+                    userData?.forEach { (key, value) ->
+                        Log.d(TAG, "User data field: $key = $value")
+                    }
+                    
+                    // Get points from totalPoints field
+                    val totalPointsValue = when (val pointsValue = document.get("totalPoints")) {
+                        is Long -> pointsValue.toInt()
+                        is Int -> pointsValue
+                        is Double -> pointsValue.toInt()
+                        is String -> pointsValue.toIntOrNull() ?: 0
+                        else -> 0
+                    }
+                    
+                    // Also check the 'points' field
+                    val pointsValue = when (val pointsValue = document.get("points")) {
+                        is Long -> pointsValue.toInt()
+                        is Int -> pointsValue
+                        is Double -> pointsValue.toInt()
+                        is String -> pointsValue.toIntOrNull() ?: 0
+                        else -> 0
+                    }
+                    
+                    // Use the higher value of the two fields
+                    val finalPointsValue = Math.max(totalPointsValue, pointsValue)
+                    
+                    Log.d(TAG, "Force refreshed points: totalPoints=$totalPointsValue, points=$pointsValue, using max: $finalPointsValue")
+                    
+                    // Update UI and adapter
+                    userPoints = finalPointsValue
+                    tvUserPoints.text = finalPointsValue.toString()
+                    updateRewardsAdapterWithPoints()
+                } else {
+                    Log.e(TAG, "User document not found during refresh")
+                }
+                
+                // Hide loading indicator
+                showLoading(false)
+            }
+            .addOnFailureListener { e ->
+                Log.e(TAG, "Error refreshing user points", e)
+                showLoading(false)
+            }
     }
 
     companion object {

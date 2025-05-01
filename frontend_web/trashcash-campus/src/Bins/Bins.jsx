@@ -1419,15 +1419,24 @@ const Bins = () => {
           const userSnap = await getDoc(userRef);
           
           if (userSnap.exists()) {
-            const currentPoints = userSnap.data().points || 0;
-            const newPoints = currentPoints + (log.potentialPoints || log.pointsEarned || 0);
+            // Check both fields to maintain compatibility
+            const userData = userSnap.data();
+            const pointsFromPoints = userData.points || 0;
+            const pointsFromTotalPoints = userData.totalPoints || 0;
             
-            // Update the user's points
+            // Use the higher value to ensure we don't lose points
+            const currentPoints = Math.max(pointsFromPoints, pointsFromTotalPoints);
+            const pointsToAdd = log.potentialPoints || log.pointsEarned || 0;
+            const newPoints = currentPoints + pointsToAdd;
+            
+            // Update both fields to ensure compatibility across app versions
             await updateDoc(userRef, {
-              points: newPoints
+              points: newPoints,
+              totalPoints: newPoints,
+              lastUpdated: serverTimestamp()
             });
             
-            console.log(`Updated user ${log.userId} points to ${newPoints}`);
+            console.log(`Updated user ${log.userId} points to ${newPoints} (added ${pointsToAdd})`);
           }
         } catch (e) {
           console.error('Error updating user points:', e);

@@ -146,6 +146,13 @@ class DashboardFragment : Fragment() {
         if (userId != null && userPointsListener == null) {
             setupUserPointsListener()
         }
+        
+        // Force refresh data when returning to this fragment
+        if (userId != null) {
+            // Force a refresh of user data when returning to the dashboard
+            Log.d(tag, "Forcing user data refresh on resume")
+            forceRefreshUserData()
+        }
     }
     
     private fun initializeUI(view: View) {
@@ -1090,8 +1097,16 @@ class DashboardFragment : Fragment() {
                 .get()
                 .addOnSuccessListener { document ->
                     if (document != null && document.exists()) {
-                        // Extract points from the document
-                        val totalPoints = when (val pointsValue = document.get("totalPoints")) {
+                        // Extract points from the document - check both field names for compatibility
+                        val userData = document.data
+                        
+                        // Log all fields for debugging
+                        userData?.forEach { (key, value) ->
+                            Log.d(tag, "User data field: $key = $value")
+                        }
+                        
+                        // Get points from totalPoints field
+                        val totalPointsValue = when (val pointsValue = document.get("totalPoints")) {
                             is Long -> pointsValue.toInt()
                             is Int -> pointsValue
                             is Double -> pointsValue.toInt()
@@ -1099,14 +1114,26 @@ class DashboardFragment : Fragment() {
                             else -> 0
                         }
                         
-                        Log.d(tag, "Force refreshed points from Firestore: $totalPoints")
+                        // Also check the 'points' field
+                        val pointsValue = when (val pointsValue = document.get("points")) {
+                            is Long -> pointsValue.toInt()
+                            is Int -> pointsValue
+                            is Double -> pointsValue.toInt()
+                            is String -> pointsValue.toIntOrNull() ?: 0
+                            else -> 0
+                        }
+                        
+                        // Use the higher value of the two fields
+                        val finalPointsValue = Math.max(totalPointsValue, pointsValue)
+                        
+                        Log.d(tag, "Force refreshed points from Firestore: totalPoints=$totalPointsValue, points=$pointsValue, using max: $finalPointsValue")
                         
                         // Create user data with the retrieved points 
                         val retrievedData = UserData(
-                            totalPoints = totalPoints,
+                            totalPoints = finalPointsValue,
                             recentPoints = 0,
                             weeklyGoal = 100,
-                            weeklyProgress = totalPoints.coerceAtMost(100) // Use points as progress up to 100
+                            weeklyProgress = finalPointsValue.coerceAtMost(100) // Use points as progress up to 100
                         )
                         
                         // Update our stored user data
@@ -1116,9 +1143,9 @@ class DashboardFragment : Fragment() {
                         updateUIWithUserData(retrievedData)
                         
                         // Show points animation if this is an actual update
-                        val oldPoints = userData?.totalPoints ?: 0
-                        if (oldPoints != totalPoints && totalPoints > oldPoints) {
-                            showPointsUpdateAnimation(totalPoints - oldPoints)
+                        val oldPoints = tvTotalPoints.text.toString().toIntOrNull() ?: 0
+                        if (finalPointsValue > oldPoints) {
+                            showPointsUpdateAnimation(finalPointsValue - oldPoints)
                         }
                         
                         // Hide loading indicator
