@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../firebase';
-import { collection, getDocs, doc, updateDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, deleteDoc, query, orderBy, setDoc } from 'firebase/firestore';
 import Navigation from '../components/Navigation';
 import './User.css';
 import trashcashLogo from '../assets/trashcash-logo.png';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPenToSquare } from '@fortawesome/free-solid-svg-icons';
+import { faPenToSquare, faUserPlus } from '@fortawesome/free-solid-svg-icons';
 
 const User = () => {
   const { currentUser, isAdmin } = useAuth();
@@ -20,6 +20,14 @@ const User = () => {
   const [showEmailForm, setShowEmailForm] = useState(false);
   const [selectedEmail, setSelectedEmail] = useState('');
   const [emailMessage, setEmailMessage] = useState('');
+  const [showAddUserModal, setShowAddUserModal] = useState(false);
+  const [newUser, setNewUser] = useState({
+    email: '',
+    displayName: '',
+    role: 'user',
+    totalPoints: 0
+  });
+  const [addUserError, setAddUserError] = useState('');
   
   // Mock data for credential requests
   const credentialRequests = [
@@ -177,6 +185,59 @@ const User = () => {
     closeEmailForm();
   };
 
+  const openAddUserModal = () => {
+    setShowAddUserModal(true);
+  };
+
+  const closeAddUserModal = () => {
+    setShowAddUserModal(false);
+    setNewUser({
+      email: '',
+      displayName: '',
+      role: 'user',
+      totalPoints: 0
+    });
+    setAddUserError('');
+  };
+
+  const handleAddUser = async () => {
+    if (!newUser.email || !newUser.displayName) {
+      setAddUserError('Email and Display Name are required');
+      return;
+    }
+    
+    try {
+      // Generate a unique ID based on timestamp
+      const userId = `user_${Date.now()}`;
+      
+      // Create a new user document
+      const userRef = doc(db, 'users', userId);
+      await setDoc(userRef, {
+        id: userId,
+        email: newUser.email,
+        displayName: newUser.displayName,
+        role: newUser.role,
+        totalPoints: Number(newUser.totalPoints) || 0,
+        createdAt: new Date()
+      });
+      
+      // Add user to local state
+      const newUserWithId = {
+        ...newUser,
+        id: userId,
+        createdAt: new Date()
+      };
+      
+      setUsers([...users, newUserWithId]);
+      
+      // Close modal and reset form
+      closeAddUserModal();
+    } catch (error) {
+      console.error('Error adding user:', error);
+      setAddUserError('Error adding user: ' + error.message);
+    }
+  };
+
   return (
     <div className="user-management-container">
       <Navigation />
@@ -213,6 +274,14 @@ const User = () => {
                   <span className="stat-value">{users.filter(user => user.role !== 'admin').length}</span>
                 </div>
               </div>
+              
+              <button 
+                className="add-user-button" 
+                onClick={openAddUserModal}
+                title="Add New User"
+              >
+                <FontAwesomeIcon icon={faUserPlus} /> Add User
+              </button>
             </div>
             
             <div className="users-table-container">
@@ -356,6 +425,85 @@ const User = () => {
               </div>
             )}
           </>
+        )}
+        
+        {/* Add User Modal */}
+        {showAddUserModal && (
+          <div className="modal-overlay">
+            <div className="edit-modal add-user-modal">
+              <h2>Add New User</h2>
+              
+              {addUserError && (
+                <div className="error-message">{addUserError}</div>
+              )}
+              
+              <div className="form-group">
+                <label>Email:</label>
+                <input
+                  type="email"
+                  value={newUser.email}
+                  onChange={(e) => setNewUser({...newUser, email: e.target.value})}
+                  className="form-input"
+                  placeholder="user@example.com"
+                />
+              </div>
+              
+              <div className="form-group">
+                <label>Display Name:</label>
+                <input
+                  type="text"
+                  value={newUser.displayName}
+                  onChange={(e) => setNewUser({...newUser, displayName: e.target.value})}
+                  className="form-input"
+                  placeholder="John Doe"
+                />
+              </div>
+              
+              <div className="form-group">
+                <label>Role:</label>
+                <select
+                  value={newUser.role}
+                  onChange={(e) => setNewUser({...newUser, role: e.target.value})}
+                  className="form-select"
+                >
+                  <option value="user">User</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+              
+              <div className="form-group">
+                <label>Points:</label>
+                <input
+                  type="number"
+                  value={newUser.totalPoints}
+                  onChange={(e) => setNewUser({...newUser, totalPoints: e.target.value})}
+                  className="form-input"
+                  min="0"
+                />
+              </div>
+              
+              <div className="modal-actions">
+                <div className="button-wrapper">
+                  <button
+                    onClick={closeAddUserModal}
+                    type="button"
+                    className="cancel-button"
+                  >
+                    Cancel
+                  </button>
+                </div>
+                <div className="button-wrapper">
+                  <button
+                    onClick={handleAddUser}
+                    type="button"
+                    className="save-button"
+                  >
+                    Add User
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         )}
       </main>
     </div>

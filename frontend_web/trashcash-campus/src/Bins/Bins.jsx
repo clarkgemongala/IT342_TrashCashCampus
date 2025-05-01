@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { db, storage } from '../firebase';
 import { 
@@ -24,9 +24,11 @@ import QRScanner from '../components/QRScanner';
 import CorsErrorInfo from '../components/CorsErrorInfo';
 import { QRCodeSVG } from 'qrcode.react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCheck, faTimes } from '@fortawesome/free-solid-svg-icons';
+import { faCheck, faTimes, faInfoCircle, faCog, faSpinner } from '@fortawesome/free-solid-svg-icons';
 import './Bins.css';
 import './ImagePreview.css';
+// Import the Notification component
+import Notification from '../components/Notification';
 
 // Helper functions for formatting
 const formatWasteType = (wasteType) => {
@@ -224,6 +226,12 @@ const Bins = () => {
   const [verifyingEntry, setVerifyingEntry] = useState(false);
   const [locationLogs, setLocationLogs] = useState([]);
   const [activeLogTab, setActiveLogTab] = useState(0);
+  
+  // Add new state variables for notifications
+  const [showNotification, setShowNotification] = useState(false);
+  const [notificationType, setNotificationType] = useState('info');
+  const [notificationMessage, setNotificationMessage] = useState('');
+  const [fixingProgress, setFixingProgress] = useState(0);
   
   // Define our list of Cebu IT campus building names once at the component level
   const cebuITBuildings = [
@@ -1923,6 +1931,7 @@ const Bins = () => {
   // Function to initialize campus locations in Firestore
   const initializeCampusLocations = async () => {
     setFixingBinLocations(true);
+    setFixingProgress(0);
     
     try {
       // Define campus locations
@@ -1941,33 +1950,51 @@ const Bins = () => {
       const batch = writeBatch(db);
       
       // Add or update each location
+      let progress = 0;
       for (const location of campusLocations) {
         const locationRef = doc(db, "campusLocations", location.id);
         batch.set(locationRef, {
           ...location,
           createdAt: serverTimestamp()
         });
+        
+        // Update progress
+        progress += 1;
+        setFixingProgress(Math.round((progress / campusLocations.length) * 100));
       }
 
       // Commit the batch
       await batch.commit();
       
       console.log("Campus locations have been initialized successfully!");
-      alert("Campus locations have been initialized successfully!");
+      
+      // Show success notification instead of alert
+      setNotificationType('success');
+      setNotificationMessage('Campus locations have been initialized successfully!');
+      setShowNotification(true);
       
       // Return the locations for bin initialization
       return campusLocations;
     } catch (error) {
       console.error("Error initializing campus locations:", error);
-      alert(`Error initializing campus locations: ${error.message}`);
+      
+      // Show error notification instead of alert
+      setNotificationType('error');
+      setNotificationMessage(`Error initializing campus locations: ${error.message}`);
+      setShowNotification(true);
+      
       return [];
     } finally {
       setFixingBinLocations(false);
+      setFixingProgress(0);
     }
   };
   
   // Function to initialize bins in Firestore
   const initializeBins = async (campusLocations) => {
+    setFixingBinLocations(true);
+    setFixingProgress(0);
+    
     try {
       console.log("Initializing bins...");
       
@@ -1982,7 +2009,13 @@ const Bins = () => {
           
           if (snapshot.empty) {
             console.warn("No campus locations found in database");
-            alert("No campus locations available. Please initialize campus locations first.");
+            
+            // Show notification instead of alert
+            setNotificationType('error');
+            setNotificationMessage('No campus locations available. Please initialize campus locations first.');
+            setShowNotification(true);
+            
+            setFixingBinLocations(false);
             return;
           }
           
@@ -1994,7 +2027,13 @@ const Bins = () => {
           console.log(`Fetched ${campusLocations.length} campus locations from database`);
         } catch (error) {
           console.error("Error fetching campus locations:", error);
-          alert("Failed to fetch campus locations. Please try again.");
+          
+          // Show notification instead of alert
+          setNotificationType('error');
+          setNotificationMessage(`Failed to fetch campus locations: ${error.message}`);
+          setShowNotification(true);
+          
+          setFixingBinLocations(false);
           return;
         }
       }
@@ -2008,34 +2047,7 @@ const Bins = () => {
         { id: 'non-biodegradable', name: 'Non-Biodegradable Bin', waste: ['plastic', 'metal'] }
       ];
       
-      // Create bins for each location with the three different bin types
-      campusLocations.forEach(location => {
-        binTypes.forEach(binType => {
-          // Create a unique ID for each bin
-          const binId = `${location.id}_${binType.id}`;
-          const binRef = doc(db, "bins", binId);
-          
-          batch.set(binRef, {
-            name: `${binType.name} at ${location.name}`,
-            location: location.name,
-            locationId: location.id,
-            binType: binType.id,
-            acceptedWaste: binType.waste,
-            tips: [
-              'Please sort your waste properly',
-              'Make sure items are clean and dry',
-              'Thank you for recycling!'
-            ],
-            coordinates: {
-              lat: location.latitude,
-              lng: location.longitude
-            },
-            createdAt: serverTimestamp()
-          });
-        });
-      });
-      
-      // Also add bins for Cebu IT campus buildings
+      // Define Cebu IT building names
       const cebuITBuildingNames = [
         "NGE Building",
         "ACAD Building",
@@ -2047,9 +2059,13 @@ const Bins = () => {
         "GLE Building"
       ];
       
-      // Create bins for each Cebu IT building
-      cebuITBuildingNames.forEach((buildingName, index) => {
-        binTypes.forEach(binType => {
+      // Calculate total operations for progress tracking
+      const totalOperations = cebuITBuildingNames.length * binTypes.length + binTypes.length;
+      let completedOperations = 0;
+      
+      // Create bins for each location with the three different bin types
+      for (const buildingName of cebuITBuildingNames) {
+        for (const binType of binTypes) {
           // Create a unique ID for each bin
           const binId = `cebu_${buildingName.toLowerCase().replace(/\s+/g, '_')}_${binType.id}`;
           const binRef = doc(db, "bins", binId);
@@ -2057,7 +2073,7 @@ const Bins = () => {
           batch.set(binRef, {
             name: `${binType.name} at ${buildingName}`,
             location: buildingName,
-            locationId: `cebu_${index + 1}`,
+            locationId: `cebu_${cebuITBuildingNames.indexOf(buildingName) + 1}`,
             binType: binType.id,
             acceptedWaste: binType.waste,
             tips: [
@@ -2071,11 +2087,15 @@ const Bins = () => {
             },
             createdAt: serverTimestamp()
           });
-        });
-      });
+          
+          // Update progress
+          completedOperations++;
+          setFixingProgress(Math.round((completedOperations / totalOperations) * 100));
+        }
+      }
       
       // Create bins for general campus waste
-      binTypes.forEach(binType => {
+      for (const binType of binTypes) {
         const binId = binType.id;
         const binRef = doc(db, "bins", binId);
         
@@ -2096,20 +2116,35 @@ const Bins = () => {
           },
           createdAt: serverTimestamp()
         });
-      });
+        
+        // Update progress
+        completedOperations++;
+        setFixingProgress(Math.round((completedOperations / totalOperations) * 100));
+      }
       
       // Commit the batch
       await batch.commit();
       
       console.log("Bins have been initialized successfully!");
-      alert("Bins have been initialized successfully!");
+      
+      // Show success notification instead of alert
+      setNotificationType('success');
+      setNotificationMessage('Bins have been initialized successfully!');
+      setShowNotification(true);
       
       // Fetch the updated bins to refresh the UI
       fetchBins();
       
     } catch (error) {
       console.error("Error initializing bins:", error);
-      alert(`Error initializing bins: ${error.message}`);
+      
+      // Show error notification instead of alert
+      setNotificationType('error');
+      setNotificationMessage(`Error initializing bins: ${error.message}`);
+      setShowNotification(true);
+    } finally {
+      setFixingBinLocations(false);
+      setFixingProgress(0);
     }
   };
 
@@ -2611,10 +2646,31 @@ const Bins = () => {
 
   return (
     <div className="bins-container">
+      {/* Notification Component */}
+      <Notification 
+        show={showNotification}
+        type={notificationType}
+        message={notificationMessage}
+        onClose={() => setShowNotification(false)}
+      />
+
       {fixingBinLocations && (
         <div className="loading-overlay">
-          <div className="loading-spinner"></div>
-          <p>Fixing bin locations... This might take a minute.</p>
+          <div className="loading-panel">
+            <div className="loading-spinner">
+              <FontAwesomeIcon icon={faSpinner} spin size="2x" />
+            </div>
+            <h3>Fixing bin locations...</h3>
+            <p>This might take a minute</p>
+            
+            <div className="progress-container">
+              <div 
+                className="progress-bar" 
+                style={{ width: `${fixingProgress}%` }}
+              ></div>
+            </div>
+            <div className="progress-text">{fixingProgress}% Complete</div>
+          </div>
         </div>
       )}
 
