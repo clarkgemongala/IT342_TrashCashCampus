@@ -502,9 +502,10 @@ class QRScannerActivity : AppCompatActivity() {
                 // Create a fallback result for when submissions fail completely
                 val fallbackResult = ScanResult(
                     success = true,
-                    message = "Your recycling has been processed in offline mode due to connectivity issues.",
+                    status = "pending",
+                    message = "Your recycling has been processed in offline mode due to connectivity issues. Points will be awarded after admin approval.",
                     pointsEarned = calculatePointsForWasteType(scannedBinType) + (if (selectedItemSize == "big") 5 else 0),
-                    totalPoints = 250, // Default value
+                    totalPoints = 0, // Don't add to total yet
                     fact = "Going offline doesn't stop your recycling effort! Thank you for helping the environment."
                 )
                 
@@ -524,7 +525,8 @@ class QRScannerActivity : AppCompatActivity() {
             val message = if (result.message.contains("Offline Mode")) {
                 // Add notice for offline mode submissions
                 "NOTICE: The app is currently in offline mode due to connectivity issues.\n\n" +
-                "Your recycling has been recorded locally and will be credited with:\n" +
+                "Your recycling has been recorded locally and will be synced when connectivity is restored.\n\n" +
+                "Upon admin approval, you will receive:\n" +
                 "• ${calculatePointsForWasteType(scannedBinType)} points for this waste type\n" +
                 "${if (selectedItemSize == "big") "• 5 bonus points for large item size\n" else ""}\n" +
                 "Thank you for recycling!"

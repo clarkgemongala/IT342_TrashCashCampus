@@ -243,26 +243,35 @@ class RewardsFragment : Fragment() {
                 if (snapshot != null && snapshot.exists()) {
                     // Try to get totalPoints with different types handling
                     val totalPointsValue = snapshot.get("totalPoints")
-                    if (totalPointsValue != null) {
-                        userPoints = when (totalPointsValue) {
-                            is Long -> totalPointsValue.toInt()
-                            is Int -> totalPointsValue
-                            is Double -> totalPointsValue.toInt()
-                            is String -> totalPointsValue.toIntOrNull() ?: 0
-                            else -> 0
-                        }
-                        
-                        Log.d(TAG, "Real-time update: userPoints = $userPoints")
-                        
-                        // Update UI
-                        tvUserPoints.text = userPoints.toString()
-                        
-                        // Update adapter if it exists
-                        updateRewardsAdapterWithPoints()
-                    } else {
-                        Log.w(TAG, "User document exists but has no totalPoints field")
-                        tvUserPoints.text = "0"
+                    val pointsValue = snapshot.get("points")
+                    
+                    // Calculate points from both fields
+                    val totalPoints = when (totalPointsValue) {
+                        is Long -> totalPointsValue.toInt()
+                        is Int -> totalPointsValue
+                        is Double -> totalPointsValue.toInt()
+                        is String -> totalPointsValue.toIntOrNull() ?: 0
+                        else -> 0
                     }
+                    
+                    val points = when (pointsValue) {
+                        is Long -> pointsValue.toInt()
+                        is Int -> pointsValue
+                        is Double -> pointsValue.toInt()
+                        is String -> pointsValue.toIntOrNull() ?: 0
+                        else -> 0
+                    }
+                    
+                    // Use the higher value for consistency
+                    userPoints = Math.max(totalPoints, points)
+                    
+                    Log.d(TAG, "Real-time update: userPoints = $userPoints (totalPoints=$totalPoints, points=$points)")
+                    
+                    // Update UI
+                    tvUserPoints.text = userPoints.toString()
+                    
+                    // Update adapter if it exists
+                    updateRewardsAdapterWithPoints()
                 } else {
                     Log.w(TAG, "User document doesn't exist")
                     tvUserPoints.text = "0"
@@ -409,9 +418,10 @@ class RewardsFragment : Fragment() {
         // Create a batch to update points and add redemption record
         val batch = db.batch()
         
-        // Update user points
+        // Update user points in both fields for compatibility
         val userRef = db.collection("users").document(userId)
         batch.update(userRef, "totalPoints", FieldValue.increment(-reward.pointsCost.toLong()))
+        batch.update(userRef, "points", FieldValue.increment(-reward.pointsCost.toLong()))
         
         // Create redemption record
         val redemptionRef = db.collection("redemptions").document()

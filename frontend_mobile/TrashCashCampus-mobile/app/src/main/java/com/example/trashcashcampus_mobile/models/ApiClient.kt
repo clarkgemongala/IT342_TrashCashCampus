@@ -394,13 +394,8 @@ class ApiClient {
                             
                             db.runTransaction { transaction ->
                                 val snapshot = transaction.get(userRef)
-                                val oldPoints = snapshot.getLong("points") ?: 0
-                                val newPoints = oldPoints + potentialPoints
                                 
-                                transaction.update(userRef, "points", newPoints)
-                                transaction.update(userRef, "lastUpdated", FieldValue.serverTimestamp())
-                                Log.d(TAG, "Updated user points from $oldPoints to $newPoints")
-                                
+                                // Only track recycling counts, don't add points yet (will be added after admin approval)
                                 // Also increment their recycling counts
                                 when (wasteType) {
                                     "plastic", "metal", "paper", "glass" -> {
@@ -410,10 +405,15 @@ class ApiClient {
                                         Log.d(TAG, "Incremented $field from $oldCount to ${oldCount+1}")
                                     }
                                 }
+                                
+                                // Update last activity timestamp
+                                transaction.update(userRef, "lastUpdated", FieldValue.serverTimestamp())
+                                Log.d(TAG, "Updated user's recycling stats - pending admin approval for points")
+                                
                                 null
                             }
                     } catch (e: Exception) {
-                            Log.e(TAG, "Error updating user points", e)
+                            Log.e(TAG, "Error updating user recycling stats", e)
                         }
                         
                         return@withContext ScanResult(
@@ -439,15 +439,15 @@ class ApiClient {
                     // Set flag to prevent further network operations
                     networkFailure.set(true)
                     
-                    // Return a successful result with points to keep app functional
-                    val earnedPoints = calculatePointsForWasteAndSize(wasteType, itemSize)
+                    // Return a successful result with pending points to keep app functional
+                    val potentialPoints = calculatePointsForWasteAndSize(wasteType, itemSize)
                     return@withContext ScanResult(
                         success = true,
-                        status = "success",
-                        message = "Your recycling has been processed successfully! (Offline Mode)",
-                        pointsEarned = earnedPoints,
-                        totalPoints = 250 + earnedPoints,
-                        fact = getRandomRecyclingFact()
+                        status = "pending",
+                        message = "Your recycling has been processed in offline mode and will be synced when connectivity is restored. Points will be awarded after admin approval.",
+                        pointsEarned = potentialPoints, // These are potential points, not immediate
+                        totalPoints = 0, // Don't add to total yet
+                        fact = "Going offline doesn't stop your recycling effort! Thank you for helping the environment."
                     )
                 } catch (e: Exception) {
                     Log.e(TAG, "Error submitting recycling for approval", e)

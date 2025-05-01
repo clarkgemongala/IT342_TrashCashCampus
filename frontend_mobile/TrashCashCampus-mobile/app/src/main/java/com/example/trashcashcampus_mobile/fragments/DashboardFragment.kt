@@ -487,7 +487,7 @@ class DashboardFragment : Fragment() {
                     tvTotalPoints.text = totalPoints.toString()
                     
                     // Create user data with the retrieved points
-                    this.userData = UserData(
+                    this@DashboardFragment.userData = UserData(
                         totalPoints = totalPoints,
                         recentPoints = 0,
                         weeklyGoal = 100,
@@ -495,7 +495,7 @@ class DashboardFragment : Fragment() {
                     )
                     
                     // Update UI
-                    updateUIWithUserData(this.userData!!)
+                    updateUIWithUserData(this@DashboardFragment.userData!!)
                     
                 } else {
                     Log.d(tag, "No Firestore document exists for user: $uid")
@@ -543,7 +543,7 @@ class DashboardFragment : Fragment() {
                 Toast.makeText(requireContext(), "Created user profile", Toast.LENGTH_SHORT).show()
                 
                 // Update our stored user data
-                this.userData = UserData(
+                this@DashboardFragment.userData = UserData(
                     totalPoints = points,
                     recentPoints = 0,
                     weeklyGoal = 100,
@@ -551,7 +551,7 @@ class DashboardFragment : Fragment() {
                 )
                 
                 // Update UI with the new data
-                updateUIWithUserData(this.userData!!)
+                updateUIWithUserData(this@DashboardFragment.userData!!)
             }
             .addOnFailureListener { e ->
                 Log.e(tag, "Error creating user document", e)
@@ -596,8 +596,8 @@ class DashboardFragment : Fragment() {
         // Log what we're doing
         Log.d(tag, "Setting default points to 0")
         
-        // Create a default UserData
-        userData = UserData(
+        // Create default user data
+        this@DashboardFragment.userData = UserData(
             totalPoints = 0,
             recentPoints = 0,
             weeklyGoal = 100,
@@ -605,7 +605,7 @@ class DashboardFragment : Fragment() {
         )
         
         // Update UI with this data
-        updateUIWithUserData(userData!!)
+        updateUIWithUserData(this@DashboardFragment.userData!!)
         
         // Show error message
         view?.post {
@@ -689,7 +689,7 @@ class DashboardFragment : Fragment() {
                                 Toast.makeText(requireContext(), "Points updated to 500", Toast.LENGTH_SHORT).show()
                                 
                                 // Update our stored user data
-                                this.userData = UserData(
+                                this@DashboardFragment.userData = UserData(
                                     totalPoints = 500,
                                     recentPoints = 0,
                                     weeklyGoal = 100,
@@ -697,7 +697,7 @@ class DashboardFragment : Fragment() {
                                 )
                                 
                                 // Update UI with the new data
-                                updateUIWithUserData(this.userData!!)
+                                updateUIWithUserData(this@DashboardFragment.userData!!)
                             }
                             .addOnFailureListener { e ->
                                 Log.e(tag, "Error updating points", e)
@@ -728,7 +728,7 @@ class DashboardFragment : Fragment() {
                             Toast.makeText(requireContext(), "Created user profile with 500 points", Toast.LENGTH_SHORT).show()
                             
                             // Update our stored user data
-                            this.userData = UserData(
+                            this@DashboardFragment.userData = UserData(
                                 totalPoints = 500,
                                 recentPoints = 0,
                                 weeklyGoal = 100,
@@ -736,7 +736,7 @@ class DashboardFragment : Fragment() {
                             )
                             
                             // Update UI with the new data
-                            updateUIWithUserData(this.userData!!)
+                            updateUIWithUserData(this@DashboardFragment.userData!!)
                         }
                         .addOnFailureListener { e ->
                             Log.e(tag, "Error creating user document", e)
@@ -840,7 +840,7 @@ class DashboardFragment : Fragment() {
                         tvTotalPoints.text = totalPoints.toString()
                         
                         // Update our user data object
-                        userData = UserData(
+                        this@DashboardFragment.userData = UserData(
                             totalPoints = totalPoints,
                             recentPoints = if (totalPoints > currentPoints) totalPoints - currentPoints else 0,
                             weeklyGoal = weeklyGoal,
@@ -848,7 +848,7 @@ class DashboardFragment : Fragment() {
                         )
                         
                         // Update weekly goal UI
-                        updateUIWithUserData(userData!!)
+                        updateUIWithUserData(this@DashboardFragment.userData!!)
                     } else {
                         Log.d(tag, "User document doesn't exist or was deleted")
                         // Show default points (0) when document doesn't exist
@@ -880,7 +880,7 @@ class DashboardFragment : Fragment() {
                         // Check if the API returned valid data
                         if (userDataFromApi.totalPoints > 0) {
                             // Update our class level user data
-                            userData = userDataFromApi
+                            this@DashboardFragment.userData = userDataFromApi
                             
                             // Log the points received
                             Log.d(tag, "Points retrieved from API: ${userDataFromApi.totalPoints}")
@@ -1002,14 +1002,14 @@ class DashboardFragment : Fragment() {
         tvTotalPoints.text = "0"
         
         // Create default user data
-        userData = UserData(
+        this@DashboardFragment.userData = UserData(
             totalPoints = 0,
             recentPoints = 0,
             weeklyGoal = 100,
             weeklyProgress = 0
         )
         
-        updateUIWithUserData(userData!!)
+        updateUIWithUserData(this@DashboardFragment.userData!!)
         
         Toast.makeText(requireContext(), 
             "Not connected to account. Please restart the app.", 
@@ -1136,8 +1136,8 @@ class DashboardFragment : Fragment() {
                             weeklyProgress = finalPointsValue.coerceAtMost(100) // Use points as progress up to 100
                         )
                         
-                        // Update our stored user data
-                        userData = retrievedData
+                        // Update our stored user data (using proper null-safe assignment)
+                        this@DashboardFragment.userData = retrievedData
                         
                         // Update UI
                         updateUIWithUserData(retrievedData)
