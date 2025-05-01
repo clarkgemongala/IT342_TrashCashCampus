@@ -1,9 +1,14 @@
 package com.example.trashcashcampus_mobile.fragments
 
 import android.app.AlertDialog
+import android.app.Dialog
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.Color
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
@@ -18,6 +23,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.trashcashcampus_mobile.R
+import com.example.trashcashcampus_mobile.utils.VoucherGenerator
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
@@ -26,8 +32,12 @@ import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.ServerTimestamp
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.HashMap
+import java.util.Locale
 import android.animation.AnimatorSet
+import android.os.Build
 
 class RewardsFragment : Fragment() {
     private val TAG = "RewardsFragment"
@@ -390,14 +400,71 @@ class RewardsFragment : Fragment() {
             return
         }
         
-        AlertDialog.Builder(requireContext())
-            .setTitle("Redeem Reward")
-            .setMessage("Are you sure you want to redeem ${reward.title} for ${reward.pointsCost} points?")
-            .setPositiveButton("Redeem") { _, _ ->
-                redeemReward(reward)
+        // Check if this reward was already redeemed today
+        checkDailyRedemptionLimit(reward) { alreadyRedeemed ->
+            if (alreadyRedeemed) {
+                Toast.makeText(requireContext(), "You have already redeemed this reward today. Please try again tomorrow.", Toast.LENGTH_LONG).show()
+                return@checkDailyRedemptionLimit
             }
-            .setNegativeButton("Cancel", null)
-            .show()
+            
+            // Show confirmation dialog if not already redeemed today
+            AlertDialog.Builder(requireContext())
+                .setTitle("Redeem Reward")
+                .setMessage("Are you sure you want to redeem ${reward.title} for ${reward.pointsCost} points?")
+                .setPositiveButton("Redeem") { _, _ ->
+                    redeemReward(reward)
+                }
+                .setNegativeButton("Cancel", null)
+                .show()
+        }
+    }
+    
+    /**
+     * Checks if user has already redeemed this reward today
+     * @param reward The reward to check
+     * @param callback Called with true if already redeemed today, false otherwise
+     */
+    private fun checkDailyRedemptionLimit(reward: Reward, callback: (Boolean) -> Unit) {
+        if (userId.isEmpty()) {
+            callback(false)
+            return
+        }
+        
+        // Get today's date in a consistent format (YYYY-MM-DD)
+        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val todayDate = dateFormat.format(Date())
+        
+        // Query Firestore for any redemptions of this reward by this user today
+        db.collection("redemptions")
+            .whereEqualTo("userId", userId)
+            .whereEqualTo("rewardId", reward.id)
+            .get()
+            .addOnSuccessListener { documents ->
+                var alreadyRedeemedToday = false
+                
+                for (document in documents) {
+                    // Get timestamp from document
+                    val timestamp = document.getTimestamp("timestamp")
+                    
+                    if (timestamp != null) {
+                        // Convert timestamp to same date format
+                        val redemptionDate = dateFormat.format(timestamp.toDate())
+                        
+                        // Check if redemption date matches today's date
+                        if (redemptionDate == todayDate) {
+                            alreadyRedeemedToday = true
+                            break
+                        }
+                    }
+                }
+                
+                callback(alreadyRedeemedToday)
+            }
+            .addOnFailureListener { e ->
+                Log.e(TAG, "Error checking redemption limit", e)
+                // Default to not redeemed in case of error
+                callback(false)
+            }
     }
     
     private fun redeemReward(reward: Reward) {
@@ -415,6 +482,11 @@ class RewardsFragment : Fragment() {
         // Show loading indicator
         showLoading(true)
         
+        // Generate a unique voucher code for this redemption
+        // Use the first character of category as prefix if available
+        val prefix = if (reward.category.isNotEmpty()) reward.category.substring(0, 1).uppercase() else ""
+        val voucherCode = VoucherGenerator.generateVoucherCode(prefix)
+        
         // Create a batch to update points and add redemption record
         val batch = db.batch()
         
@@ -423,7 +495,7 @@ class RewardsFragment : Fragment() {
         batch.update(userRef, "totalPoints", FieldValue.increment(-reward.pointsCost.toLong()))
         batch.update(userRef, "points", FieldValue.increment(-reward.pointsCost.toLong()))
         
-        // Create redemption record
+        // Create redemption record with voucher code
         val redemptionRef = db.collection("redemptions").document()
         val redemptionData = HashMap<String, Any>()
         redemptionData["userId"] = userId
@@ -432,6 +504,7 @@ class RewardsFragment : Fragment() {
         redemptionData["pointsCost"] = reward.pointsCost
         redemptionData["timestamp"] = FieldValue.serverTimestamp()
         redemptionData["status"] = "pending"
+        redemptionData["voucherCode"] = voucherCode  // Store the voucher code in the redemption record
         
         batch.set(redemptionRef, redemptionData)
         
@@ -439,7 +512,9 @@ class RewardsFragment : Fragment() {
         batch.commit()
             .addOnSuccessListener {
                 showLoading(false)
-                Toast.makeText(requireContext(), "Successfully redeemed ${reward.title}!", Toast.LENGTH_SHORT).show()
+                
+                // Show voucher code dialog
+                showVoucherCodeDialog(reward, voucherCode)
                 
                 // Points will be updated automatically through the snapshot listener
             }
@@ -448,6 +523,83 @@ class RewardsFragment : Fragment() {
                 Log.e(TAG, "Error redeeming reward", e)
                 Toast.makeText(requireContext(), "Failed to redeem reward. Please try again.", Toast.LENGTH_SHORT).show()
             }
+    }
+    
+    /**
+     * Shows the voucher code dialog after successful redemption
+     */
+    private fun showVoucherCodeDialog(reward: Reward, voucherCode: String) {
+        // Create dialog from custom layout
+        val dialog = Dialog(requireContext(), android.R.style.Theme_Material_Light_Dialog)
+        dialog.setContentView(R.layout.dialog_voucher_code)
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+        dialog.setCancelable(false) // Prevent dismissal by tapping outside
+        
+        // Set up views
+        val tvRewardTitle = dialog.findViewById<TextView>(R.id.tv_reward_title)
+        val tvVoucherCode = dialog.findViewById<TextView>(R.id.tv_voucher_code)
+        val tvVoucherDescription = dialog.findViewById<TextView>(R.id.tv_voucher_description)
+        val btnCopyCode = dialog.findViewById<Button>(R.id.btn_copy_code)
+        val btnClose = dialog.findViewById<Button>(R.id.btn_close)
+        
+        // Set reward details - ensure proper formatting
+        tvRewardTitle.text = reward.title
+        tvVoucherCode.text = voucherCode
+        tvVoucherDescription.text = "Use this voucher code to claim your ${reward.title}:"
+        
+        // Copy code button with improved feedback
+        btnCopyCode.setOnClickListener {
+            val clipboardManager = requireContext().getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            val clip = ClipData.newPlainText("Voucher Code", voucherCode)
+            clipboardManager.setPrimaryClip(clip)
+            
+            // Show success feedback
+            btnCopyCode.text = "Copied!"
+            btnCopyCode.isEnabled = false
+            
+            // Reset after a delay
+            Handler(Looper.getMainLooper()).postDelayed({
+                btnCopyCode.text = "Copy Code"
+                btnCopyCode.isEnabled = true
+            }, 1500)
+            
+            Toast.makeText(requireContext(), "Voucher code copied to clipboard", Toast.LENGTH_SHORT).show()
+        }
+        
+        // Close button
+        btnClose.setOnClickListener {
+            dialog.dismiss()
+        }
+        
+        // Store in Firestore a record with the voucher code
+        logVoucherRedemption(reward, voucherCode)
+        
+        // Show the dialog
+        dialog.show()
+    }
+    
+    /**
+     * Logs additional information about the redemption for admin purposes
+     */
+    private fun logVoucherRedemption(reward: Reward, voucherCode: String) {
+        try {
+            val redemptionLog = HashMap<String, Any>()
+            redemptionLog["userId"] = userId
+            redemptionLog["rewardId"] = reward.id
+            redemptionLog["rewardName"] = reward.title
+            redemptionLog["voucherCode"] = voucherCode
+            redemptionLog["timestamp"] = FieldValue.serverTimestamp()
+            redemptionLog["deviceInfo"] = Build.MODEL
+            
+            // Add to voucher tracking collection for admin viewing
+            db.collection("voucherCodes").document(voucherCode)
+                .set(redemptionLog)
+                .addOnFailureListener { e ->
+                    Log.e(TAG, "Error logging voucher redemption", e)
+                }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in logVoucherRedemption", e)
+        }
     }
     
     private fun showLoading(isLoading: Boolean) {
@@ -507,34 +659,98 @@ class RewardsFragment : Fragment() {
                 holder.rewardIcon.setBackgroundColor(Color.parseColor("#f0f0f0"))
             }
             
-            // Set up redeem button based on user points
-            val canRedeem = userPoints >= reward.pointsCost
-            holder.redeemButton.isEnabled = canRedeem
+            // Check if this reward is redeemable today (points and daily limit check)
+            val canRedeemPoints = userPoints >= reward.pointsCost
             
-            // Change button appearance based on points status
-            if (canRedeem) {
-                holder.redeemButton.text = "Redeem"
-                holder.redeemButton.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.primary))
-                holder.redeemButton.setTextColor(ContextCompat.getColor(requireContext(), android.R.color.white))
-            } else {
-                holder.redeemButton.text = "Not Enough Points"
-                holder.redeemButton.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.text_disabled))
-                holder.redeemButton.setTextColor(ContextCompat.getColor(requireContext(), R.color.text_secondary))
-            }
+            // This will hold our final result after the daily redemption check
+            var canRedeem = canRedeemPoints
             
-            holder.redeemButton.setOnClickListener {
-                if (canRedeem) {
-                    onRedeemClick(reward)
-                } else {
-                    Toast.makeText(context, "You need ${reward.pointsCost - userPoints} more points", Toast.LENGTH_SHORT).show()
+            // Set up the button in "checking" state if we have enough points
+            if (canRedeemPoints) {
+                // Initially set button to checking state
+                updateRedeemButtonForChecking(holder)
+                
+                // Check daily redemption status (only if user has enough points)
+                checkDailyRedemptionLimit(reward) { alreadyRedeemed ->
+                    // Update the final result based on daily redemption check
+                    canRedeem = canRedeemPoints && !alreadyRedeemed
+                    
+                    // Update button UI based on both points and daily limit
+                    if (canRedeem) {
+                        updateRedeemButtonForAvailable(holder)
+                    } else if (alreadyRedeemed) {
+                        updateRedeemButtonForAlreadyRedeemed(holder)
+                    } else {
+                        updateRedeemButtonForNotEnoughPoints(holder)
+                    }
+                    
+                    // Set up click listener based on final state
+                    setupRedeemButtonClickListener(holder, reward, canRedeem, alreadyRedeemed)
                 }
+            } else {
+                // Not enough points, no need to check daily limit
+                updateRedeemButtonForNotEnoughPoints(holder)
+                
+                // Set up click listener for not enough points
+                setupRedeemButtonClickListener(holder, reward, false, false)
             }
             
             // Highlight if user can afford this reward
-            if (canRedeem) {
+            if (canRedeemPoints) {
                 holder.rewardPoints.setTextColor(ContextCompat.getColor(requireContext(), R.color.success))
             } else {
                 holder.rewardPoints.setTextColor(ContextCompat.getColor(requireContext(), R.color.text_primary))
+            }
+        }
+        
+        private fun updateRedeemButtonForAvailable(holder: RewardViewHolder) {
+            holder.redeemButton.text = "Redeem"
+            holder.redeemButton.isEnabled = true
+            holder.redeemButton.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.primary))
+            holder.redeemButton.setTextColor(ContextCompat.getColor(requireContext(), android.R.color.white))
+        }
+        
+        private fun updateRedeemButtonForNotEnoughPoints(holder: RewardViewHolder) {
+            holder.redeemButton.text = "Not Enough Points"
+            holder.redeemButton.isEnabled = false
+            holder.redeemButton.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.text_disabled))
+            holder.redeemButton.setTextColor(ContextCompat.getColor(requireContext(), R.color.text_secondary))
+        }
+        
+        private fun updateRedeemButtonForAlreadyRedeemed(holder: RewardViewHolder) {
+            holder.redeemButton.text = "Already Redeemed Today"
+            holder.redeemButton.isEnabled = false
+            holder.redeemButton.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.text_disabled))
+            holder.redeemButton.setTextColor(ContextCompat.getColor(requireContext(), R.color.text_secondary))
+        }
+        
+        private fun updateRedeemButtonForChecking(holder: RewardViewHolder) {
+            holder.redeemButton.text = "Checking..."
+            holder.redeemButton.isEnabled = false
+            holder.redeemButton.setBackgroundColor(ContextCompat.getColor(requireContext(), R.color.primary))
+            holder.redeemButton.setTextColor(ContextCompat.getColor(requireContext(), android.R.color.white))
+        }
+        
+        private fun setupRedeemButtonClickListener(
+            holder: RewardViewHolder, 
+            reward: Reward, 
+            canRedeem: Boolean, 
+            alreadyRedeemed: Boolean
+        ) {
+            holder.redeemButton.setOnClickListener {
+                when {
+                    canRedeem -> onRedeemClick(reward)
+                    alreadyRedeemed -> Toast.makeText(
+                        context, 
+                        "You've already redeemed this reward today. Try again tomorrow.", 
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    else -> Toast.makeText(
+                        context, 
+                        "You need ${reward.pointsCost - userPoints} more points", 
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
             }
         }
         
