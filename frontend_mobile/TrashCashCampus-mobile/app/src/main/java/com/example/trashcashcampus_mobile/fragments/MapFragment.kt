@@ -287,11 +287,11 @@ class MapFragment : Fragment() {
                 Log.d(TAG, "Launching QR scanner with location: $locationName")
                 
                 // Launch QR scanner with location data
-                val intent = Intent(requireContext(), QRScannerActivity::class.java)
+            val intent = Intent(requireContext(), QRScannerActivity::class.java)
                 intent.putExtra("LOCATION_NAME", locationName)
                 // Also pass location as BUILDING_NAME for compatibility
                 intent.putExtra("BUILDING_NAME", locationName)
-                startActivity(intent)
+            startActivity(intent)
                 
                 // Close the info window
                 close()

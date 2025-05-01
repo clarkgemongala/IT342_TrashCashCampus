@@ -1728,4 +1728,34 @@
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(-20px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+.cors-error-banner {
+  background-color: #fff3e0;
+  padding: 12px 20px;
+  margin-top: 10px;
+  margin-bottom: 15px;
+  border-radius: 8px;
+  border-left: 4px solid #ff9800;
+  margin-left: auto;
+  margin-right: auto;
+  max-width: 1200px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.cors-error-content {
+  max-width: 100%;
+}
+
+.cors-error-content h3 {
+  color: #e65100;
+  margin-top: 0;
+  margin-bottom: 8px;
+  font-size: 1.1rem;
+}
+
+.cors-error-content p {
+  color: #555;
+  margin: 5px 0;
+  font-size: 0.9rem;
 } 
