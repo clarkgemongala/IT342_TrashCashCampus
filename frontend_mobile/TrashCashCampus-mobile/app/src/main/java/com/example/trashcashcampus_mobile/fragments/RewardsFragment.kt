@@ -14,6 +14,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.trashcashcampus_mobile.R
@@ -26,6 +27,7 @@ import com.google.firebase.firestore.ServerTimestamp
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import java.util.HashMap
+import android.animation.AnimatorSet
 
 class RewardsFragment : Fragment() {
     private val TAG = "RewardsFragment"
@@ -85,6 +87,9 @@ class RewardsFragment : Fragment() {
         
         // Load rewards directly from Firestore
         loadRewards(activeCategory)
+        
+        // Start the animation
+        animateRewardsEntrance()
     }
 
     override fun onDestroy() {
@@ -493,6 +498,62 @@ class RewardsFragment : Fragment() {
         }
         
         override fun getItemCount() = rewards.size
+    }
+
+    private fun animateRewardsEntrance() {
+        // Get references to view elements
+        val titleText = view?.findViewById<View>(R.id.tv_rewards_title)
+        val pointsCard = view?.findViewById<View>(R.id.card_user_points)
+        val categoriesCard = view?.findViewById<View>(R.id.card_categories)
+        val rewardsListCard = view?.findViewById<View>(R.id.card_rewards_list)
+        
+        // Define animation durations and delays
+        val baseDelay = 100L
+        val animDuration = 500L
+        
+        // Animate the title
+        titleText?.apply {
+            animate()
+                .alpha(1f)
+                .translationY(0f)
+                .setDuration(animDuration)
+                .setInterpolator(android.view.animation.DecelerateInterpolator())
+                .setStartDelay(baseDelay)
+                .start()
+        }
+        
+        // Animate the points card
+        pointsCard?.apply {
+            animate()
+                .alpha(1f)
+                .translationY(0f)
+                .setDuration(animDuration)
+                .setInterpolator(android.view.animation.OvershootInterpolator(0.8f))
+                .setStartDelay(baseDelay + 150)
+                .start()
+        }
+        
+        // Animate the categories card
+        categoriesCard?.apply {
+            animate()
+                .alpha(1f)
+                .translationY(0f)
+                .setDuration(animDuration)
+                .setInterpolator(android.view.animation.OvershootInterpolator(0.8f))
+                .setStartDelay(baseDelay + 250)
+                .start()
+        }
+        
+        // Animate the rewards list card
+        rewardsListCard?.apply {
+            animate()
+                .alpha(1f)
+                .translationY(0f)
+                .setDuration(animDuration)
+                .setInterpolator(android.view.animation.OvershootInterpolator(0.8f))
+                .setStartDelay(baseDelay + 350)
+                .start()
+        }
     }
 
     companion object {

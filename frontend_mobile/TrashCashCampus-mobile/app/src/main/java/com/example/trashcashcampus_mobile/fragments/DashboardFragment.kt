@@ -1,12 +1,17 @@
 package com.example.trashcashcampus_mobile.fragments
 
+import android.animation.AnimatorSet
+import android.animation.ArgbEvaluator
+import android.animation.ObjectAnimator
 import android.content.Context
 import android.content.Intent
+import android.graphics.Color
 import android.os.Bundle
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.Button
 import android.widget.ImageButton
 import android.widget.ImageView
@@ -118,6 +123,9 @@ class DashboardFragment : Fragment() {
         
         // Set up button click listeners
         setupListeners()
+        
+        // Animate dashboard elements
+        animateDashboardEntrance()
     }
     
     override fun onDestroyView() {
@@ -1147,6 +1155,191 @@ class DashboardFragment : Fragment() {
         } ?: run {
             // No user ID available
             showLoading(false)
+        }
+    }
+
+    private fun animateDashboardEntrance() {
+        // Get references to view elements
+        val appBar = view?.findViewById<View>(R.id.layout_app_bar)
+        val userInfoCard = view?.findViewById<View>(R.id.card_user_info)
+        val pointsCard = view?.findViewById<View>(R.id.card_points)
+        val weeklyGoalCard = view?.findViewById<View>(R.id.card_weekly_goal)
+        val rewardsCard = view?.findViewById<View>(R.id.card_rewards)
+        
+        // Define animation durations and delays
+        val baseDelay = 100L
+        val animDuration = 500L
+        
+        // Animate the app bar
+        appBar?.apply {
+            animate()
+                .alpha(1f)
+                .translationY(0f)
+                .setDuration(animDuration)
+                .setInterpolator(android.view.animation.DecelerateInterpolator())
+                .setStartDelay(baseDelay)
+                .start()
+        }
+        
+        // Animate the user info card
+        userInfoCard?.apply {
+            animate()
+                .alpha(1f)
+                .translationY(0f)
+                .setDuration(animDuration)
+                .setInterpolator(android.view.animation.OvershootInterpolator(0.8f))
+                .setStartDelay(baseDelay + 100)
+                .start()
+        }
+        
+        // Animate the points card
+        pointsCard?.apply {
+            animate()
+                .alpha(1f)
+                .translationY(0f)
+                .setDuration(animDuration)
+                .setInterpolator(android.view.animation.OvershootInterpolator(0.8f))
+                .setStartDelay(baseDelay + 200)
+                .start()
+        }
+        
+        // Animate the weekly goal card
+        weeklyGoalCard?.apply {
+            animate()
+                .alpha(1f)
+                .translationY(0f)
+                .setDuration(animDuration)
+                .setInterpolator(android.view.animation.OvershootInterpolator(0.8f))
+                .setStartDelay(baseDelay + 300)
+                .start()
+        }
+        
+        // Animate the rewards card
+        rewardsCard?.apply {
+            animate()
+                .alpha(1f)
+                .translationY(0f)
+                .setDuration(animDuration)
+                .setInterpolator(android.view.animation.OvershootInterpolator(0.8f))
+                .setStartDelay(baseDelay + 400)
+                .withEndAction {
+                    // Add a subtle pulse animation to the "View All Rewards" button to draw attention
+                    val rewardsButton = view?.findViewById<Button>(R.id.btn_view_rewards)
+                    rewardsButton?.apply {
+                        val scaleX = ObjectAnimator.ofFloat(this, "scaleX", 1f, 1.05f, 1f)
+                        val scaleY = ObjectAnimator.ofFloat(this, "scaleY", 1f, 1.05f, 1f)
+                        
+                        val animSet = AnimatorSet()
+                        animSet.playTogether(scaleX, scaleY)
+                        animSet.duration = 800
+                        animSet.interpolator = AccelerateDecelerateInterpolator()
+                        animSet.start()
+                    }
+                }
+                .start()
+        }
+        
+        // Add animation to display point increments when they come in
+        observePointChanges()
+    }
+    
+    private fun observePointChanges() {
+        // When points change, show the increment with an animation
+        var previousPoints = 0
+        
+        // Update the observer in the existing setupUserPointsListener function
+        // We'll track point changes and animate when they increase
+        userPointsListener?.remove()
+        
+        userPointsListener = db.collection("users").document(userId!!)
+            .addSnapshotListener { snapshot, e ->
+                if (e != null) {
+                    Log.w(tag, "Listen failed.", e)
+                    return@addSnapshotListener
+                }
+                
+                if (snapshot != null && snapshot.exists()) {
+                    // Convert snapshot to HashMap instead of UserData class
+                    val userData = snapshot.data
+                    val currentPoints = when (val pointsValue = userData?.get("totalPoints")) {
+                        is Long -> pointsValue.toInt()
+                        is Int -> pointsValue
+                        is Double -> pointsValue.toInt()
+                        is String -> pointsValue.toIntOrNull() ?: 0
+                        else -> 0
+                    }
+                    
+                    // Get the display name
+                    val displayName = userData?.get("displayName") as? String ?: "User"
+                    
+                    // Update UI with user data
+                    activity?.runOnUiThread {
+                        tvUserName.text = displayName
+                        tvTotalPoints.text = currentPoints.toString()
+                        
+                        // Calculate points increment and animate if positive
+                        if (previousPoints > 0 && currentPoints > previousPoints) {
+                            val increment = currentPoints - previousPoints
+                            animatePointIncrement(increment)
+                        }
+                        
+                        // Update progress bar
+                        val weeklyGoal = 100 // Default weekly goal
+                        val weeklyProgress = currentPoints.coerceAtMost(weeklyGoal) // Simple progress calculation
+                        tvWeeklyGoal.text = weeklyGoal.toString()
+                        tvGoalProgress.text = "$weeklyProgress/$weeklyGoal"
+                        progressWeekly.max = weeklyGoal
+                        progressWeekly.progress = weeklyProgress
+                    }
+                    
+                    // Store points for next comparison
+                    previousPoints = currentPoints
+                }
+            }
+    }
+    
+    private fun animatePointIncrement(increment: Int) {
+        // Show the increment text
+        tvPointsIncrement.text = "+$increment"
+        tvPointsIncrement.visibility = View.VISIBLE
+        tvPointsIncrement.alpha = 0f
+        tvPointsIncrement.scaleX = 0.5f
+        tvPointsIncrement.scaleY = 0.5f
+        
+        try {
+            // Create a color transition animation for points
+            val colorFrom = Color.WHITE
+            val colorTo = Color.parseColor("#FFEB3B")
+            val colorAnim = ObjectAnimator.ofInt(tvTotalPoints, "textColor", colorFrom, colorTo, colorFrom)
+            colorAnim.duration = 1000
+            colorAnim.setEvaluator(ArgbEvaluator())
+            colorAnim.interpolator = AccelerateDecelerateInterpolator()
+            colorAnim.start()
+            
+            // Animate the increment text
+            tvPointsIncrement.animate()
+                .alpha(1f)
+                .scaleX(1.2f)
+                .scaleY(1.2f)
+                .setDuration(300)
+                .withEndAction {
+                    tvPointsIncrement.animate()
+                        .alpha(0f)
+                        .translationY(-50f)
+                        .setDuration(800)
+                        .setStartDelay(500)
+                        .withEndAction {
+                            tvPointsIncrement.translationY = 0f
+                            tvPointsIncrement.visibility = View.INVISIBLE
+                        }
+                        .start()
+                }
+                .start()
+                
+        } catch (e: Exception) {
+            Log.e(tag, "Error animating point increment", e)
+            // Fallback - just show the increment
+            tvPointsIncrement.visibility = View.VISIBLE
         }
     }
 

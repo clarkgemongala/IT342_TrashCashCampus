@@ -4,7 +4,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/background"
+    android:background="@android:color/transparent"
     android:padding="16dp">
 
     <TextView
@@ -13,9 +13,12 @@
         android:layout_height="wrap_content"
         android:text="Rewards"
         android:textColor="@color/text_primary"
-        android:textSize="28sp"
+        android:textSize="32sp"
         android:textStyle="bold"
+        android:fontFamily="sans-serif-medium"
         android:layout_marginTop="8dp"
+        android:alpha="0"
+        android:translationY="-30dp"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent" />
 
@@ -25,12 +28,14 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
-        app:cardCornerRadius="16dp"
-        app:cardElevation="2dp"
-        app:cardBackgroundColor="@color/white"
+        app:cardCornerRadius="24dp"
+        app:cardElevation="4dp"
+        app:cardBackgroundColor="@color/primary"
         app:layout_constraintTop_toBottomOf="@id/tv_rewards_title"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
+        app:layout_constraintEnd_toEndOf="parent"
+        android:alpha="0"
+        android:translationY="50dp">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -43,7 +48,8 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="Available Points"
-                android:textColor="@color/text_secondary"
+                android:textColor="#FFFFFF"
+                android:fontFamily="sans-serif-medium"
                 android:textSize="18sp" />
 
             <TextView
@@ -51,95 +57,128 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="0"
-                android:textColor="@color/text_primary"
-                android:textSize="48sp"
+                android:textColor="#FFFFFF"
+                android:textSize="56sp"
                 android:textStyle="bold"
+                android:fontFamily="sans-serif-medium"
+                android:layout_marginTop="8dp" />
+                
+            <TextView
+                android:id="@+id/tv_rewards_hint"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Tap on a reward to redeem!"
+                android:textColor="#9FFFFFFF"
+                android:textSize="16sp"
+                android:fontFamily="sans-serif-medium"
                 android:layout_marginTop="8dp" />
         </LinearLayout>
     </androidx.cardview.widget.CardView>
 
     <!-- Category Tabs -->
-    <HorizontalScrollView
-        android:id="@+id/category_scroll"
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/card_categories"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="16dp"
-        android:scrollbars="none"
+        app:cardCornerRadius="16dp"
+        app:cardElevation="2dp"
+        app:cardBackgroundColor="@color/white"
         app:layout_constraintTop_toBottomOf="@id/card_user_points"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent">
-
-        <LinearLayout
-            android:id="@+id/category_container"
-            android:layout_width="wrap_content"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:alpha="0"
+        android:translationY="50dp">
+        
+        <HorizontalScrollView
+            android:id="@+id/category_scroll"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:padding="4dp">
+            android:scrollbars="none"
+            android:padding="12dp">
 
-            <Button
-                android:id="@+id/btn_category_all"
+            <LinearLayout
+                android:id="@+id/category_container"
                 android:layout_width="wrap_content"
-                android:layout_height="40dp"
-                android:text="All Rewards"
-                android:layout_marginEnd="8dp"
-                android:textColor="@color/text_primary"
-                android:backgroundTint="@color/surface"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
 
-            <Button
-                android:id="@+id/btn_category_campus"
-                android:layout_width="wrap_content"
-                android:layout_height="40dp"
-                android:text="Campus Services"
-                android:layout_marginEnd="8dp"
-                android:textColor="@color/text_primary"
-                android:backgroundTint="@color/surface"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/btn_category_all"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="All Rewards"
+                    android:layout_marginEnd="8dp"
+                    android:textColor="@color/white"
+                    app:chipBackgroundColor="@color/primary"
+                    style="@style/Widget.MaterialComponents.Chip.Choice" />
 
-            <Button
-                android:id="@+id/btn_category_food"
-                android:layout_width="wrap_content"
-                android:layout_height="40dp"
-                android:text="Food &amp; Beverages"
-                android:layout_marginEnd="8dp"
-                android:textColor="@color/text_primary"
-                android:backgroundTint="@color/surface"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/btn_category_campus"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Campus Services"
+                    android:layout_marginEnd="8dp"
+                    android:textColor="@color/text_primary"
+                    app:chipBackgroundColor="@color/surface"
+                    style="@style/Widget.MaterialComponents.Chip.Choice" />
 
-            <Button
-                android:id="@+id/btn_category_merchandise"
-                android:layout_width="wrap_content"
-                android:layout_height="40dp"
-                android:text="Merchandise"
-                android:layout_marginEnd="8dp"
-                android:textColor="@color/text_primary"
-                android:backgroundTint="@color/surface"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/btn_category_food"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Food &amp; Beverages"
+                    android:layout_marginEnd="8dp"
+                    android:textColor="@color/text_primary"
+                    app:chipBackgroundColor="@color/surface"
+                    style="@style/Widget.MaterialComponents.Chip.Choice" />
 
-            <Button
-                android:id="@+id/btn_category_experiences"
-                android:layout_width="wrap_content"
-                android:layout_height="40dp"
-                android:text="Experiences"
-                android:layout_marginEnd="8dp"
-                android:textColor="@color/text_primary"
-                android:backgroundTint="@color/surface"
-                style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
-        </LinearLayout>
-    </HorizontalScrollView>
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/btn_category_merchandise"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Merchandise"
+                    android:layout_marginEnd="8dp"
+                    android:textColor="@color/text_primary"
+                    app:chipBackgroundColor="@color/surface"
+                    style="@style/Widget.MaterialComponents.Chip.Choice" />
+
+                <com.google.android.material.chip.Chip
+                    android:id="@+id/btn_category_experiences"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Experiences"
+                    android:textColor="@color/text_primary"
+                    app:chipBackgroundColor="@color/surface"
+                    style="@style/Widget.MaterialComponents.Chip.Choice" />
+            </LinearLayout>
+        </HorizontalScrollView>
+    </com.google.android.material.card.MaterialCardView>
 
     <!-- Rewards Grid -->
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/recycler_rewards"
+    <androidx.cardview.widget.CardView
+        android:id="@+id/card_rewards_list"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_marginTop="8dp"
-        android:clipToPadding="false"
-        android:paddingBottom="16dp"
-        app:layout_constraintTop_toBottomOf="@id/category_scroll"
+        android:layout_marginTop="16dp"
+        app:cardCornerRadius="16dp"
+        app:cardElevation="2dp"
+        app:cardBackgroundColor="@color/white"
+        app:layout_constraintTop_toBottomOf="@id/card_categories"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toEndOf="parent" />
+        app:layout_constraintEnd_toEndOf="parent"
+        android:alpha="0"
+        android:translationY="50dp">
+        
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recycler_rewards"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:padding="8dp" />
+            
+    </androidx.cardview.widget.CardView>
 
     <!-- Loading Indicator -->
     <ProgressBar

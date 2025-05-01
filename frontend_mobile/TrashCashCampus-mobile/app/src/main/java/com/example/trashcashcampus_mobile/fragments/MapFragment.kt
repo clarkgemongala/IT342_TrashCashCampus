@@ -1,17 +1,23 @@
 package com.example.trashcashcampus_mobile.fragments
 
 import android.Manifest
+import android.animation.AnimatorSet
+import android.animation.ObjectAnimator
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.preference.PreferenceManager
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.content.res.AppCompatResources
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
@@ -27,13 +33,22 @@ import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.infowindow.InfoWindow
+import android.app.AlertDialog
 
 class MapFragment : Fragment() {
     private val TAG = "MapFragment"
+    // Add QR scanner request code constant
+    companion object {
+        const val QR_SCANNER_REQUEST_CODE = 100
+        
+        @JvmStatic
+        fun newInstance() = MapFragment()
+    }
     
     // UI elements
     // private lateinit var btnScanQR: Button
     private lateinit var mapView: MapView
+    private lateinit var customInfoWindow: InfoWindow
     
     // Location permissions
     private val REQUEST_PERMISSIONS_REQUEST_CODE = 1
@@ -63,6 +78,52 @@ class MapFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         
+        // Initialize map view
+        mapView = view.findViewById(R.id.map_view)
+        
+        // Initialize info window for markers
+        customInfoWindow = object : InfoWindow(R.layout.map_info_window, mapView) {
+            override fun onOpen(item: Any?) {
+                val marker = item as? Marker ?: return
+                val infoView = mView
+                
+                // Fix the IDs to match the actual ones in map_info_window.xml
+                val title = infoView.findViewById<TextView>(R.id.info_title)
+                val snippet = infoView.findViewById<TextView>(R.id.info_snippet)
+                val scanButton = infoView.findViewById<Button>(R.id.info_button)
+                
+                title.text = marker.title
+                snippet.text = marker.snippet
+                
+                scanButton.setOnClickListener {
+                    if (marker.title?.contains("Recycling Bin") == true) {
+                        // Launch QR scanner for this location
+                        launchQRScanner(marker.position.latitude, marker.position.longitude)
+                    } else {
+                        // Just show a message for collection points
+                        Toast.makeText(context, "Visit this location to redeem your points!", Toast.LENGTH_SHORT).show()
+                    }
+                    // Close the info window
+                    close()
+                }
+            }
+            
+            override fun onClose() {
+                // Clean up if needed
+            }
+        }
+        
+        // Configure map
+        configureMap()
+        
+        // Add markers for trash bins and collection points
+        addMapMarkers()
+        
+        // Animate map entrance
+        animateMapEntrance()
+    }
+    
+    private fun configureMap() {
         // Configure osmdroid
         val ctx = requireActivity().applicationContext
         Configuration.getInstance().load(ctx, PreferenceManager.getDefaultSharedPreferences(ctx))
@@ -70,7 +131,6 @@ class MapFragment : Fragment() {
         // Initialize UI elements
         // Remove the global scan QR button - we'll keep only the ones in marker windows
         // btnScanQR = view.findViewById(R.id.btn_scan_qr)
-        mapView = view.findViewById(R.id.map_view)
         
         // Remove button click listeners setup since we removed the button
         // setupListeners()
@@ -80,9 +140,6 @@ class MapFragment : Fragment() {
         
         // Initialize the map with basic configuration
         initializeMapBase()
-        
-        // Load campus locations from backend
-        loadCampusLocations()
         
         // Set up tap listener on map to dismiss any open info windows
         mapView.setOnTouchListener { _, _ ->
@@ -150,28 +207,35 @@ class MapFragment : Fragment() {
             
             // Set custom click behavior
             marker.setOnMarkerClickListener { clickedMarker, _ ->
-                // Show a custom info window with the scan button
-                val infoWindow = CustomInfoWindow(mapView, clickedMarker, location.name)
-                // Use constant value instead of marker.height which is unavailable
-                val markerHeight = 100 // Default height in pixels
-                infoWindow.open(clickedMarker, marker.position, 0, -markerHeight)
+                // Create an alert dialog
+                val dialogView = layoutInflater.inflate(R.layout.map_info_window, null)
+                
+                // Set marker information
+                val title = dialogView.findViewById<TextView>(R.id.info_title)
+                title.text = marker.title
+                
+                // Set up scan button
+                val btnScan = dialogView.findViewById<Button>(R.id.info_button)
+                btnScan.setOnClickListener {
+                    // Launch QR scanner with location data
+                    launchQRScanner(location.latitude, location.longitude)
+                    dialogView.isPressed = false
+                }
+                
+                // Show the dialog
+                val dialog = AlertDialog.Builder(requireContext())
+                    .setView(dialogView)
+                    .create()
+                
+                dialog.show()
+                
+                // Return true to indicate we've handled the event
                 true
             }
             
-            // Set icon based on bin type if needed
-            /*when (location.binType.toLowerCase()) {
-                "recyclable" -> marker.icon = ContextCompat.getDrawable(requireContext(), R.drawable.ic_bin_recyclable)
-                "paper" -> marker.icon = ContextCompat.getDrawable(requireContext(), R.drawable.ic_bin_paper)
-                "plastic" -> marker.icon = ContextCompat.getDrawable(requireContext(), R.drawable.ic_bin_plastic)
-                "food" -> marker.icon = ContextCompat.getDrawable(requireContext(), R.drawable.ic_bin_food)
-                else -> marker.icon = ContextCompat.getDrawable(requireContext(), R.drawable.ic_bin_general)
-            }*/
-            
+            marker.infoWindow = customInfoWindow
             mapView.overlays.add(marker)
         }
-        
-        // Refresh the map to show changes
-        mapView.invalidate()
     }
     
     private fun addDefaultMarkers() {
@@ -213,11 +277,11 @@ class MapFragment : Fragment() {
             val view = mView
             
             // Set location name
-            val title = view.findViewById<TextView>(R.id.info_window_title)
+            val title = view.findViewById<TextView>(R.id.info_title)
             title.text = marker.title
             
             // Set up scan button
-            val btnScan = view.findViewById<Button>(R.id.btn_scan_at_location)
+            val btnScan = view.findViewById<Button>(R.id.info_button)
             btnScan.setOnClickListener {
                 // Launch QR scanner with location data
             val intent = Intent(requireContext(), QRScannerActivity::class.java)
@@ -226,15 +290,6 @@ class MapFragment : Fragment() {
                 
                 // Close the info window
                 close()
-            }
-            
-            // Add a close button to the info window
-            val btnClose = view.findViewById<View>(R.id.btn_close_info)
-            if (btnClose != null) {
-                btnClose.setOnClickListener {
-                    // Close this info window
-                    close()
-                }
             }
         }
         
@@ -273,10 +328,175 @@ class MapFragment : Fragment() {
     }
     
     // Data class for mapping locations
-    data class MapPoint(val name: String, val latitude: Double, val longitude: Double)
+    data class MapPoint(val name: String, val latitude: Double, val longitude: Double, val type: String = "bin")
 
-    companion object {
-        @JvmStatic
-        fun newInstance() = MapFragment()
+    private fun animateMapEntrance() {
+        // Get references to view elements
+        val titleText = view?.findViewById<View>(R.id.tv_map_title)
+        val subtitleText = view?.findViewById<View>(R.id.tv_map_subtitle)
+        val mapContainer = view?.findViewById<View>(R.id.map_container)
+        
+        // Define animation durations and delays
+        val baseDelay = 100L
+        val animDuration = 500L
+        
+        // Animate the title
+        titleText?.apply {
+            animate()
+                .alpha(1f)
+                .translationY(0f)
+                .setDuration(animDuration)
+                .setInterpolator(android.view.animation.DecelerateInterpolator())
+                .setStartDelay(baseDelay)
+                .start()
+        }
+        
+        // Animate the subtitle
+        subtitleText?.apply {
+            animate()
+                .alpha(1f)
+                .translationY(0f)
+                .setDuration(animDuration)
+                .setInterpolator(android.view.animation.DecelerateInterpolator())
+                .setStartDelay(baseDelay + 100)
+                .start()
+        }
+        
+        // Animate the map container with a bounce effect
+        mapContainer?.apply {
+            animate()
+                .alpha(1f)
+                .translationY(0f)
+                .setDuration(animDuration + 100)
+                .setInterpolator(android.view.animation.OvershootInterpolator(0.8f))
+                .setStartDelay(baseDelay + 200)
+                .withEndAction {
+                    try {
+                        // Add a subtle scale animation to draw attention to the map
+                        val scaleX = ObjectAnimator.ofFloat(this, "scaleX", 1f, 1.02f, 1f)
+                        val scaleY = ObjectAnimator.ofFloat(this, "scaleY", 1f, 1.02f, 1f)
+                        
+                        val animSet = AnimatorSet()
+                        animSet.playTogether(scaleX, scaleY)
+                        animSet.duration = 800
+                        animSet.interpolator = AccelerateDecelerateInterpolator()
+                        animSet.start()
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error during map animation", e)
+                    }
+                }
+                .start()
+        }
+    }
+    
+    private fun addMarkerWithAnimation(geoPoint: GeoPoint, markerType: String) {
+        // Create marker
+        val marker = Marker(mapView)
+        marker.position = geoPoint
+        marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+        
+        // Set marker appearance based on type
+        when (markerType) {
+            "bin" -> {
+                marker.icon = AppCompatResources.getDrawable(requireContext(), R.drawable.ic_recycling)
+                marker.title = "Recycling Bin"
+                marker.snippet = "Tap to scan QR code"
+            }
+            "collection" -> {
+                marker.icon = AppCompatResources.getDrawable(requireContext(), R.drawable.ic_collection_point)
+                marker.title = "Collection Point"
+                marker.snippet = "Redeem points here"
+            }
+        }
+        
+        // Set info window
+        marker.infoWindow = customInfoWindow
+        
+        // Set onclick listener for QR scanning
+        marker.setOnMarkerClickListener { clickedMarker, _ ->
+            clickedMarker.showInfoWindow()
+            mapView.controller.animateTo(clickedMarker.position)
+            true
+        }
+        
+        // Add to map with animation
+        mapView.overlays.add(marker)
+        
+        // Animate the marker when it's added
+        val handler = Handler(Looper.getMainLooper())
+        handler.postDelayed({
+            // Start with marker slightly above its position and not fully opaque
+            marker.alpha = 0f
+            marker.position = GeoPoint(geoPoint.latitude, geoPoint.longitude)
+            marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+            
+            // Animate marker dropping down
+            val startLat = geoPoint.latitude + 0.0001 // Slightly above
+            val steps = 10
+            val delay = 20L // milliseconds per step
+            
+            for (i in 0 until steps) {
+                handler.postDelayed({
+                    val fraction = i.toFloat() / steps
+                    val newLat = startLat - (startLat - geoPoint.latitude) * fraction
+                    marker.position = GeoPoint(newLat, geoPoint.longitude)
+                    marker.alpha = fraction
+                    mapView.invalidate()
+                }, i * delay)
+            }
+            
+            // Final position
+            handler.postDelayed({
+                marker.position = geoPoint
+                marker.alpha = 1f
+                mapView.invalidate()
+            }, steps * delay)
+        }, 500) // Delay each marker animation slightly
+    }
+
+    private fun addMapMarkers() {
+        // Load campus locations from backend
+        loadCampusLocations()
+        
+        // Add some default markers to begin with
+        val defaultLocations = listOf(
+            // Recycling bins (sample data)
+            MapPoint("Library Recycling Bin", 21.5001, 39.2435, "bin"),
+            MapPoint("Student Center Bin", 21.4997, 39.2450, "bin"),
+            MapPoint("Admin Building Bin", 21.5008, 39.2445, "bin"),
+            MapPoint("Engineering Bin", 21.4990, 39.2458, "bin"),
+            
+            // Collection points (sample data)
+            MapPoint("Main Collection Center", 21.5004, 39.2440, "collection"),
+            MapPoint("South Campus Collection", 21.4985, 39.2448, "collection")
+        )
+        
+        // Add markers with animation, slightly delayed from each other
+        defaultLocations.forEachIndexed { index, point ->
+            val handler = Handler(Looper.getMainLooper())
+            handler.postDelayed({
+                addMarkerWithAnimation(
+                    GeoPoint(point.latitude, point.longitude),
+                    point.type
+                )
+            }, 300L + (index * 150L)) // Stagger the marker additions
+        }
+    }
+    
+    // Updated data class for mapping locations with type
+    // data class MapPoint(val name: String, val latitude: Double, val longitude: Double, val type: String = "bin")
+
+    private fun launchQRScanner(latitude: Double, longitude: Double) {
+        try {
+            // Launch QR scanner activity with location data
+            val intent = Intent(requireContext(), QRScannerActivity::class.java)
+            intent.putExtra("latitude", latitude)
+            intent.putExtra("longitude", longitude)
+            intent.putExtra("source", "map")
+            startActivityForResult(intent, QR_SCANNER_REQUEST_CODE)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error launching QR scanner", e)
+            Toast.makeText(requireContext(), "Could not open QR scanner", Toast.LENGTH_SHORT).show()
+        }
     }
 } 

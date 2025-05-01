@@ -203,11 +203,63 @@ class MainActivity : AppCompatActivity() {
     }
     
     private fun loadFragment(fragment: Fragment) {
+        val previousFragment = activeFragment
         activeFragment = fragment
-        supportFragmentManager.beginTransaction()
-            .setCustomAnimations(R.anim.fade_in, R.anim.fade_out)
+        
+        // Determine the animation direction
+        val transitionAnimator = when {
+            previousFragment == null -> {
+                // First load - fade in
+                supportFragmentManager.beginTransaction()
+                    .setCustomAnimations(R.anim.fade_in, R.anim.fade_out)
+            }
+            previousFragment is DashboardFragment && fragment is RewardsFragment -> {
+                // Dashboard to Rewards (move right)
+                supportFragmentManager.beginTransaction()
+                    .setCustomAnimations(R.anim.slide_in_right, R.anim.slide_out_left)
+            }
+            previousFragment is RewardsFragment && fragment is DashboardFragment -> {
+                // Rewards to Dashboard (move left)
+                supportFragmentManager.beginTransaction()
+                    .setCustomAnimations(R.anim.slide_in_left, R.anim.slide_out_right)
+            }
+            previousFragment is RewardsFragment && fragment is MapFragment -> {
+                // Rewards to Map (move right)
+                supportFragmentManager.beginTransaction()
+                    .setCustomAnimations(R.anim.slide_in_right, R.anim.slide_out_left)
+            }
+            previousFragment is MapFragment && fragment is RewardsFragment -> {
+                // Map to Rewards (move left)
+                supportFragmentManager.beginTransaction()
+                    .setCustomAnimations(R.anim.slide_in_left, R.anim.slide_out_right)
+            }
+            previousFragment is DashboardFragment && fragment is MapFragment -> {
+                // Dashboard to Map (move right twice)
+                supportFragmentManager.beginTransaction()
+                    .setCustomAnimations(R.anim.slide_in_right, R.anim.slide_out_left)
+            }
+            previousFragment is MapFragment && fragment is DashboardFragment -> {
+                // Map to Dashboard (move left twice)
+                supportFragmentManager.beginTransaction()
+                    .setCustomAnimations(R.anim.slide_in_left, R.anim.slide_out_right)
+            }
+            else -> {
+                // Default fade animation
+                supportFragmentManager.beginTransaction()
+                    .setCustomAnimations(R.anim.fade_in, R.anim.fade_out)
+            }
+        }
+        
+        transitionAnimator
             .replace(R.id.fragment_container, fragment)
             .commit()
+        
+        // Animate the bottom navigation with a small bounce
+        val bottomNavigation = findViewById<BottomNavigationView>(R.id.bottom_navigation)
+        val animator = ObjectAnimator.ofFloat(bottomNavigation, "translationY", 20f, 0f)
+        animator.duration = 300
+        animator.interpolator = OvershootInterpolator(2f)
+        animator.start()
     }
     
     private fun checkBackendConnection() {

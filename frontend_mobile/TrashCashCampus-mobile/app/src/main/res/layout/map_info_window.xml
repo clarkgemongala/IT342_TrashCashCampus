@@ -4,54 +4,46 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="240dp"
     android:layout_height="wrap_content"
-    app:cardCornerRadius="8dp"
+    app:cardCornerRadius="12dp"
     app:cardElevation="4dp"
     app:cardBackgroundColor="@color/white">
 
-    <RelativeLayout
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content">
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
 
-        <!-- Close button at top right -->
-        <ImageButton
-            android:id="@+id/btn_close_info"
-            android:layout_width="28dp"
-            android:layout_height="28dp"
-            android:layout_alignParentEnd="true"
-            android:layout_alignParentTop="true"
-            android:layout_margin="4dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="Close"
-            android:src="@android:drawable/ic_menu_close_clear_cancel"
-            android:tint="#757575" />
-
-        <LinearLayout
+        <TextView
+            android:id="@+id/info_title"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="12dp">
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="@color/text_primary"
+            android:text="Location Title"
+            android:gravity="center_horizontal"
+            android:layout_marginBottom="8dp" />
+            
+        <TextView
+            android:id="@+id/info_snippet"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="14sp"
+            android:textColor="@color/text_secondary"
+            android:text="Location description"
+            android:gravity="center_horizontal"
+            android:layout_marginBottom="12dp" />
 
-            <TextView
-                android:id="@+id/info_window_title"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:textSize="16sp"
-                android:textStyle="bold"
-                android:textColor="@color/text_primary"
-                android:text="Location Title"
-                android:gravity="center_horizontal"
-                android:layout_marginBottom="8dp" />
-
-            <Button
-                android:id="@+id/btn_scan_at_location"
-                android:layout_width="match_parent"
-                android:layout_height="48dp"
-                android:text="Scan QR Code"
-                android:textSize="14sp"
-                android:textAllCaps="false"
-                android:background="@color/accent"
-                android:textColor="@color/white" />
-        </LinearLayout>
-    </RelativeLayout>
+        <Button
+            android:id="@+id/info_button"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Scan QR Code"
+            android:textSize="14sp"
+            android:backgroundTint="@color/primary"
+            android:textColor="@color/white"
+            app:cornerRadius="8dp" />
+    </LinearLayout>
 
 </androidx.cardview.widget.CardView> 
