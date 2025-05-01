@@ -31,7 +31,7 @@
             android:layout_marginTop="24dp"
             android:adjustViewBounds="true"
             android:contentDescription="Recycling illustration"
-            android:src="@drawable/login_illustration"
+            android:src="@drawable/name_logo"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@+id/btnBack"
@@ -111,6 +111,20 @@
                 android:layout_height="3dp"
                 android:background="#DDDDDD"
                 app:layout_constraintStart_toStartOf="@+id/vCircleEmail"
+                app:layout_constraintEnd_toEndOf="@+id/vCircleGender"
+                app:layout_constraintTop_toTopOf="@+id/vCircleEmail"
+                app:layout_constraintBottom_toBottomOf="@+id/vCircleEmail" />
+
+            <!-- Progress connector line for animation -->
+            <View
+                android:id="@+id/vConnectorLineProgress"
+                android:layout_width="0dp"
+                android:layout_height="3dp"
+                android:background="@color/orange_progress"
+                android:scaleX="0"
+                android:pivotX="0"
+                app:layout_constraintStart_toStartOf="@+id/vCircleEmail"
+                app:layout_constraintEnd_toStartOf="@+id/vCircleName"
                 app:layout_constraintTop_toTopOf="@+id/vCircleEmail"
                 app:layout_constraintBottom_toBottomOf="@+id/vCircleEmail" />
 
@@ -173,7 +187,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:background="@drawable/bg_input_field_rounded"
+            android:background="@drawable/bg_input_field_animated"
             android:hint="Firstname Lastname"
             android:inputType="textPersonName"
             android:padding="16dp"
@@ -189,12 +203,13 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginTop="32dp"
-            android:background="@drawable/bg_button_green"
+            android:background="@drawable/bg_button_green_consistent"
             android:padding="16dp"
             android:text="Continue"
             android:textAlignment="center"
             android:textAllCaps="false"
-            android:textColor="#333333"
+            android:textColor="#FFFFFF"
+            android:textStyle="bold"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@+id/etFullName" />

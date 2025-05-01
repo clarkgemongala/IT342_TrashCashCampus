@@ -22,6 +22,8 @@
     <color name="text_primary">#212121</color>
     <color name="text_secondary">#757575</color>
     <color name="text_disabled">#9E9E9E</color>
+    <color name="dark_text">#333333</color>
+    <color name="light_text">#BBBBBB</color>
     
     <!-- Background Colors -->
     <color name="background">#F5F5F5</color>
@@ -34,6 +36,11 @@
     <!-- Splash Screen Colors -->
     <color name="splash_start_color">#0D652D</color>
     <color name="splash_end_color">#1E8E3E</color>
+    
+    <!-- Progress Indicator Colors -->
+    <color name="orange_progress">#FF7143</color>
+    <color name="progress_unselected">#DDDDDD</color>
+    <color name="progress_completed_line">#FF7143</color>
     
     <!-- Material Design Colors -->
     <color name="design_default_color_primary">@color/primary</color>

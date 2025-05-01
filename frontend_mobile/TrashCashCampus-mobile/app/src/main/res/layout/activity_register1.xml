@@ -8,6 +8,7 @@
     android:background="@color/white">
 
     <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/mainContent"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:paddingHorizontal="24dp"
@@ -20,7 +21,7 @@
             android:layout_marginTop="48dp"
             android:adjustViewBounds="true"
             android:contentDescription="Recycling illustration"
-            android:src="@drawable/login_illustration"
+            android:src="@drawable/email_logo"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent"
@@ -39,7 +40,7 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@+id/ivRegisterIllustration" />
 
-        <!-- Improved Progress indicator with same colored circles -->
+        <!-- Progress indicator with circle steps to match other screens -->
         <androidx.constraintlayout.widget.ConstraintLayout
             android:id="@+id/clProgressIndicator"
             android:layout_width="match_parent"
@@ -81,7 +82,6 @@
                 app:layout_constraintEnd_toEndOf="@+id/vCircleBirthday"
                 app:layout_constraintTop_toTopOf="parent" />
 
-            <!-- Connector lines positioned behind the circles -->
             <TextView
                 android:id="@+id/tvGenderStep"
                 android:layout_width="wrap_content"
@@ -89,17 +89,31 @@
                 android:text="Gender"
                 android:textColor="#BBBBBB"
                 android:textSize="14sp"
-                app:layout_constraintEnd_toEndOf="@+id/vCircleGender"
-                app:layout_constraintHorizontal_bias="1.0"
                 app:layout_constraintStart_toStartOf="@+id/vCircleGender"
+                app:layout_constraintEnd_toEndOf="@+id/vCircleGender"
                 app:layout_constraintTop_toTopOf="parent" />
 
+            <!-- Connector lines positioned behind the circles -->
             <View
                 android:id="@+id/vConnectorLineBackground"
                 android:layout_width="0dp"
                 android:layout_height="3dp"
                 android:background="#DDDDDD"
                 app:layout_constraintStart_toStartOf="@+id/vCircleEmail"
+                app:layout_constraintEnd_toEndOf="@+id/vCircleGender"
+                app:layout_constraintTop_toTopOf="@+id/vCircleEmail"
+                app:layout_constraintBottom_toBottomOf="@+id/vCircleEmail" />
+
+            <!-- Progress connector line to be animated -->
+            <View
+                android:id="@+id/vConnectorLineProgress"
+                android:layout_width="0dp"
+                android:layout_height="3dp"
+                android:background="@color/orange_progress"
+                android:scaleX="0"
+                android:pivotX="0"
+                app:layout_constraintStart_toStartOf="@+id/vCircleEmail"
+                app:layout_constraintEnd_toStartOf="@+id/vCircleName"
                 app:layout_constraintTop_toTopOf="@+id/vCircleEmail"
                 app:layout_constraintBottom_toBottomOf="@+id/vCircleEmail" />
 
@@ -141,7 +155,6 @@
                 app:layout_constraintStart_toEndOf="@+id/vCircleBirthday"
                 app:layout_constraintEnd_toEndOf="parent"
                 app:layout_constraintTop_toTopOf="@+id/vCircleEmail" />
-
         </androidx.constraintlayout.widget.ConstraintLayout>
 
         <TextView
@@ -161,7 +174,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:background="@drawable/bg_input_field_rounded"
+            android:background="@drawable/bg_input_field_animated"
             android:hint="example@cit.edu"
             android:inputType="textEmailAddress"
             android:padding="16dp"
@@ -177,16 +190,16 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginTop="32dp"
-            android:background="@drawable/bg_button_green"
+            android:background="@drawable/bg_button_green_consistent"
             android:padding="16dp"
             android:text="Continue"
             android:textAlignment="center"
             android:textAllCaps="false"
-            android:textColor="#333333"
+            android:textColor="#FFFFFF"
+            android:textStyle="bold"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@+id/etEmail" />
-
 
         <LinearLayout
             android:layout_width="wrap_content"
@@ -212,10 +225,41 @@
                 android:layout_height="wrap_content"
                 android:layout_marginStart="4dp"
                 android:text="Log in"
-                android:textColor="#FF7143"
+                android:textColor="#34A853"
                 android:textSize="14sp"
                 android:textStyle="bold" />
         </LinearLayout>
 
+        <!-- Loading overlay -->
+        <RelativeLayout
+            android:id="@+id/loadingOverlay"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="#80FFFFFF"
+            android:clickable="true"
+            android:focusable="true"
+            android:visibility="gone"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent">
+
+            <ProgressBar
+                android:id="@+id/progressBar"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_centerInParent="true"
+                android:indeterminateTint="#34A853" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_below="@id/progressBar"
+                android:layout_centerHorizontal="true"
+                android:layout_marginTop="8dp"
+                android:text="Checking email..."
+                android:textColor="#333333"
+                android:textSize="14sp" />
+        </RelativeLayout>
     </androidx.constraintlayout.widget.ConstraintLayout>
 </ScrollView>

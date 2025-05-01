@@ -1,5 +1,8 @@
 package com.example.trashcashcampus_mobile
 
+import android.animation.AnimatorSet
+import android.animation.ObjectAnimator
+import android.animation.ValueAnimator
 import android.app.DatePickerDialog
 import android.content.Intent
 import android.os.Bundle
@@ -9,7 +12,11 @@ import android.text.Editable
 import android.text.InputType
 import android.text.TextWatcher
 import android.util.Log
+import android.view.MotionEvent
 import android.view.View
+import android.view.ViewGroup
+import android.view.animation.Animation
+import android.view.animation.AnimationUtils
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.EditText
@@ -21,6 +28,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.AppCompatButton
+import androidx.core.app.ActivityOptionsCompat
 import com.example.trashcashcampus_mobile.utils.ApiClient
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
@@ -124,6 +132,9 @@ class RegisterActivity : AppCompatActivity() {
                 try {
                     // Now set up the UI for the current step
                     setupStepContent(step)
+                    
+                    // Apply enter animations for the current step's main content
+                    applyEnterAnimation()
                 } catch (e: Exception) {
                     Log.e(TAG, "Error in post-layout setup for step $step: ${e.message}", e)
                     Toast.makeText(this, "Error setting up the form. Please restart the app.", Toast.LENGTH_SHORT).show()
@@ -165,6 +176,7 @@ class RegisterActivity : AppCompatActivity() {
         tvLogIn.setOnClickListener {
             // Go back to login screen
             finish()
+            overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
         }
 
         // Find email input - safely
@@ -177,6 +189,20 @@ class RegisterActivity : AppCompatActivity() {
         // Restore email if it exists
         if (userEmail.isNotEmpty()) {
             etEmail.setText(userEmail)
+        }
+
+        // Apply a subtle animation to the email field when focused
+        etEmail.setOnFocusChangeListener { v, hasFocus ->
+            if (hasFocus) {
+                val scaleX = ObjectAnimator.ofFloat(v, "scaleX", 1f, 1.05f, 1f)
+                val scaleY = ObjectAnimator.ofFloat(v, "scaleY", 1f, 1.05f, 1f)
+                
+                AnimatorSet().apply {
+                    playTogether(scaleX, scaleY)
+                    duration = 300
+                    start()
+                }
+            }
         }
 
         // Save email as user types
@@ -194,23 +220,42 @@ class RegisterActivity : AppCompatActivity() {
             Log.e(TAG, "btnContinue is null")
             return
         }
+        
+        // Add a press animation for the button
+        btnContinue.setOnTouchListener { v, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    v.animate().scaleX(0.95f).scaleY(0.95f).setDuration(100).start()
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    v.animate().scaleX(1f).scaleY(1f).setDuration(100).start()
+                }
+            }
+            false
+        }
+        
         btnContinue.setOnClickListener {
             // Save email again in case text watcher missed it
             userEmail = etEmail.text.toString().trim()
 
             // Validate email
             if (userEmail.isEmpty() || !android.util.Patterns.EMAIL_ADDRESS.matcher(userEmail).matches()) {
+                showErrorAnimation(etEmail)
                 Toast.makeText(this@RegisterActivity, "Please enter a valid email", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
 
             // Check if the email ends with @cit.edu
             if (!userEmail.endsWith("@cit.edu")) {
+                showErrorAnimation(etEmail)
                 Toast.makeText(this@RegisterActivity, "Please use your CIT email (@cit.edu)", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
 
             try {
+                // Show loading animation
+                showLoadingAnimation()
+                
                 // BYPASS FIREBASE AUTH CHECK due to Google API security exception
                 Log.w(TAG, "Bypassing Firebase Auth check due to potential security exception")
                 
@@ -440,7 +485,7 @@ class RegisterActivity : AppCompatActivity() {
     private fun checkEmailInFirestore(email: String) {
         try {
             // Show loading indicator
-            Toast.makeText(this, "Checking email...", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Checking email availability...", Toast.LENGTH_SHORT).show()
             
             val db = Firebase.firestore
             db.collection("users")
@@ -450,12 +495,21 @@ class RegisterActivity : AppCompatActivity() {
                     if (documents.isEmpty) {
                         // Email not found in Firestore, proceed with registration
                         Log.d(TAG, "Email not found in Firestore, proceeding with registration")
-                        currentStep = 2
-                        showRegistrationStep(currentStep)
+                        
+                        // Animate the progress indicator before moving to step 2
+                        animateProgressIndicator(1, 2)
+                        
+                        // Add a short delay to let the animation play before moving to next step
+                        Handler(Looper.getMainLooper()).postDelayed({
+                            // Proceed to step 2
+                            Log.d(TAG, "Moving from step 1 to step 2 (direct implementation)")
+                            currentStep = 2
+                            showRegistrationStep(currentStep)
+                        }, 300)
                     } else {
                         // Email already exists in Firestore
                         Log.d(TAG, "Email already registered in our database")
-                        Toast.makeText(this, "Email already registered in our database", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this, "This email is already registered. Please use a different email or log in.", Toast.LENGTH_SHORT).show()
                     }
                 }
                 .addOnFailureListener { e ->
@@ -788,10 +842,17 @@ class RegisterActivity : AppCompatActivity() {
                     if (documents.isEmpty) {
                         // Name not found in Firestore, proceed with registration
                         Log.d(TAG, "Name not found in Firestore, proceeding with registration")
-                        // Proceed to step 3
-                        Log.d(TAG, "Moving from step 2 to step 3 (direct implementation)")
-                        currentStep = 3
-                        showRegistrationStep(currentStep)
+                        
+                        // Animate the progress indicator before moving to step 3
+                        animateProgressIndicator(2, 3)
+                        
+                        // Add a short delay to let the animation play before moving to next step
+                        Handler(Looper.getMainLooper()).postDelayed({
+                            // Proceed to step 3
+                            Log.d(TAG, "Moving from step 2 to step 3 (direct implementation)")
+                            currentStep = 3
+                            showRegistrationStep(currentStep)
+                        }, 300)
                     } else {
                         // Name already exists in Firestore
                         Log.d(TAG, "Name already registered in our database")
@@ -867,10 +928,16 @@ class RegisterActivity : AppCompatActivity() {
                         return@setOnClickListener
                     }
                     
-                    // Proceed to step 4
-                    Log.d(TAG, "Moving from step 3 to step 4 (direct implementation)")
-                    currentStep = 4
-                    showRegistrationStep(currentStep)
+                    // Animate the progress indicator before moving to step 4
+                    animateProgressIndicator(3, 4)
+                    
+                    // Add a short delay to let the animation play before moving to next step
+                    Handler(Looper.getMainLooper()).postDelayed({
+                        // Proceed to step 4
+                        Log.d(TAG, "Moving from step 3 to step 4 (direct implementation)")
+                        currentStep = 4
+                        showRegistrationStep(currentStep)
+                    }, 300)
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error in direct handling of step 3: ${e.message}", e)
@@ -905,49 +972,7 @@ class RegisterActivity : AppCompatActivity() {
                 
                 // Setup gender spinner with options
                 try {
-                    val spinner = findViewById<Spinner>(R.id.spinnerGender)
-                    
-                    if (spinner != null) {
-                        // Create gender options
-                        val genderOptions = arrayOf("Select your gender", "Male", "Female", "Prefer Not to Say")
-                        
-                        // Create adapter with custom layouts
-                        val adapter = ArrayAdapter(
-                            this,
-                            R.layout.spinner_item,
-                            genderOptions
-                        )
-                        adapter.setDropDownViewResource(R.layout.spinner_dropdown_item)
-                        
-                        // Apply adapter to spinner
-                        spinner.adapter = adapter
-                        
-                        // Set selection based on stored value
-                        if (selectedGender.isNotEmpty()) {
-                            val position = genderOptions.indexOf(selectedGender)
-                            if (position > 0) {
-                                spinner.setSelection(position)
-                            }
-                        } else {
-                            // Default selection hint
-                            spinner.setSelection(0)
-                        }
-                        
-                        // Set listener for selection
-                        spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-                            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
-                                if (position > 0) {
-                                    selectedGender = genderOptions[position]
-                                }
-                            }
-                            
-                            override fun onNothingSelected(parent: AdapterView<*>?) {
-                                // Do nothing
-                            }
-                        }
-                    } else {
-                        Log.e(TAG, "Gender spinner not found in layout")
-                    }
+                    setupGenderSpinner()
                 } catch (e: Exception) {
                     Log.e(TAG, "Error setting up gender spinner: ${e.message}", e)
                     Toast.makeText(this@RegisterActivity, "Error loading gender options", Toast.LENGTH_SHORT).show()
@@ -960,9 +985,15 @@ class RegisterActivity : AppCompatActivity() {
                     if (selectedGender.isEmpty() || selectedGender == "Select your gender") {
                         Toast.makeText(this@RegisterActivity, "Please select your gender", Toast.LENGTH_SHORT).show()
                     } else {
-                        Log.d(TAG, "Moving from step 4 to step 5 (direct implementation)")
-                        currentStep = 5
-                        showRegistrationStep(currentStep)
+                        // Animate the progress indicator before moving to step 5
+                        animateProgressIndicator(4, 5)
+                        
+                        // Add a short delay to let the animation play before moving to next step
+                        Handler(Looper.getMainLooper()).postDelayed({
+                            Log.d(TAG, "Moving from step 4 to step 5")
+                            currentStep = 5
+                            showRegistrationStep(currentStep)
+                        }, 300)
                     }
                 }
             } catch (e: Exception) {
@@ -1077,5 +1108,351 @@ class RegisterActivity : AppCompatActivity() {
         // For simplicity, we'll just return to step 1
         currentStep = 1
         showRegistrationStep(currentStep)
+    }
+
+    // New method to apply enter animations
+    private fun applyEnterAnimation() {
+        try {
+            // Find main container views to animate
+            val mainContent = findViewById<View>(android.R.id.content)?.findViewById<View>(R.id.mainContent)
+            val btnContinue = findViewById<AppCompatButton>(R.id.btnContinue) ?: findViewById<AppCompatButton>(R.id.btnFinish)
+            
+            // Animate main content with fade in and slight slide up
+            mainContent?.let {
+                it.alpha = 0f
+                it.translationY = 50f
+                it.animate()
+                    .alpha(1f)
+                    .translationY(0f)
+                    .setDuration(500)
+                    .start()
+            }
+            
+            // Animate button with bounce effect
+            btnContinue?.let {
+                val bounceAnim = AnimationUtils.loadAnimation(this, R.anim.bounce)
+                it.startAnimation(bounceAnim)
+            }
+            
+            // Animate fields one by one with a delay
+            animateInputFields()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error applying animations: ${e.message}")
+            // Continue without animations if there's an error
+        }
+    }
+    
+    // Animate input fields with a staggered effect
+    private fun animateInputFields() {
+        try {
+            val delay = 150L
+            
+            // Get all EditText fields
+            val rootView = findViewById<View>(android.R.id.content)
+            val editTexts = findAllEditTextsInView(rootView)
+            
+            // Animate each field with a delay
+            editTexts.forEachIndexed { index, editText ->
+                editText.alpha = 0f
+                editText.translationX = 50f
+                
+                editText.animate()
+                    .alpha(1f)
+                    .translationX(0f)
+                    .setStartDelay(delay * index)
+                    .setDuration(400)
+                    .start()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error animating input fields: ${e.message}")
+        }
+    }
+    
+    // Helper method to find all EditText views in a view hierarchy
+    private fun findAllEditTextsInView(view: View?): List<EditText> {
+        val editTexts = mutableListOf<EditText>()
+        
+        if (view == null) return editTexts
+        
+        if (view is EditText) {
+            editTexts.add(view)
+        } else if (view is ViewGroup) {
+            for (i in 0 until view.childCount) {
+                editTexts.addAll(findAllEditTextsInView(view.getChildAt(i)))
+            }
+        }
+        
+        return editTexts
+    }
+    
+    // Updated method to navigate to next step with animation
+    private fun navigateToNextStep(nextStep: Int) {
+        try {
+            // Apply exit animation before changing the view
+            val mainContent = findViewById<View>(android.R.id.content)?.findViewById<View>(R.id.mainContent)
+            
+            // If we can find the main content, animate it out
+            if (mainContent != null) {
+                mainContent.animate()
+                    .alpha(0f)
+                    .translationX(-100f)
+                    .setDuration(300)
+                    .withEndAction {
+                        // Update step and show new view after animation
+                        currentStep = nextStep
+                        showRegistrationStep(currentStep)
+                        
+                        // Apply custom transition animation
+                        overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+                    }
+                    .start()
+            } else {
+                // If we can't find the main content, just navigate without animation
+                currentStep = nextStep
+                showRegistrationStep(currentStep)
+                overridePendingTransition(R.anim.slide_in_right, R.anim.slide_out_left)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error navigating to next step: ${e.message}")
+            // Fall back to non-animated transition
+            currentStep = nextStep
+            showRegistrationStep(currentStep)
+        }
+    }
+    
+    // Updated method to navigate to previous step with animation
+    private fun navigateToPreviousStep(previousStep: Int) {
+        try {
+            // Apply exit animation before changing the view
+            val mainContent = findViewById<View>(android.R.id.content)?.findViewById<View>(R.id.mainContent)
+            
+            // If we can find the main content, animate it out
+            if (mainContent != null) {
+                mainContent.animate()
+                    .alpha(0f)
+                    .translationX(100f)
+                    .setDuration(300)
+                    .withEndAction {
+                        // Update step and show new view after animation
+                        currentStep = previousStep
+                        showRegistrationStep(currentStep)
+                        
+                        // Apply custom transition animation
+                        overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
+                    }
+                    .start()
+            } else {
+                // If we can't find the main content, just navigate without animation
+                currentStep = previousStep
+                showRegistrationStep(currentStep)
+                overridePendingTransition(R.anim.slide_in_left, R.anim.slide_out_right)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error navigating to previous step: ${e.message}")
+            // Fall back to non-animated transition
+            currentStep = previousStep
+            showRegistrationStep(currentStep)
+        }
+    }
+
+    // New method to show loading animation
+    private fun showLoadingAnimation() {
+        try {
+            val loadingOverlay = findViewById<View>(R.id.loadingOverlay) ?: return
+            
+            // Fade in the loading overlay
+            loadingOverlay.visibility = View.VISIBLE
+            loadingOverlay.alpha = 0f
+            loadingOverlay.animate()
+                .alpha(1f)
+                .setDuration(300)
+                .start()
+                
+            // Hide loading overlay after a delay (in case the network call takes too long)
+            Handler(Looper.getMainLooper()).postDelayed({
+                loadingOverlay.animate()
+                    .alpha(0f)
+                    .setDuration(300)
+                    .withEndAction {
+                        loadingOverlay.visibility = View.GONE
+                    }
+                    .start()
+            }, 3000)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error showing loading animation: ${e.message}")
+        }
+    }
+    
+    // New method to show error animation on input fields
+    private fun showErrorAnimation(view: View) {
+        try {
+            // Store the original padding values
+            val originalPaddingLeft = view.paddingLeft
+            val originalPaddingTop = view.paddingTop
+            val originalPaddingRight = view.paddingRight
+            val originalPaddingBottom = view.paddingBottom
+            
+            // Create shake animation
+            val animator = ObjectAnimator.ofFloat(view, "translationX", 0f, -15f, 15f, -15f, 15f, -15f, 15f, -15f, 15f, 0f)
+            animator.duration = 500
+            animator.start()
+            
+            // Highlight the field with red briefly
+            view.setBackgroundResource(R.drawable.bg_input_field_error)
+            
+            // Apply the original padding to maintain dimensions
+            view.setPadding(originalPaddingLeft, originalPaddingTop, originalPaddingRight, originalPaddingBottom)
+            
+            // Reset to normal style after a delay
+            Handler(Looper.getMainLooper()).postDelayed({
+                view.setBackgroundResource(R.drawable.bg_input_field_animated)
+                // Maintain the original padding
+                view.setPadding(originalPaddingLeft, originalPaddingTop, originalPaddingRight, originalPaddingBottom)
+            }, 1500)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error showing error animation: ${e.message}")
+        }
+    }
+
+    // Add this new method for animating progress indicators
+    private fun animateProgressIndicator(completedStep: Int, nextStep: Int) {
+        try {
+            Log.d(TAG, "Animating progress indicators from step $completedStep to $nextStep")
+            
+            // Get the ImageView for the completed step that will change to a checkmark
+            val completedCircleId = when (completedStep) {
+                1 -> R.id.vCircleEmail
+                2 -> R.id.vCircleName
+                3 -> R.id.vCircleBirthday
+                4 -> R.id.vCircleGender
+                else -> null
+            }
+            
+            // Find the view for the completed step
+            val completedCircleView = if (completedCircleId != null) findViewById<View>(completedCircleId) else null
+            
+            // Only proceed if we found the view
+            if (completedCircleView != null) {
+                // Change the background to the selected state (orange circle)
+                completedCircleView.setBackgroundResource(R.drawable.circle_selected)
+                
+                // If it's a View (not already an ImageView with a checkmark)
+                if (completedCircleView is View && completedCircleView !is ImageView) {
+                    // Create a new ImageView with the checkmark to replace it
+                    val parentLayout = completedCircleView.parent as? ViewGroup
+                    val indexInParent = parentLayout?.indexOfChild(completedCircleView) ?: -1
+                    
+                    if (parentLayout != null && indexInParent >= 0) {
+                        // Create the checkmark ImageView with the same dimensions as the original view
+                        val params = completedCircleView.layoutParams
+                        
+                        // Create the checkmark ImageView
+                        val checkmarkView = ImageView(this).apply {
+                            id = completedCircleView.id
+                            layoutParams = params
+                            setBackgroundResource(R.drawable.circle_selected)
+                            setImageResource(R.drawable.ic_check)
+                            // Use a fixed padding value in pixels instead of a dimension resource
+                            setPadding(8.dpToPx(), 8.dpToPx(), 8.dpToPx(), 8.dpToPx())
+                            scaleX = 0f
+                            scaleY = 0f
+                            alpha = 0f
+                        }
+                        
+                        // Remove the old view and add the new one
+                        parentLayout.removeView(completedCircleView)
+                        parentLayout.addView(checkmarkView, indexInParent)
+                        
+                        // Load and start the pop-in animation
+                        val animation = AnimationUtils.loadAnimation(this, R.anim.circle_pop_in)
+                        checkmarkView.startAnimation(animation)
+                    }
+                } else if (completedCircleView is ImageView) {
+                    // If it's already an ImageView (in case of going back and forth between steps)
+                    // Just play the animation on the existing view
+                    val animation = AnimationUtils.loadAnimation(this, R.anim.circle_pop_in)
+                    completedCircleView.startAnimation(animation)
+                }
+                
+                // Update text color for completed step
+                val stepTextId = when (completedStep) {
+                    1 -> R.id.tvEmailStep
+                    2 -> R.id.tvNameStep
+                    3 -> R.id.tvBirthdayStep
+                    4 -> R.id.tvGenderStep
+                    else -> null
+                }
+                
+                findViewById<TextView>(stepTextId ?: 0)?.setTextColor(getColor(R.color.orange_progress))
+                
+                // Update the next step's text to active state
+                val nextStepTextId = when (nextStep) {
+                    2 -> R.id.tvNameStep
+                    3 -> R.id.tvBirthdayStep
+                    4 -> R.id.tvGenderStep
+                    else -> null
+                }
+                
+                // Only try to update the text color if we can find the view
+                val nextStepTextView = if (nextStepTextId != null) findViewById<TextView>(nextStepTextId) else null
+                nextStepTextView?.setTextColor(getColor(R.color.dark_text))
+                
+                // Animate the connecting line between completed and next step
+                if (completedStep < 4) {
+                    // Find the connector line view - both the background and progress lines
+                    val connectorBgId = R.id.vConnectorLineBackground
+                    val connectorProgressId = when (completedStep) {
+                        1 -> R.id.vConnectorLineProgress  // Default ID expected in layouts
+                        2 -> R.id.vConnectorLineProgress2 // May need to add these IDs to layouts
+                        3 -> R.id.vConnectorLineProgress3
+                        else -> null
+                    }
+                    
+                    // If progress line not found, try a different approach
+                    val connectorLine = findViewById<View>(connectorProgressId ?: 0)
+                    if (connectorLine != null) {
+                        // Use the animation we created
+                        val animation = AnimationUtils.loadAnimation(this, R.anim.line_expand)
+                        connectorLine.startAnimation(animation)
+                    } else {
+                        // If we couldn't find a specific progress line, try to find the background line
+                        // and dynamically create a progress line over it
+                        val bgLine = findViewById<View>(connectorBgId)
+                        if (bgLine != null && bgLine.parent is ViewGroup) {
+                            // Create a new orange progress line with same dimensions as background
+                            val parentLayout = bgLine.parent as ViewGroup
+                            val indexInParent = parentLayout.indexOfChild(bgLine)
+                            
+                            val progressLine = View(this).apply {
+                                id = View.generateViewId()  // Generate a new ID
+                                // Create new layout params instead of cloning
+                                val originalParams = bgLine.layoutParams
+                                layoutParams = ViewGroup.LayoutParams(originalParams.width, originalParams.height)
+                                setBackgroundColor(getColor(R.color.orange_progress))
+                                // Start with 0 width for animation
+                                scaleX = 0f
+                                pivotX = 0f  // Important: set pivot to start of line for proper scale animation
+                            }
+                            
+                            // Add the progress line right after the background line
+                            parentLayout.addView(progressLine, indexInParent + 1)
+                            
+                            // Use animation
+                            val animation = AnimationUtils.loadAnimation(this, R.anim.line_expand)
+                            progressLine.startAnimation(animation)
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error animating progress indicators: ${e.message}", e)
+            // Continue without animation if there's an error
+        }
+    }
+    
+    // Helper extension function to convert DP to pixels
+    private fun Int.dpToPx(): Int {
+        val scale = resources.displayMetrics.density
+        return (this * scale + 0.5f).toInt()
     }
 }

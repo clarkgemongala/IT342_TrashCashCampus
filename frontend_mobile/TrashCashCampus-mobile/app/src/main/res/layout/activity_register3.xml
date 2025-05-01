@@ -31,7 +31,7 @@
             android:layout_marginTop="24dp"
             android:adjustViewBounds="true"
             android:contentDescription="Recycling illustration"
-            android:src="@drawable/login_illustration"
+            android:src="@drawable/birth_logo"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@+id/btnBack"
@@ -111,19 +111,33 @@
                 android:layout_height="3dp"
                 android:background="#DDDDDD"
                 app:layout_constraintStart_toStartOf="@+id/vCircleEmail"
+                app:layout_constraintEnd_toEndOf="@+id/vCircleGender"
                 app:layout_constraintTop_toTopOf="@+id/vCircleEmail"
                 app:layout_constraintBottom_toBottomOf="@+id/vCircleEmail" />
 
-            <!-- Connector lines for completed steps (orange) -->
+            <!-- Progress connector line for Email to Name (already completed) -->
             <View
-                android:id="@+id/vConnectorLineCompleted"
+                android:id="@+id/vConnectorLineProgress"
                 android:layout_width="0dp"
                 android:layout_height="3dp"
-                android:background="#FF7143"
+                android:background="@color/orange_progress"
                 app:layout_constraintStart_toStartOf="@+id/vCircleEmail"
                 app:layout_constraintEnd_toEndOf="@+id/vCircleName"
                 app:layout_constraintTop_toTopOf="@+id/vCircleEmail"
                 app:layout_constraintBottom_toBottomOf="@+id/vCircleEmail" />
+
+            <!-- Progress connector line for Name to Birthday (to be animated) -->
+            <View
+                android:id="@+id/vConnectorLineProgress2"
+                android:layout_width="0dp"
+                android:layout_height="3dp"
+                android:background="@color/orange_progress"
+                android:scaleX="0"
+                android:pivotX="0"
+                app:layout_constraintStart_toStartOf="@+id/vCircleName"
+                app:layout_constraintEnd_toStartOf="@+id/vCircleBirthday"
+                app:layout_constraintTop_toTopOf="@+id/vCircleName"
+                app:layout_constraintBottom_toBottomOf="@+id/vCircleName" />
 
             <!-- Circles positioned to be evenly spaced -->
             <ImageView
@@ -187,7 +201,7 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:background="@drawable/bg_input_field_rounded"
+            android:background="@drawable/bg_input_field_animated"
             android:padding="16dp"
             android:clickable="true"
             android:focusable="true"
@@ -222,12 +236,13 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginTop="32dp"
-            android:background="@drawable/bg_button_green"
+            android:background="@drawable/bg_button_green_consistent"
             android:padding="16dp"
             android:text="Continue"
             android:textAlignment="center"
             android:textAllCaps="false"
-            android:textColor="#333333"
+            android:textColor="#FFFFFF"
+            android:textStyle="bold"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@+id/datePickerContainer" />
