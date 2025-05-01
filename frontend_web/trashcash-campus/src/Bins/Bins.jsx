@@ -1320,7 +1320,8 @@ const Bins = () => {
           ...data,
           userEmail,
           timestamp: data.submittedAt || data.timestamp || Date.now(),
-          pointsEarned: data.potentialPoints || 0,
+          pointsEarned: data.status === 'approved' ? (data.pointsEarned || data.potentialPoints || 0) : 0,
+          potentialPoints: data.potentialPoints || 0,
           status: data.status || 'pending',
           approved: data.approved || false,
           photoUrl: photoUrl, // Include the actual photo URL if available
@@ -1391,6 +1392,14 @@ const Bins = () => {
         processedBy: currentUser.uid
       };
       
+      // If approved, make sure pointsEarned is correctly set to match potentialPoints
+      if (isApproved) {
+        // Ensure the pointsEarned field is properly updated
+        const potentialPoints = log.potentialPoints || 0;
+        console.log(`Approving entry ${log.id}: Setting pointsEarned to ${potentialPoints} (current value: ${log.pointsEarned || 0})`);
+        updateData.pointsEarned = potentialPoints;
+      }
+      
       // If location is N/A or missing, try to find the correct location
       if (!log.locationName || log.locationName === 'N/A') {
         // Look for matching bin based on binId
@@ -1424,10 +1433,15 @@ const Bins = () => {
             const pointsFromPoints = userData.points || 0;
             const pointsFromTotalPoints = userData.totalPoints || 0;
             
+            // Log the values read from the database
+            console.log(`User ${log.userId} current points - points field: ${pointsFromPoints}, totalPoints field: ${pointsFromTotalPoints}`);
+            
             // Use the higher value to ensure we don't lose points
             const currentPoints = Math.max(pointsFromPoints, pointsFromTotalPoints);
             const pointsToAdd = log.potentialPoints || log.pointsEarned || 0;
             const newPoints = currentPoints + pointsToAdd;
+            
+            console.log(`Adding ${pointsToAdd} points from ${log.potentialPoints ? 'potentialPoints' : 'pointsEarned'} field to user ${log.userId}`);
             
             // Update both fields to ensure compatibility across app versions
             await updateDoc(userRef, {

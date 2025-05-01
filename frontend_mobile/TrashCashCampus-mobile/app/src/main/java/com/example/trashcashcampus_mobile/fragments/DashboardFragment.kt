@@ -1104,29 +1104,35 @@ class DashboardFragment : Fragment() {
                         userData?.forEach { (key, value) ->
                             Log.d(tag, "User data field: $key = $value")
                         }
+
+                        // Get points from both possible field names
+                        val totalPoints = userData?.get("totalPoints")
+                        val points = userData?.get("points")
                         
-                        // Get points from totalPoints field
-                        val totalPointsValue = when (val pointsValue = document.get("totalPoints")) {
-                            is Long -> pointsValue.toInt()
-                            is Int -> pointsValue
-                            is Double -> pointsValue.toInt()
-                            is String -> pointsValue.toIntOrNull() ?: 0
+                        // Log both fields
+                        Log.d(tag, "Found totalPoints: $totalPoints (${totalPoints?.javaClass?.name})")
+                        Log.d(tag, "Found points: $points (${points?.javaClass?.name})")
+                        
+                        // Convert to int, handling all possible types
+                        val totalPointsValue = when (totalPoints) {
+                            is Long -> totalPoints.toInt()
+                            is Int -> totalPoints
+                            is Double -> totalPoints.toInt()
+                            is String -> totalPoints.toIntOrNull() ?: 0
                             else -> 0
                         }
                         
-                        // Also check the 'points' field
-                        val pointsValue = when (val pointsValue = document.get("points")) {
-                            is Long -> pointsValue.toInt()
-                            is Int -> pointsValue
-                            is Double -> pointsValue.toInt()
-                            is String -> pointsValue.toIntOrNull() ?: 0
+                        val pointsValue = when (points) {
+                            is Long -> points.toInt()
+                            is Int -> points
+                            is Double -> points.toInt()
+                            is String -> points.toIntOrNull() ?: 0
                             else -> 0
                         }
                         
-                        // Use the higher value of the two fields
+                        // Use the higher value
                         val finalPointsValue = Math.max(totalPointsValue, pointsValue)
-                        
-                        Log.d(tag, "Force refreshed points from Firestore: totalPoints=$totalPointsValue, points=$pointsValue, using max: $finalPointsValue")
+                        Log.d(tag, "Using final points value: $finalPointsValue")
                         
                         // Create user data with the retrieved points 
                         val retrievedData = UserData(

@@ -342,7 +342,8 @@ class ApiClient {
                     binLog["photoUrl"] = photoBase64
                     binLog["qrCode"] = qrCode
                     binLog["itemSize"] = itemSize
-                    binLog["pointsEarned"] = potentialPoints
+                    binLog["pointsEarned"] = 0 // Initially zero until approved
+                    binLog["potentialPoints"] = potentialPoints // Points that will be awarded after approval
                     binLog["status"] = "pending"
                     binLog["photoPreview"] = photoBase64
                     
