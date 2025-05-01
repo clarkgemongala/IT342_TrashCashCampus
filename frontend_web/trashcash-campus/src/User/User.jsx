@@ -382,44 +382,18 @@ const User = () => {
                   </div>
                   
                   <div className="modal-actions">
-                    <div className="button-wrapper">
-                      <button
-                        onClick={handleEditCancel}
-                        type="button"
-                        style={{
-                          width: '100%',
-                          height: '50px',
-                          backgroundColor: '#e8e8e8',
-                          color: '#333',
-                          border: 'none',
-                          borderRadius: '4px',
-                          fontSize: '1rem',
-                          fontWeight: '500',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                    <div className="button-wrapper">
-                      <button
-                        onClick={handleEditSave}
-                        type="button"
-                        style={{
-                          width: '100%',
-                          height: '50px',
-                          backgroundColor: '#1a5336',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '4px',
-                          fontSize: '1rem',
-                          fontWeight: '500',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        Save
-                      </button>
-                    </div>
+                    <button
+                      onClick={handleEditCancel}
+                      type="button"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleEditSave}
+                      type="button"
+                    >
+                      Save
+                    </button>
                   </div>
                 </div>
               </div>
@@ -483,24 +457,18 @@ const User = () => {
               </div>
               
               <div className="modal-actions">
-                <div className="button-wrapper">
-                  <button
-                    onClick={closeAddUserModal}
-                    type="button"
-                    className="cancel-button"
-                  >
-                    Cancel
-                  </button>
-                </div>
-                <div className="button-wrapper">
-                  <button
-                    onClick={handleAddUser}
-                    type="button"
-                    className="save-button"
-                  >
-                    Add User
-                  </button>
-                </div>
+                <button
+                  onClick={closeAddUserModal}
+                  type="button"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAddUser}
+                  type="button"
+                >
+                  Add User
+                </button>
               </div>
             </div>
           </div>
