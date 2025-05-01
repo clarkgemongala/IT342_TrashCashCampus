@@ -69,14 +69,18 @@ class MainActivity : AppCompatActivity() {
         // Initialize Firebase Auth
         auth = FirebaseAuth.getInstance()
         
+        // Get authentication status from shared preferences
+        val prefs = getSharedPreferences("TrashCashPrefs", MODE_PRIVATE)
+        val isLoggedIn = prefs.getBoolean("isLoggedIn", false)
+        
         // Decide which layout to use based on authentication state
         val currentUser = auth.currentUser
-        if (currentUser != null && currentUser.isEmailVerified) {
-            // User is signed in and verified, show home with navigation
+        if (currentUser != null && currentUser.isEmailVerified && isLoggedIn) {
+            // User is signed in, verified, and has completely logged in - show home with navigation
             setContentView(R.layout.activity_main_with_navigation)
             initializeNavigation()
         } else {
-            // Not signed in, show login form
+            // Not signed in or not verified, show login form
             setContentView(R.layout.activity_main)
             initializeLoginForm()
         }
@@ -483,6 +487,7 @@ class MainActivity : AppCompatActivity() {
         with(prefs.edit()) {
             putString("userId", userId)
             putString("email", email)
+            putBoolean("isLoggedIn", true)
             apply()
         }
         

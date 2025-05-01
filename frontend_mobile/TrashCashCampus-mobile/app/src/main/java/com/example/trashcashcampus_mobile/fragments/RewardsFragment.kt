@@ -170,21 +170,31 @@ class RewardsFragment : Fragment() {
         val primaryColor = ContextCompat.getColor(requireContext(), R.color.primary)
         val bgColor = ContextCompat.getColor(requireContext(), R.color.background)
         val textPrimaryColor = ContextCompat.getColor(requireContext(), R.color.text_primary)
-        val blackColor = ContextCompat.getColor(requireContext(), android.R.color.black)
+        val whiteColor = ContextCompat.getColor(requireContext(), android.R.color.white)
         
         categoryButtons.forEach { (category, button) ->
             if (category == activeCategory) {
-                // Active button state
-                button.isEnabled = false
-                button.setBackgroundColor(primaryColor)
-                button.setTextColor(blackColor) // Use black text for better visibility on colored background
-                button.setTypeface(null, android.graphics.Typeface.BOLD) // Make text bold
+                // Active button state - explicitly set the button's chipBackgroundColor (for Material Chips)
+                if (button is com.google.android.material.chip.Chip) {
+                    button.setChipBackgroundColorResource(R.color.primary)
+                    button.setTextColor(whiteColor)
+                } else {
+                    // Fallback for regular buttons
+                    button.setBackgroundColor(primaryColor)
+                    button.setTextColor(whiteColor)
+                }
+                button.isEnabled = true // Keep it enabled to maintain appearance
             } else {
                 // Inactive button state
+                if (button is com.google.android.material.chip.Chip) {
+                    button.setChipBackgroundColorResource(R.color.surface)
+                    button.setTextColor(textPrimaryColor)
+                } else {
+                    // Fallback for regular buttons
+                    button.setBackgroundColor(bgColor)
+                    button.setTextColor(textPrimaryColor)
+                }
                 button.isEnabled = true
-                button.setBackgroundColor(bgColor) // Use background color instead of transparent
-                button.setTextColor(textPrimaryColor)
-                button.setTypeface(null, android.graphics.Typeface.NORMAL) // Normal text weight
             }
         }
     }

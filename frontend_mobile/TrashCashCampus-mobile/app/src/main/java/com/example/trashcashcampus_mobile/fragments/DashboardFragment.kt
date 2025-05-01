@@ -225,29 +225,21 @@ class DashboardFragment : Fragment() {
                     // Get user email to check if it's a CIT email
                     val email = userEmail ?: ""
                     
-                    // Try to get full name - prioritize differently for CIT emails
-                    var fullName: String
+                    // Try to get display name with priority: displayName > fullName > name > email username
+                    val displayName = userData?.get("displayName") as? String 
+                        ?: userData?.get("fullName") as? String
+                        ?: userData?.get("name") as? String
+                    
+                    // Update UI with the display name
+                    updateDisplayName(displayName)
                     
                     if (email.endsWith("@cit.edu")) {
-                        // For CIT emails, fetch from separate collection
+                        // For CIT emails, fetch from separate collection for better name
                         Log.d(tag, "CIT email detected: $email, fetching from students collection")
                         fetchStudentName(email)
-                    } else {
-                        // Try to get full name with priority: displayName > fullName > name > email username
-                        fullName = userData?.get("displayName") as? String 
-                            ?: userData?.get("fullName") as? String
-                            ?: userData?.get("name") as? String
-                            ?: userEmail?.split("@")?.get(0)
-                            ?: "User"
-                        
-                        // Update UI immediately with name
-                        tvUserName.text = fullName
-                        Log.d(tag, "Set user name to: $fullName")
-                        
-                        // If name is email username, try to update with a better name
-                        if (fullName == userEmail?.split("@")?.get(0)) {
-                            updateUserDisplayName(uid)
-                        }
+                    } else if (displayName == null || displayName.isBlank() || displayName == email.split("@")[0]) {
+                        // If no name or just using email username, try to update with a better name
+                        updateUserDisplayName(uid)
                     }
                     
                     // Get totalPoints from document
@@ -276,7 +268,6 @@ class DashboardFragment : Fragment() {
             }
     }
     
-    // Fetch student name from students collection for CIT emails
     private fun fetchStudentName(email: String) {
         Log.d(tag, "Fetching student name for email: $email")
         db.collection("students")
@@ -292,7 +283,7 @@ class DashboardFragment : Fragment() {
                     
                     if (!fullName.isNullOrEmpty()) {
                         Log.d(tag, "Found student fullName: $fullName")
-                        tvUserName.text = fullName
+                        updateDisplayName(fullName)
                         
                         // Also update the user document with this name
                         userId?.let { uid ->
@@ -311,25 +302,24 @@ class DashboardFragment : Fragment() {
                     } else {
                         // Fall back to email username
                         val username = email.split("@")[0]
-                        tvUserName.text = username
+                        updateDisplayName(username)
                         Log.d(tag, "No fullName found in students collection, using: $username")
                     }
                 } else {
                     // No student document found
                     val username = email.split("@")[0]
-                    tvUserName.text = username
-                    Log.d(tag, "No document found in students collection for email: $email")
+                    updateDisplayName(username)
+                    Log.d(tag, "No student record found, using email username: $username")
                 }
             }
             .addOnFailureListener { e ->
-                Log.e(tag, "Error fetching from students collection", e)
+                Log.e(tag, "Error fetching student name", e)
                 // Fall back to email username
                 val username = email.split("@")[0]
-                tvUserName.text = username
+                updateDisplayName(username)
             }
     }
     
-    // Try to update the user's display name with a better value
     private fun updateUserDisplayName(uid: String) {
         // Get Firebase Auth display name if available
         val authUser = FirebaseAuth.getInstance().currentUser
@@ -445,16 +435,12 @@ class DashboardFragment : Fragment() {
                     }
                     
                     // Update UI with user's name
-                    val fullName = userData?.get("displayName") as? String 
+                    val displayName = userData?.get("displayName") as? String 
                         ?: userData?.get("fullName") as? String
                         ?: userData?.get("name") as? String
-                        ?: userEmail?.split("@")?.get(0)
-                        ?: "User"
                     
-                    tvUserName.text = fullName
-                    
-                    // Log the name we're using
-                    Log.d(tag, "Using name for display: $fullName")
+                    // Update the display name
+                    updateDisplayName(displayName)
                     
                     // Try multiple ways to get totalPoints
                     var totalPoints = 0
@@ -509,7 +495,7 @@ class DashboardFragment : Fragment() {
                     
                     // Use email username instead of default "User"
                     val username = userEmail?.split("@")?.get(0) ?: "User"
-                    tvUserName.text = username
+                    updateDisplayName(username)
                     
                     // Create a new user with default points
                     createUserWithPoints(uid, username, 0)
@@ -517,7 +503,7 @@ class DashboardFragment : Fragment() {
             }
             .addOnFailureListener { exception ->
                 Log.e(tag, "Error getting user data from Firestore", exception)
-                tvUserName.text = userEmail?.split("@")?.get(0) ?: "User"
+                updateDisplayName(userEmail?.split("@")?.get(0))
                 
                 // Default to 0 points when there's an error
                 tvTotalPoints.text = "0"
@@ -791,7 +777,6 @@ class DashboardFragment : Fragment() {
                         var totalPoints = 0
                         var weeklyGoal = 100
                         var weeklyProgress = 0
-                        var userName = "User"
                         
                         // Try to get totalPoints
                         val totalPointsValue = snapshot.get("totalPoints")
@@ -831,14 +816,12 @@ class DashboardFragment : Fragment() {
                         }
                         
                         // Try to get user name
-                        val userNameValue = snapshot.get("displayName") ?: snapshot.get("fullName") ?: snapshot.get("name")
-                        if (userNameValue != null && userNameValue is String) {
-                            userName = userNameValue
-                            Log.d(tag, "Real-time listener found displayName = $userName")
-                        }
+                        val displayName = snapshot.getString("displayName") 
+                            ?: snapshot.getString("fullName") 
+                            ?: snapshot.getString("name")
                         
                         // Update user name
-                        tvUserName.text = userName
+                        updateDisplayName(displayName)
                         
                         // Check if this is an actual update (not the initial load)
                         val currentPoints = userData?.totalPoints ?: 0
@@ -1066,6 +1049,7 @@ class DashboardFragment : Fragment() {
             remove("userId")
             remove("email")
             remove("token")
+            putBoolean("isLoggedIn", false)
             apply()
         }
     }
@@ -1340,6 +1324,19 @@ class DashboardFragment : Fragment() {
             Log.e(tag, "Error animating point increment", e)
             // Fallback - just show the increment
             tvPointsIncrement.visibility = View.VISIBLE
+        }
+    }
+
+    private fun updateDisplayName(displayName: String?) {
+        val finalName = displayName?.takeIf { it.isNotBlank() }
+            ?: userEmail?.split("@")?.get(0)
+            ?: "User"
+        
+        try {
+            tvUserName.text = finalName
+            Log.d(tag, "Updated display name: $finalName")
+        } catch (e: Exception) {
+            Log.e(tag, "Error updating display name", e)
         }
     }
 

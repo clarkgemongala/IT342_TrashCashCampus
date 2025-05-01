@@ -174,9 +174,17 @@ class QRScannerActivity : AppCompatActivity() {
         radioBtnSmall = findViewById(R.id.radioBtnSmall)
         radioBtnBig = findViewById(R.id.radioBtnBig)
         
+        // Configure the image view for proper display
+        photoImageView.setImageResource(android.R.drawable.ic_menu_camera)
+        photoImageView.scaleType = ImageView.ScaleType.CENTER
+        
         // Initially hide progress bar and photo verification UI
         progressBar.visibility = View.GONE
         photoVerificationLayout.visibility = View.GONE
+        
+        // Make sure the scanner container is visible
+        findViewById<View>(R.id.scannerContainer).visibility = View.VISIBLE
+        scannerView.visibility = View.VISIBLE
         
         // Make sure cancel button is enabled
         btnCancel.isEnabled = true
@@ -224,12 +232,21 @@ class QRScannerActivity : AppCompatActivity() {
                                 scannedQRCode = enhancedQrData.toString()
                                 Log.d(tag, "Enhanced QR data with location: $scannedQRCode")
                             } else {
-                                // Without location name, use the building from the intent extras if available
-                                val building = intent.getStringExtra("BUILDING_NAME") ?: "NGE Building"
-                                val enhancedQrData = JSONObject(result.text)
-                                enhancedQrData.put("locationName", building)
-                                scannedQRCode = enhancedQrData.toString()
-                                Log.d(tag, "Enhanced QR data with default building: $scannedQRCode")
+                                // Without location name, check if we can get it from the intent extras
+                                val building = intent.getStringExtra("BUILDING_NAME")
+                                if (building != null) {
+                                    // Use the building name from intent extras
+                                    val enhancedQrData = JSONObject(result.text)
+                                    enhancedQrData.put("locationName", building)
+                                    scannedQRCode = enhancedQrData.toString()
+                                    Log.d(tag, "Enhanced QR data with building from intent: $scannedQRCode")
+                                } else if (!json.has("locationName")) {
+                                    // Only use default if no location info exists in QR code or from intent
+                                    val enhancedQrData = JSONObject(result.text)
+                                    enhancedQrData.put("locationName", "NGE Building")
+                                    scannedQRCode = enhancedQrData.toString()
+                                    Log.d(tag, "Enhanced QR data with default building: $scannedQRCode")
+                                }
                             }
                             
                             // Show photo verification UI
@@ -263,14 +280,17 @@ class QRScannerActivity : AppCompatActivity() {
                                 Log.e(tag, "Error creating JSON data", e2)
                             }
                         } else {
-                            // If no location name, use a default building
+                            // If no location name from intent, check for BUILDING_NAME
+                            val building = intent.getStringExtra("BUILDING_NAME")
                             try {
                                 val jsonData = JSONObject()
                                 jsonData.put("binId", scannedQRCode)
                                 jsonData.put("binName", "Recyclable Bin")
-                                jsonData.put("locationName", "NGE Building") // Default to NGE Building
+                                // Use building from intent if available, otherwise default
+                                jsonData.put("locationName", building ?: "NGE Building") 
                                 scannedQRCode = jsonData.toString()
-                                Log.d(tag, "Created JSON QR data with default building: $scannedQRCode")
+                                Log.d(tag, building?.let { "Created JSON QR data with building: $scannedQRCode" } 
+                                    ?: "Created JSON QR data with default building: $scannedQRCode")
                             } catch (e2: Exception) {
                                 Log.e(tag, "Error creating JSON data", e2)
                             }
@@ -305,21 +325,35 @@ class QRScannerActivity : AppCompatActivity() {
     }
     
     private fun showPhotoVerificationUI(binName: String) {
-        // Hide scanner UI
-        scannerView.visibility = View.GONE
-        progressBar.visibility = View.GONE
-        
-        // Update prompt
-        tvScannerPrompt.text = "Take a photo of your waste in the $binName"
-        
-        // Show photo verification UI
-        photoVerificationLayout.visibility = View.VISIBLE
-        
-        // Enable the submit button only if photo has been taken
-        btnSubmit.isEnabled = false
-        
-        // Ensure cancel button is enabled
-        btnCancel.isEnabled = true
+        try {
+            // Update prompt
+            tvScannerPrompt.text = "Take a photo of your waste in the $binName"
+            
+            // Hide scanner view container
+            findViewById<View>(R.id.scannerContainer).visibility = View.GONE
+            
+            // Hide progress
+            progressBar.visibility = View.GONE
+            
+            // Show photo verification UI
+            photoVerificationLayout.visibility = View.VISIBLE
+            
+            // Make sure image view is visible with default camera icon
+            photoImageView.setImageResource(android.R.drawable.ic_menu_camera)
+            photoImageView.scaleType = ImageView.ScaleType.CENTER
+            
+            // Enable the take photo button
+            btnTakePhoto.isEnabled = true
+            
+            // Enable the submit button only if photo has been taken
+            btnSubmit.isEnabled = false
+            
+            // Ensure cancel button is enabled
+            btnCancel.isEnabled = true
+        } catch(e: Exception) {
+            Log.e(tag, "Error showing photo verification UI", e)
+            Toast.makeText(this, "Error displaying camera interface", Toast.LENGTH_SHORT).show()
+        }
     }
     
     private fun takePicture() {
@@ -334,14 +368,29 @@ class QRScannerActivity : AppCompatActivity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
         if (requestCode == REQUEST_IMAGE_CAPTURE && resultCode == RESULT_OK) {
-            val imageBitmap = data?.extras?.get("data") as Bitmap
-            photoImageView.setImageBitmap(imageBitmap)
-            
-            // Convert the bitmap to Base64 string
-            capturedPhotoBase64 = bitmapToBase64(imageBitmap)
-            
-            // Enable submit button
-            btnSubmit.isEnabled = true
+            try {
+                val imageBitmap = data?.extras?.get("data") as Bitmap
+                
+                // Set the captured image to the ImageView with proper scaling
+                photoImageView.setImageBitmap(imageBitmap)
+                photoImageView.scaleType = ImageView.ScaleType.CENTER_CROP
+                
+                // Convert the bitmap to Base64 string
+                capturedPhotoBase64 = bitmapToBase64(imageBitmap)
+                
+                // Enable submit button
+                btnSubmit.isEnabled = true
+            } catch (e: Exception) {
+                Log.e(tag, "Error processing camera result", e)
+                Toast.makeText(this, "Error processing photo, please try again", Toast.LENGTH_SHORT).show()
+                
+                // Reset photo view
+                photoImageView.setImageResource(android.R.drawable.ic_menu_camera)
+                photoImageView.scaleType = ImageView.ScaleType.CENTER
+                
+                // Don't enable submit
+                btnSubmit.isEnabled = false
+            }
         }
     }
     
@@ -390,22 +439,48 @@ class QRScannerActivity : AppCompatActivity() {
         val dateFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
         val dateStr = dateFormat.format(Date(timestamp))
         
-        // Debug logs for location tracking
-        Log.d(tag, "LOCATION: Processing waste with location: $locationName")
+        // Extract location data from intent or scanned QR code
+        var submissionLocation = locationName
+        
+        // If locationName is null, check if it's in the QR code
+        if (submissionLocation == null) {
+            try {
+                val qrData = JSONObject(scannedQRCode)
+                if (qrData.has("locationName")) {
+                    submissionLocation = qrData.getString("locationName")
+                }
+            } catch (e: Exception) {
+                Log.e(tag, "Error parsing QR data for location", e)
+            }
+        }
+        
+        // Last resort - check for BUILDING_NAME in intent
+        if (submissionLocation == null) {
+            submissionLocation = intent.getStringExtra("BUILDING_NAME")
+        }
+        
+        // Debug logs for location tracking - very important
+        Log.d(tag, "LOCATION: Processing waste with location: $submissionLocation")
+        Log.d(tag, "LOCATION: Original QR data: $scannedQRCode")
+        
+        // Make sure the final QR code has location data
         try {
-            val qrData = JSONObject(scannedQRCode)
-            Log.d(tag, "LOCATION: QR data has locationName: ${qrData.has("locationName")}")
-            if (qrData.has("locationName")) {
-                Log.d(tag, "LOCATION: QR code location is: ${qrData.getString("locationName")}")
+            val finalQrData = JSONObject(scannedQRCode)
+            
+            // If the QR code doesn't have location, but we have it from somewhere else, add it
+            if (!finalQrData.has("locationName") && !submissionLocation.isNullOrEmpty()) {
+                finalQrData.put("locationName", submissionLocation)
+                scannedQRCode = finalQrData.toString()
+                Log.d(tag, "LOCATION: Added missing location to QR data: $scannedQRCode")
             }
         } catch (e: Exception) {
-            Log.e(tag, "Error parsing QR data for location check", e)
+            Log.e(tag, "Error updating QR data with location", e)
         }
         
         // Send to backend via API with photo
         lifecycleScope.launch {
             try {
-                Log.d(tag, "Submitting waste for admin approval: userId=$uid, binType=$scannedBinType, size=$selectedItemSize")
+                Log.d(tag, "Submitting waste for admin approval: userId=$uid, binType=$scannedBinType, size=$selectedItemSize, location=$submissionLocation")
                 
                 // Submit with pending approval status
                 val result = ApiClient.submitRecyclingForApproval(
@@ -497,24 +572,41 @@ class QRScannerActivity : AppCompatActivity() {
     }
     
     private fun resetToScanMode() {
-        // Clear captured data
-        capturedPhotoBase64 = ""
-        scannedQRCode = ""
-        scannedBinType = ""
-        
-        // Reset UI
-        photoImageView.setImageResource(android.R.drawable.ic_menu_camera)
-        photoVerificationLayout.visibility = View.GONE
-        scannerView.visibility = View.VISIBLE
-        progressBar.visibility = View.GONE
-        tvScannerPrompt.text = "Scan a TrashCash QR code"
-        
-        // Make sure buttons are properly enabled
-        btnCancel.isEnabled = true
-        btnTakePhoto.isEnabled = true
-        
-        // Restart scanner
-        codeScanner.startPreview()
+        try {
+            // Clear captured data
+            capturedPhotoBase64 = ""
+            scannedQRCode = ""
+            scannedBinType = ""
+            
+            // Reset UI
+            photoImageView.setImageResource(android.R.drawable.ic_menu_camera)
+            photoImageView.scaleType = ImageView.ScaleType.CENTER
+            
+            // Hide photo verification layout
+            photoVerificationLayout.visibility = View.GONE
+            
+            // Show scanner container
+            findViewById<View>(R.id.scannerContainer).visibility = View.VISIBLE
+            
+            // Make scanner visible again
+            scannerView.visibility = View.VISIBLE
+            
+            // Hide progress
+            progressBar.visibility = View.GONE
+            
+            // Reset prompt
+            tvScannerPrompt.text = "Scan a TrashCash QR code"
+            
+            // Make sure buttons are properly enabled
+            btnCancel.isEnabled = true
+            btnTakePhoto.isEnabled = true
+            
+            // Restart scanner
+            codeScanner.startPreview()
+        } catch(e: Exception) {
+            Log.e(tag, "Error resetting to scan mode", e)
+            Toast.makeText(this, "Error resetting scanner", Toast.LENGTH_SHORT).show()
+        }
     }
     
     private fun showErrorDialog(message: String) {

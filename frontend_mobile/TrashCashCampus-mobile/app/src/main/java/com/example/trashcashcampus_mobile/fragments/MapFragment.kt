@@ -283,10 +283,15 @@ class MapFragment : Fragment() {
             // Set up scan button
             val btnScan = view.findViewById<Button>(R.id.info_button)
             btnScan.setOnClickListener {
+                // Log the location being passed to ensure it's correct
+                Log.d(TAG, "Launching QR scanner with location: $locationName")
+                
                 // Launch QR scanner with location data
-            val intent = Intent(requireContext(), QRScannerActivity::class.java)
+                val intent = Intent(requireContext(), QRScannerActivity::class.java)
                 intent.putExtra("LOCATION_NAME", locationName)
-            startActivity(intent)
+                // Also pass location as BUILDING_NAME for compatibility
+                intent.putExtra("BUILDING_NAME", locationName)
+                startActivity(intent)
                 
                 // Close the info window
                 close()
@@ -390,68 +395,160 @@ class MapFragment : Fragment() {
     }
     
     private fun addMarkerWithAnimation(geoPoint: GeoPoint, markerType: String) {
-        // Create marker
-        val marker = Marker(mapView)
-        marker.position = geoPoint
-        marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
-        
-        // Set marker appearance based on type
-        when (markerType) {
-            "bin" -> {
-                marker.icon = AppCompatResources.getDrawable(requireContext(), R.drawable.ic_recycling)
-                marker.title = "Recycling Bin"
-                marker.snippet = "Tap to scan QR code"
-            }
-            "collection" -> {
-                marker.icon = AppCompatResources.getDrawable(requireContext(), R.drawable.ic_collection_point)
-                marker.title = "Collection Point"
-                marker.snippet = "Redeem points here"
-            }
-        }
-        
-        // Set info window
-        marker.infoWindow = customInfoWindow
-        
-        // Set onclick listener for QR scanning
-        marker.setOnMarkerClickListener { clickedMarker, _ ->
-            clickedMarker.showInfoWindow()
-            mapView.controller.animateTo(clickedMarker.position)
-            true
-        }
-        
-        // Add to map with animation
-        mapView.overlays.add(marker)
-        
-        // Animate the marker when it's added
-        val handler = Handler(Looper.getMainLooper())
-        handler.postDelayed({
-            // Start with marker slightly above its position and not fully opaque
-            marker.alpha = 0f
-            marker.position = GeoPoint(geoPoint.latitude, geoPoint.longitude)
+        try {
+            // Create marker
+            val marker = Marker(mapView)
+            marker.position = geoPoint
             marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
             
-            // Animate marker dropping down
-            val startLat = geoPoint.latitude + 0.0001 // Slightly above
+            // Set marker appearance based on type
+            when (markerType) {
+                "bin" -> {
+                    marker.icon = AppCompatResources.getDrawable(requireContext(), R.drawable.ic_recycling)
+                    marker.title = "Recycling Bin"
+                    marker.snippet = "Tap to scan QR code"
+                    
+                    // Apply a green tint to bin markers
+                    marker.setInfoWindowAnchor(Marker.ANCHOR_CENTER, 0f)
+                    marker.infoWindow = customInfoWindow
+                }
+                "collection" -> {
+                    marker.icon = AppCompatResources.getDrawable(requireContext(), R.drawable.ic_collection_point)
+                    marker.title = "Collection Point"
+                    marker.snippet = "Redeem points here"
+                    
+                    // Apply a blue tint to collection markers
+                    marker.setInfoWindowAnchor(Marker.ANCHOR_CENTER, 0f)
+                    marker.infoWindow = customInfoWindow
+                }
+            }
+            
+            // Set onclick listener for marker
+            marker.setOnMarkerClickListener { clickedMarker, _ ->
+                // Add a pulse animation when marker is clicked
+                pulseMarker(clickedMarker)
+                
+                clickedMarker.showInfoWindow()
+                mapView.controller.animateTo(clickedMarker.position)
+                true
+            }
+            
+            // Add to map with animation
+            mapView.overlays.add(marker)
+            
+            // Animate the marker when it's added
+            val handler = Handler(Looper.getMainLooper())
+            handler.postDelayed({
+                try {
+                    // Start with marker slightly above its position and not fully opaque
+                    marker.alpha = 0f
+                    marker.position = GeoPoint(geoPoint.latitude, geoPoint.longitude)
+                    marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                    
+                    // Animate marker dropping down with a bounce effect
+                    val startLat = geoPoint.latitude + 0.0002 // Slightly higher for more dramatic effect
+                    val steps = 15 // More steps for smoother animation
+                    val delay = 15L // milliseconds per step
+                    
+                    for (i in 0 until steps) {
+                        handler.postDelayed({
+                            try {
+                                val fraction = i.toFloat() / steps
+                                // Use a custom curve for bounce effect
+                                val progress = if (fraction < 0.7f) {
+                                    fraction
+                                } else {
+                                    val bounceFactor = (fraction - 0.7f) / 0.3f
+                                    // Add a small bounce at the end (overshoot then settle)
+                                    val bounce = 1f + 0.1f * Math.sin(bounceFactor * Math.PI).toFloat()
+                                    0.7f + (0.3f * bounce)
+                                }
+                                
+                                val newLat = startLat - (startLat - geoPoint.latitude) * progress
+                                marker.position = GeoPoint(newLat, geoPoint.longitude)
+                                marker.alpha = Math.min(1f, fraction * 1.5f) // Fade in faster than drop
+                                mapView.invalidate()
+                            } catch (e: Exception) {
+                                Log.e(TAG, "Error in marker animation step", e)
+                            }
+                        }, i * delay)
+                    }
+                    
+                    // Final position and add a small "settle" animation
+                    handler.postDelayed({
+                        try {
+                            marker.position = geoPoint
+                            marker.alpha = 1f
+                            mapView.invalidate()
+                            
+                            // Add a small scale "settle" animation
+                            pulseMarker(marker, 0.9f, 1.0f, 300)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error in marker final animation", e)
+                        }
+                    }, steps * delay)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error during marker animation setup", e)
+                    // Fallback to show marker without animation
+                    marker.position = geoPoint
+                    marker.alpha = 1f
+                    mapView.invalidate()
+                }
+            }, 300L) // Initial delay before animation
+        } catch (e: Exception) {
+            Log.e(TAG, "Error creating animated marker", e)
+        }
+    }
+    
+    // Add a pulse animation to a marker when clicked
+    private fun pulseMarker(marker: Marker, startScale: Float = 1.0f, endScale: Float = 1.3f, duration: Long = 500) {
+        try {
+            val handler = Handler(Looper.getMainLooper())
             val steps = 10
-            val delay = 20L // milliseconds per step
+            val delay = duration / steps
             
             for (i in 0 until steps) {
                 handler.postDelayed({
-                    val fraction = i.toFloat() / steps
-                    val newLat = startLat - (startLat - geoPoint.latitude) * fraction
-                    marker.position = GeoPoint(newLat, geoPoint.longitude)
-                    marker.alpha = fraction
-                    mapView.invalidate()
+                    try {
+                        val progress = i.toFloat() / steps
+                        // Create a pulse effect (grow then shrink)
+                        val scaleProgress = if (progress < 0.5f) {
+                            // First half: grow
+                            startScale + (endScale - startScale) * (progress * 2)
+                        } else {
+                            // Second half: shrink
+                            endScale - (endScale - startScale) * ((progress - 0.5f) * 2)
+                        }
+                        
+                        // Apply scale to marker
+                        marker.icon?.setBounds(
+                            0, 0,
+                            (marker.icon?.intrinsicWidth ?: 0) * scaleProgress.toInt(),
+                            (marker.icon?.intrinsicHeight ?: 0) * scaleProgress.toInt()
+                        )
+                        mapView.invalidate()
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error in pulse animation step", e)
+                    }
                 }, i * delay)
             }
             
-            // Final position
+            // Reset to original size
             handler.postDelayed({
-                marker.position = geoPoint
-                marker.alpha = 1f
-                mapView.invalidate()
-            }, steps * delay)
-        }, 500) // Delay each marker animation slightly
+                try {
+                    marker.icon?.setBounds(
+                        0, 0,
+                        marker.icon?.intrinsicWidth ?: 0,
+                        marker.icon?.intrinsicHeight ?: 0
+                    )
+                    mapView.invalidate()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error resetting marker size", e)
+                }
+            }, duration + 50)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error during pulse animation", e)
+        }
     }
 
     private fun addMapMarkers() {
@@ -488,15 +585,51 @@ class MapFragment : Fragment() {
 
     private fun launchQRScanner(latitude: Double, longitude: Double) {
         try {
+            // Find the location name based on coordinates
+            val locationName = findLocationNameByCoordinates(latitude, longitude)
+            
+            // Log for debugging
+            Log.d(TAG, "Launching QR scanner for coordinates: $latitude, $longitude, location: $locationName")
+            
             // Launch QR scanner activity with location data
             val intent = Intent(requireContext(), QRScannerActivity::class.java)
             intent.putExtra("latitude", latitude)
             intent.putExtra("longitude", longitude)
             intent.putExtra("source", "map")
+            // Add the location name
+            intent.putExtra("LOCATION_NAME", locationName)
+            intent.putExtra("BUILDING_NAME", locationName)
             startActivityForResult(intent, QR_SCANNER_REQUEST_CODE)
         } catch (e: Exception) {
             Log.e(TAG, "Error launching QR scanner", e)
             Toast.makeText(requireContext(), "Could not open QR scanner", Toast.LENGTH_SHORT).show()
         }
+    }
+    
+    // Helper method to find location name based on coordinates
+    private fun findLocationNameByCoordinates(latitude: Double, longitude: Double): String {
+        // First check if we have campus locations loaded from backend
+        if (campusLocations.isNotEmpty()) {
+            // Find the closest location
+            val closestLocation = campusLocations.minByOrNull { location ->
+                val latDiff = location.latitude - latitude
+                val lonDiff = location.longitude - longitude
+                // Simple distance calculation (not exact but good enough for comparison)
+                Math.sqrt((latDiff * latDiff) + (lonDiff * lonDiff))
+            }
+            
+            if (closestLocation != null) {
+                return closestLocation.name
+            }
+        }
+        
+        // If no match from backend, try default pin points
+        val closestPoint = defaultPinPoints.minByOrNull { point ->
+            val latDiff = point.latitude - latitude
+            val lonDiff = point.longitude - longitude
+            Math.sqrt((latDiff * latDiff) + (lonDiff * lonDiff))
+        }
+        
+        return closestPoint?.name ?: "Unknown Location"
     }
 } 
