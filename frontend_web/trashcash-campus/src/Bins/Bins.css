@@ -1003,6 +1003,8 @@
   gap: 1rem;
   padding: 1rem;
   justify-content: space-between;
+  box-sizing: border-box;
+  width: 100%;
 }
 
 .retake-button {
@@ -1014,6 +1016,8 @@
   color: white;
   cursor: pointer;
   font-weight: 500;
+  box-sizing: border-box;
+  max-width: 49%;
 }
 
 .submit-button {
@@ -1025,6 +1029,8 @@
   color: white;
   cursor: pointer;
   font-weight: 500;
+  box-sizing: border-box;
+  max-width: 49%;
 }
 
 /* Full-sized image preview */

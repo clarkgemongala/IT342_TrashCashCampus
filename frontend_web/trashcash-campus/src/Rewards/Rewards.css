@@ -448,6 +448,7 @@
   max-height: 90vh;
   overflow-y: auto;
   padding: 0;
+  box-sizing: border-box;
 }
 
 .modal-content h2 {
@@ -514,6 +515,8 @@
   background-color: #f9f9f9;
   border-top: 1px solid #e0e0e0;
   gap: 10px;
+  box-sizing: border-box;
+  width: 100%;
 }
 
 .modal-actions button {
@@ -524,11 +527,13 @@
   font-weight: 500;
   font-size: 0.95rem;
   transition: background-color 0.2s;
+  box-sizing: border-box;
 }
 
 .modal-actions button:first-child {
   background-color: #f2f2f2;
   color: #333;
+  box-sizing: border-box;
 }
 
 .modal-actions button:first-child:hover {

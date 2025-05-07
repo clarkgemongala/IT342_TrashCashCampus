@@ -437,7 +437,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: rgba(0, 0, 0, 0.7);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -779,6 +779,8 @@
   margin-top: 2rem;
   width: 100%;
   gap: 10px;
+  box-sizing: border-box;
+  padding: 0;
 }
 
 .button-wrapper {
@@ -786,33 +788,37 @@
 }
 
 .cancel-button {
-  width: 100%;
+  flex: 1;
   height: 50px;
-  background-color: #f5f5f5;
-  color: #444;
+  background-color: #f0f2f5;
+  color: #333;
   border: none;
-  border-radius: 8px;
+  border-radius: 4px;
   font-size: 1rem;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
+  box-sizing: border-box;
+  max-width: 49%;
 }
 
 .cancel-button:hover {
-  background-color: #e8e8e8;
+  background-color: #e4e6e9;
 }
 
 .save-button {
-  width: 100%;
+  flex: 1;
   height: 50px;
   background-color: #1a5336;
   color: white;
   border: none;
-  border-radius: 8px;
+  border-radius: 4px;
   font-size: 1rem;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
+  box-sizing: border-box;
+  max-width: 49%;
 }
 
 .save-button:hover {
@@ -906,25 +912,14 @@
 }
 
 /* Modal styles */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.7);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
-}
-
 .edit-modal {
   background-color: white;
   border-radius: 8px;
   width: 90%;
   max-width: 500px;
   padding: 2rem;
+  box-sizing: border-box;
+  position: relative;
 }
 
 .edit-modal h2 {
@@ -952,6 +947,7 @@
   border-radius: 4px;
   font-size: 1rem;
   background-color: #fff;
+  box-sizing: border-box;
 }
 
 .edit-modal .form-input:disabled {
@@ -966,6 +962,7 @@
   margin-top: 2rem;
   width: 100%;
   gap: 10px;
+  box-sizing: border-box;
 }
 
 .edit-modal .button-wrapper {
@@ -984,6 +981,7 @@
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
+  box-sizing: border-box;
 }
 
 /* The Save button */
@@ -998,6 +996,7 @@
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
+  box-sizing: border-box;
 }
 
 /* Mobile styles */
@@ -1038,11 +1037,13 @@
   margin-top: 2rem;
   width: 100%;
   gap: 10px;
+  box-sizing: border-box;
+  padding: 0;
 }
 
 /* The Cancel button */
 .modal-actions button:first-of-type {
-  width: 100%;
+  flex: 1;
   height: 50px;
   background-color: #f0f2f5;
   color: #333;
@@ -1052,11 +1053,13 @@
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
+  box-sizing: border-box;
+  max-width: 49%;
 }
 
 /* The Save/Add User button */
 .modal-actions button:last-of-type {
-  width: 100%;
+  flex: 1;
   height: 50px;
   background-color: #1a5336;
   color: white;
@@ -1066,6 +1069,8 @@
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
+  box-sizing: border-box;
+  max-width: 49%;
 }
 
 /* Hover states */
