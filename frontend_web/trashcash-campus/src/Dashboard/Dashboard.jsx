@@ -20,6 +20,8 @@ const Dashboard = () => {
   });
   const [recentActivities, setRecentActivities] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const entriesPerPage = 5;
 
   useEffect(() => {
     const fetchAdminData = async () => {
@@ -185,6 +187,29 @@ const Dashboard = () => {
     return 5;
   };
 
+  // Calculate pagination
+  const indexOfLastEntry = currentPage * entriesPerPage;
+  const indexOfFirstEntry = indexOfLastEntry - entriesPerPage;
+  const currentEntries = recentActivities.slice(indexOfFirstEntry, indexOfLastEntry);
+  const totalPages = Math.ceil(recentActivities.length / entriesPerPage);
+
+  // Change page
+  const paginate = (pageNumber) => setCurrentPage(pageNumber);
+  
+  // Go to next page
+  const nextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+  
+  // Go to previous page
+  const prevPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
   return (
     <div className="dashboard-container">
       <Navigation />
@@ -251,35 +276,62 @@ const Dashboard = () => {
                   <p>Users haven't submitted any recycling activities yet.</p>
                 </div>
               ) : (
-                <div className="activities-list">
-                  {recentActivities.map((activity) => (
-                    <div key={activity.id} className="activity-card">
-                      <div className="activity-icon">
-                        {getWasteIcon(activity.wasteType)}
-                      </div>
-                      <div className="activity-details">
-                        <div className="activity-title">
-                          {activity.userEmail} recycled {activity.wasteType || 'waste'} at {activity.binLocation || activity.locationName || 'Unknown Location'}
+                <>
+                  <div className="activities-list">
+                    {currentEntries.map((activity) => (
+                      <div key={activity.id} className="activity-card">
+                        <div className="activity-icon">
+                          {getWasteIcon(activity.wasteType)}
                         </div>
-                        <div className="activity-subtitle">
-                          Bin: {activity.binName || activity.binId || 'Unknown Bin'}
+                        <div className="activity-details">
+                          <div className="activity-title">
+                            {activity.userEmail} recycled {activity.wasteType || 'waste'} at {activity.binLocation || activity.locationName || 'Unknown Location'}
+                          </div>
+                          <div className="activity-subtitle">
+                            Bin: {activity.binName || activity.binId || 'Unknown Bin'}
+                          </div>
+                          <div className="activity-date">{formatDate(activity.timestamp)}</div>
                         </div>
-                        <div className="activity-date">{formatDate(activity.timestamp)}</div>
-                      </div>
-                      <div className="activity-points">
-                        <div className="bin-info">
-                          <span className={`bin-type ${activity.binType || getBinType(activity.wasteType)}`}>
-                            {(activity.binType === 'biodegradable' || 
-                             activity.binType === 'organic' || 
-                             activity.wasteType === 'organic' || 
-                             activity.wasteType === 'food') ? 'Biodegradable' : 'Recyclable'}
-                          </span>
+                        <div className="activity-points">
+                          <div className="bin-info">
+                            <span className={`bin-type ${activity.binType || getBinType(activity.wasteType)}`}>
+                              {(activity.binType === 'biodegradable' || 
+                               activity.binType === 'organic' || 
+                               activity.wasteType === 'organic' || 
+                               activity.wasteType === 'food') ? 'Biodegradable' : 'Recyclable'}
+                            </span>
+                          </div>
+                          <div className="points-earned">+{getPoints(activity.wasteType, activity.pointsEarned)} pts</div>
                         </div>
-                        <div className="points-earned">+{getPoints(activity.wasteType, activity.pointsEarned)} pts</div>
                       </div>
+                    ))}
+                  </div>
+                  
+                  {/* Pagination controls */}
+                  {recentActivities.length > entriesPerPage && (
+                    <div className="pagination-controls">
+                      <button 
+                        className="pagination-button prev"
+                        onClick={prevPage}
+                        disabled={currentPage === 1}
+                      >
+                        &laquo; Previous
+                      </button>
+                      
+                      <div className="pagination-info">
+                        Page {currentPage} of {totalPages}
+                      </div>
+                      
+                      <button 
+                        className="pagination-button next"
+                        onClick={nextPage}
+                        disabled={currentPage === totalPages}
+                      >
+                        Next &raquo;
+                      </button>
                     </div>
-                  ))}
-                </div>
+                  )}
+                </>
               )}
             </section>
           </>
