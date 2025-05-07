@@ -12,8 +12,17 @@
   padding: 2rem;
 }
 
+.dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
 .dashboard-title {
-  margin-bottom: 2rem;
+  margin-bottom: 0;
   color: #333;
   font-size: 2rem;
 }
@@ -85,11 +94,6 @@
   padding: 1.5rem;
   border-radius: 8px;
   background-color: #f7f7f7;
-  transition: transform 0.3s ease;
-}
-
-.impact-card:hover {
-  transform: translateY(-5px);
 }
 
 .impact-icon {
@@ -107,6 +111,37 @@
 .impact-label {
   font-size: 0.9rem;
   color: #666;
+}
+
+/* Bin Count Section */
+.bin-count-section {
+  background-color: #ffffff;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  margin-bottom: 30px;
+}
+
+.bin-count-section h2 {
+  color: #1e3a1f;
+  font-size: 1.2rem;
+  margin-bottom: 15px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.bin-count-value {
+  font-size: 3rem;
+  font-weight: 700;
+  color: #1e3a1f;
+  margin-bottom: 5px;
+  text-align: center;
+}
+
+.bin-count-label {
+  color: #6b7280;
+  font-size: 0.9rem;
+  text-align: center;
 }
 
 /* Activities Section */
@@ -139,140 +174,114 @@
 .activities-list {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 15px;
 }
 
 .activity-card {
   display: flex;
-  align-items: center;
-  padding: 1rem;
+  background-color: #fff;
   border-radius: 8px;
-  background-color: #f7f7f7;
-  transition: background-color 0.3s ease;
-}
-
-.activity-card:hover {
-  background-color: #f0f0f0;
+  padding: 15px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  align-items: center;
 }
 
 .activity-icon {
-  font-size: 2rem;
-  margin-right: 1rem;
+  font-size: 1.8rem;
+  margin-right: 15px;
   min-width: 40px;
   text-align: center;
 }
 
 .activity-details {
   flex: 1;
-  overflow: hidden;
 }
 
 .activity-title {
   font-weight: 500;
-  margin-bottom: 0.25rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.activity-subtitle {
-  font-size: 0.85rem;
-  color: #555;
-  margin-bottom: 0.25rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.activity-date {
-  font-size: 0.85rem;
-  color: #666;
-}
-
-.activity-points {
-  font-weight: 700;
-  color: #1a5336;
-  font-size: 1.2rem;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  min-width: 120px;
-  text-align: right;
-}
-
-.activity-points .bin-info {
-  font-size: 0.85rem;
-  color: #555;
-  font-weight: normal;
+  color: #1e3a1f;
   margin-bottom: 4px;
 }
 
-.activity-points .points-earned {
-  color: #1a5336;
-  font-weight: bold;
+.activity-subtitle {
+  color: #6b7280;
+  font-size: 0.85rem;
+  margin-bottom: 4px;
+}
+
+.activity-date {
+  color: #9ca3af;
+  font-size: 0.8rem;
+}
+
+.activity-points {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  margin-left: 10px;
+}
+
+.bin-info {
+  margin-bottom: 5px;
 }
 
 .bin-type {
   display: inline-block;
-  padding: 2px 8px;
-  border-radius: 12px;
-  font-size: 0.8rem;
-  font-weight: 500;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
 }
 
-.bin-type.organic {
-  background-color: #e8f5e9;
-  color: #2e7d32;
+.bin-type.biodegradable, .bin-type.organic {
+  background-color: #d1fae5;
+  color: #065f46;
 }
 
 .bin-type.recyclable {
-  background-color: #e3f2fd;
-  color: #1565c0;
+  background-color: #dbeafe;
+  color: #1e40af;
 }
 
-.bin-type.non-recyclable {
-  background-color: #ffebee;
-  color: #c62828;
+.bin-type.non-biodegradable, .bin-type.unknown {
+  background-color: #fee2e2;
+  color: #b91c1c;
 }
 
-.bin-type.unknown {
-  background-color: #f5f5f5;
-  color: #757575;
+.points-earned {
+  font-weight: 700;
+  color: #1e3a1f;
+  font-size: 1.1rem;
 }
 
-/* Responsive styles */
+/* Responsive adjustments */
 @media (max-width: 768px) {
   .dashboard-content {
     padding: 1rem;
   }
-  
+
   .impact-cards {
     grid-template-columns: 1fr;
   }
-  
+
   .activity-card {
     flex-direction: column;
-    text-align: center;
+    align-items: flex-start;
   }
-  
-  .activity-icon {
-    margin-right: 0;
-    margin-bottom: 0.5rem;
-  }
-  
-  .activity-points {
-    margin-top: 0.5rem;
-    align-items: center;
-  }
-  
-  .activity-points .bin-info {
-    margin-bottom: 2px;
-  }
-}
 
-.dashboard-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid #e0e0e0;
+  .activity-icon {
+    margin-bottom: 10px;
+    margin-right: 0;
+  }
+
+  .activity-points {
+    margin-top: 10px;
+    margin-left: 0;
+    align-items: flex-start;
+    width: 100%;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+  }
 }

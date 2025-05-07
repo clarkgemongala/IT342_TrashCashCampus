@@ -20,6 +20,7 @@ const Dashboard = () => {
   });
   const [recentActivities, setRecentActivities] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [binCount, setBinCount] = useState(0);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -36,9 +37,9 @@ const Dashboard = () => {
           
           // Calculate environmental impact
           const impactSaved = {
-            trees: (userData.totalRecycled || 0) * 0.1, // Approx 10 items = 1 tree
-            water: (userData.totalRecycled || 0) * 100, // Liters of water
-            co2: (userData.totalRecycled || 0) * 2.5 // kg of CO2
+            trees: (userData.totalRecycled || 0) * 0.1,
+            water: (userData.totalRecycled || 0) * 100,
+            co2: (userData.totalRecycled || 0) * 2.5
           };
           
           // Determine rank based on points
@@ -58,15 +59,26 @@ const Dashboard = () => {
           });
         }
 
+        // Count total bins
+        const binsRef = collection(db, 'bins');
+        const binsSnapshot = await getDocs(binsRef);
+        setBinCount(binsSnapshot.size);
+
         // Fetch recent recycling activities
         try {
-          const activitiesRef = collection(db, 'recyclingActivities');
+          // Check if binLogs collection exists and use it preferentially
+          let targetCollection = 'binLogs';
+          const testBinLogsRef = collection(db, 'binLogs');
+          const testBinLogs = await getDocs(query(testBinLogsRef, limit(1)));
           
-          // Query to get all recent recycling activities from all bins
+          if (testBinLogs.empty) {
+            targetCollection = 'recyclingActivities';
+          }
+          
           const activitiesQuery = query(
-            activitiesRef,
+            collection(db, targetCollection),
             orderBy('timestamp', 'desc'),
-            limit(5)
+            limit(10)
           );
           
           const activitiesSnapshot = await getDocs(activitiesQuery);
@@ -78,19 +90,16 @@ const Dashboard = () => {
           // For each activity, if we don't have the user email, try to fetch it
           const activitiesWithUser = await Promise.all(
             activities.map(async (activity) => {
-              // If we already have the userEmail, just return the activity
               if (activity.userEmail) {
                 return activity;
               }
               
-              // If we have the userId but no userEmail, try to fetch the user data
               if (activity.userId) {
                 try {
                   const userRef = doc(db, 'users', activity.userId);
                   const userSnap = await getDoc(userRef);
                   
                   if (userSnap.exists()) {
-                    // Add the user email to the activity
                     return {
                       ...activity,
                       userEmail: userSnap.data().email || 'Unknown User'
@@ -101,7 +110,6 @@ const Dashboard = () => {
                 }
               }
               
-              // If we couldn't get the user email, return activity with default
               return {
                 ...activity,
                 userEmail: 'Unknown User'
@@ -112,7 +120,7 @@ const Dashboard = () => {
           setRecentActivities(activitiesWithUser);
         } catch (activityError) {
           console.error('Error fetching activities:', activityError);
-          setRecentActivities([]); // Set empty array on error
+          setRecentActivities([]);
         }
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
@@ -129,13 +137,54 @@ const Dashboard = () => {
     if (!timestamp) return 'Unknown';
     
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
+    return new Intl.DateTimeFormat('en-US', {
       year: 'numeric',
+      month: 'short',
+      day: '2-digit',
       hour: '2-digit',
       minute: '2-digit'
-    });
+    }).format(date);
+  };
+
+  // Get appropriate icon based on waste type
+  const getWasteIcon = (wasteType) => {
+    if (!wasteType) return '♻️';
+    
+    const type = wasteType.toLowerCase();
+    if (type.includes('paper')) return '📄';
+    if (type.includes('plastic')) return '🥤';
+    if (type.includes('glass')) return '🍶';
+    if (type.includes('metal')) return '🥫';
+    if (type.includes('organic') || type.includes('food')) return '🌱';
+    return '♻️';
+  };
+
+  // Get bin type from waste type
+  const getBinType = (wasteType) => {
+    if (!wasteType) return 'recyclable';
+    
+    const type = wasteType.toLowerCase();
+    if (type.includes('organic') || type.includes('food')) return 'biodegradable';
+    if (type.includes('paper') || type.includes('plastic') || 
+        type.includes('glass') || type.includes('metal')) return 'recyclable';
+    return 'recyclable';
+  };
+
+  // Get points based on waste type
+  const getPoints = (wasteType, pointsEarned) => {
+    if (pointsEarned !== undefined && pointsEarned !== null) {
+      return pointsEarned;
+    }
+    
+    if (!wasteType) return 5;
+    
+    const type = wasteType.toLowerCase();
+    if (type.includes('organic') || type.includes('food')) return 5;
+    if (type.includes('paper')) return 10;
+    if (type.includes('plastic')) return 10;
+    if (type.includes('glass')) return 10;
+    if (type.includes('metal')) return 25;
+    return 5;
   };
 
   return (
@@ -178,13 +227,13 @@ const Dashboard = () => {
                   <div className="impact-icon">🌳</div>
                   <div className="impact-value">{stats.impactSaved.trees.toFixed(1)}</div>
                   <div className="impact-label">Trees Saved</div>
-              </div>
+                </div>
               
                 <div className="impact-card">
                   <div className="impact-icon">💧</div>
                   <div className="impact-value">{stats.impactSaved.water.toFixed(0)}</div>
                   <div className="impact-label">Liters of Water Conserved</div>
-              </div>
+                </div>
               
                 <div className="impact-card">
                   <div className="impact-icon">☁️</div>
@@ -192,6 +241,13 @@ const Dashboard = () => {
                   <div className="impact-label">kg of CO2 Emissions Reduced</div>
                 </div>
               </div>
+            </section>
+            
+            {/* Bin count section */}
+            <section className="bin-count-section">
+              <h2>QR Bins Available</h2>
+              <div className="bin-count-value">{binCount}</div>
+              <div className="bin-count-label">Scan QR codes at these bins to earn points!</div>
             </section>
             
             {/* Recent activities section */}
@@ -208,14 +264,11 @@ const Dashboard = () => {
                   {recentActivities.map((activity) => (
                     <div key={activity.id} className="activity-card">
                       <div className="activity-icon">
-                        {activity.wasteType === 'paper' ? '📄' :
-                         activity.wasteType === 'plastic' ? '🥤' :
-                         activity.wasteType === 'glass' ? '🍶' :
-                         activity.wasteType === 'metal' ? '🥫' : '♻️'}
+                        {getWasteIcon(activity.wasteType)}
                       </div>
                       <div className="activity-details">
                         <div className="activity-title">
-                          {activity.userEmail || 'Unknown User'} recycled {activity.wasteType} at {activity.binLocation || 'Unknown Location'}
+                          {activity.userEmail} recycled {activity.wasteType || 'waste'} at {activity.binLocation || activity.locationName || 'Unknown Location'}
                         </div>
                         <div className="activity-subtitle">
                           Bin: {activity.binName || activity.binId || 'Unknown Bin'}
@@ -224,21 +277,14 @@ const Dashboard = () => {
                       </div>
                       <div className="activity-points">
                         <div className="bin-info">
-                          {(() => {
-                            const binType = activity.binType || 
-                              (activity.wasteType === 'organic' ? 'organic' :
-                               activity.wasteType === 'plastic' || activity.wasteType === 'paper' || 
-                               activity.wasteType === 'glass' || activity.wasteType === 'metal' ? 'recyclable' : 'unknown');
-                            
-                            const binLabel = binType === 'organic' ? 'Biodegradable' : 
-                                             binType === 'non-recyclable' ? 'Non-Biodegradable' : 
-                                             binType === 'recyclable' ? 'Recyclable' : 
-                                             activity.binName || 'Bin';
-                            
-                            return <span className={`bin-type ${binType}`}>{binLabel}</span>;
-                          })()}
+                          <span className={`bin-type ${activity.binType || getBinType(activity.wasteType)}`}>
+                            {(activity.binType === 'biodegradable' || 
+                             activity.binType === 'organic' || 
+                             activity.wasteType === 'organic' || 
+                             activity.wasteType === 'food') ? 'Biodegradable' : 'Recyclable'}
+                          </span>
                         </div>
-                        <div className="points-earned">+{activity.pointsEarned || 0} pts</div>
+                        <div className="points-earned">+{getPoints(activity.wasteType, activity.pointsEarned)} pts</div>
                       </div>
                     </div>
                   ))}
