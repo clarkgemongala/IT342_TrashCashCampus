@@ -16,6 +16,8 @@ import android.widget.RadioButton
 import android.widget.RadioGroup
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.constraintlayout.widget.ConstraintLayout
@@ -55,9 +57,11 @@ class QRScannerActivity : AppCompatActivity() {
     private lateinit var radioBtnSmall: RadioButton
     private lateinit var radioBtnBig: RadioButton
     
-    // Camera permission request codes
+    // Camera permission request code
     private val CAMERA_PERMISSION_REQUEST_CODE = 100
-    private val REQUEST_IMAGE_CAPTURE = 101
+    
+    // Modern ActivityResultLauncher for camera
+    private lateinit var takePictureLauncher: ActivityResultLauncher<Intent>
     
     // Firebase Auth
     private lateinit var auth: FirebaseAuth
@@ -77,6 +81,35 @@ class QRScannerActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_qr_scanner)
+        
+        // Register the ActivityResultLauncher for camera
+        takePictureLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == RESULT_OK) {
+                try {
+                    val imageBitmap = result.data?.extras?.get("data") as Bitmap
+                    
+                    // Set the captured image to the ImageView with proper scaling
+                    photoImageView.setImageBitmap(imageBitmap)
+                    photoImageView.scaleType = ImageView.ScaleType.CENTER_CROP
+                    
+                    // Convert the bitmap to Base64 string
+                    capturedPhotoBase64 = bitmapToBase64(imageBitmap)
+                    
+                    // Enable submit button
+                    btnSubmit.isEnabled = true
+                } catch (e: Exception) {
+                    Log.e(tag, "Error processing camera result", e)
+                    Toast.makeText(this, "Error processing photo, please try again", Toast.LENGTH_SHORT).show()
+                    
+                    // Reset photo view
+                    photoImageView.setImageResource(android.R.drawable.ic_menu_camera)
+                    photoImageView.scaleType = ImageView.ScaleType.CENTER
+                    
+                    // Don't enable submit
+                    btnSubmit.isEnabled = false
+                }
+            }
+        }
         
         // Initialize Firebase Auth
         auth = FirebaseAuth.getInstance()
@@ -357,40 +390,16 @@ class QRScannerActivity : AppCompatActivity() {
     }
     
     private fun takePicture() {
-        val takePictureIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
-        if (takePictureIntent.resolveActivity(packageManager) != null) {
-            startActivityForResult(takePictureIntent, REQUEST_IMAGE_CAPTURE)
-        } else {
-            Toast.makeText(this, "No camera app available", Toast.LENGTH_SHORT).show()
-        }
-    }
-    
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == REQUEST_IMAGE_CAPTURE && resultCode == RESULT_OK) {
-            try {
-                val imageBitmap = data?.extras?.get("data") as Bitmap
-                
-                // Set the captured image to the ImageView with proper scaling
-                photoImageView.setImageBitmap(imageBitmap)
-                photoImageView.scaleType = ImageView.ScaleType.CENTER_CROP
-                
-                // Convert the bitmap to Base64 string
-                capturedPhotoBase64 = bitmapToBase64(imageBitmap)
-                
-                // Enable submit button
-                btnSubmit.isEnabled = true
-            } catch (e: Exception) {
-                Log.e(tag, "Error processing camera result", e)
-                Toast.makeText(this, "Error processing photo, please try again", Toast.LENGTH_SHORT).show()
-                
-                // Reset photo view
-                photoImageView.setImageResource(android.R.drawable.ic_menu_camera)
-                photoImageView.scaleType = ImageView.ScaleType.CENTER
-                
-                // Don't enable submit
-                btnSubmit.isEnabled = false
+        try {
+            val takePictureIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
+            if (takePictureIntent.resolveActivity(packageManager) != null) {
+                takePictureLauncher.launch(takePictureIntent)
+            } else {
+                Toast.makeText(this, "No camera app available", Toast.LENGTH_SHORT).show()
             }
+        } catch (e: Exception) {
+            Log.e(tag, "Error launching camera: ${e.message}")
+            Toast.makeText(this, "Error launching camera: ${e.message}", Toast.LENGTH_SHORT).show()
         }
     }
     
@@ -667,11 +676,33 @@ class QRScannerActivity : AppCompatActivity() {
     }
     
     private fun requestCameraPermission() {
-        ActivityCompat.requestPermissions(
-            this,
-            arrayOf(Manifest.permission.CAMERA),
-            CAMERA_PERMISSION_REQUEST_CODE
-        )
+        if (ActivityCompat.shouldShowRequestPermissionRationale(this, Manifest.permission.CAMERA)) {
+            // Show explanation to the user why we need this permission
+            AlertDialog.Builder(this)
+                .setTitle("Camera Permission Needed")
+                .setMessage("This app needs the camera permission to scan QR codes and take photos of waste items.")
+                .setPositiveButton("OK") { _, _ ->
+                    // Request permission
+                    ActivityCompat.requestPermissions(
+                        this,
+                        arrayOf(Manifest.permission.CAMERA),
+                        CAMERA_PERMISSION_REQUEST_CODE
+                    )
+                }
+                .setNegativeButton("Cancel") { _, _ ->
+                    Toast.makeText(this, "Camera permission denied", Toast.LENGTH_SHORT).show()
+                    finish()
+                }
+                .create()
+                .show()
+        } else {
+            // No explanation needed, request the permission
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(Manifest.permission.CAMERA),
+                CAMERA_PERMISSION_REQUEST_CODE
+            )
+        }
     }
     
     override fun onRequestPermissionsResult(

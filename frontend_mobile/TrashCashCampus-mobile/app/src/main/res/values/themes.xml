@@ -31,7 +31,6 @@
         <item name="android:windowBackground">@color/splash_start_color</item>
         <item name="android:statusBarColor">@color/splash_start_color</item>
         <item name="android:navigationBarColor">@color/splash_start_color</item>
-        <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowFullscreen">true</item>
     </style>
 </resources>

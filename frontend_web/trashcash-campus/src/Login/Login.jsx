@@ -146,7 +146,7 @@ function Login() {
   const [alertMessage, setAlertMessage] = useState('');
   
   // Mobile app QR code URL
-  const mobileAppDownloadUrl = 'https://drive.google.com/file/d/1I69ZuEO0R9J4J8BapRkKcP38GRnx5Lzr/view?usp=sharing';
+  const mobileAppDownloadUrl = 'https://drive.google.com/file/d/1DpL3KTi0CHYvpwxgWU8rUD2tKfXI1_4A/view?usp=sharing';
   
   // Handle body overflow when modals are open
   useEffect(() => {

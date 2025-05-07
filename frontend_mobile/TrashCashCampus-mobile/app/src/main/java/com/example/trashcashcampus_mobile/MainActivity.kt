@@ -31,6 +31,7 @@ import com.example.trashcashcampus_mobile.fragments.RewardsFragment
 import com.example.trashcashcampus_mobile.utils.ApiClient
 import com.example.trashcashcampus_mobile.utils.LoadingManager
 import com.google.android.material.bottomnavigation.BottomNavigationView
+import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
@@ -64,25 +65,44 @@ class MainActivity : AppCompatActivity() {
     private var activeFragment: Fragment? = null
     
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        
-        // Initialize Firebase Auth
-        auth = FirebaseAuth.getInstance()
-        
-        // Get authentication status from shared preferences
-        val prefs = getSharedPreferences("TrashCashPrefs", MODE_PRIVATE)
-        val isLoggedIn = prefs.getBoolean("isLoggedIn", false)
-        
-        // Decide which layout to use based on authentication state
-        val currentUser = auth.currentUser
-        if (currentUser != null && currentUser.isEmailVerified && isLoggedIn) {
-            // User is signed in, verified, and has completely logged in - show home with navigation
-            setContentView(R.layout.activity_main_with_navigation)
-            initializeNavigation()
-        } else {
-            // Not signed in or not verified, show login form
-            setContentView(R.layout.activity_main)
-            initializeLoginForm()
+        try {
+            Log.d(TAG, "onCreate: Starting MainActivity initialization")
+            super.onCreate(savedInstanceState)
+            
+            // We'll let initViews handle setting the content view
+            // DON'T set content view here to avoid double calls
+            
+            // Initialize Firebase safely
+            try {
+                Log.d(TAG, "onCreate: Initializing Firebase")
+                FirebaseApp.initializeApp(this)
+                auth = FirebaseAuth.getInstance()
+                Log.d(TAG, "onCreate: Firebase initialized successfully")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error initializing Firebase: ${e.message}", e)
+                // Continue - we'll handle auth failure later
+            }
+            
+            // Rest of initialization code with proper error handling
+            try {
+                Log.d(TAG, "onCreate: Initializing views")
+                initViews()
+                Log.d(TAG, "onCreate: Checking for existing session")
+                checkForExistingSession()
+                Log.d(TAG, "onCreate: MainActivity initialization completed successfully")
+            } catch (e: Exception) {
+                Log.e(TAG, "Error in initialization: ${e.message}", e)
+                // Show a toast to the user
+                Toast.makeText(this, "Error initializing app: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Critical error in onCreate: ${e.message}", e)
+            // Try to show an error message to the user
+            try {
+                Toast.makeText(this, "App initialization failed", Toast.LENGTH_LONG).show()
+            } catch (ex: Exception) {
+                // Nothing more we can do
+            }
         }
     }
     
@@ -106,32 +126,93 @@ class MainActivity : AppCompatActivity() {
     
     private fun initializeLoginForm() {
         try {
+            Log.d(TAG, "initializeLoginForm: Starting to initialize login form")
+            
             // Set up the Activity Result Launcher
+            Log.d(TAG, "initializeLoginForm: Setting up Activity Result Launcher")
             setupActivityResultLauncher()
             
             // Initialize UI elements
-            loginLayout = findViewById(R.id.loginLayout)
-            etEmail = findViewById(R.id.etEmail)
-            etPassword = findViewById(R.id.etPassword)
-            btnTogglePasswordVisibility = findViewById(R.id.btnTogglePasswordVisibility)
-            btnLogin = findViewById(R.id.btnLogin)
-            tvRegister = findViewById(R.id.tvRegister)
-            ivLoginIllustration = findViewById(R.id.ivLoginIllustration)
-            tvWelcome = findViewById(R.id.tvWelcome)
+            Log.d(TAG, "initializeLoginForm: Finding UI elements")
+            loginLayout = findViewById(R.id.loginLayout) ?: throw NullPointerException("loginLayout not found")
+            Log.d(TAG, "initializeLoginForm: Found loginLayout")
+            
+            etEmail = findViewById(R.id.etEmail) ?: throw NullPointerException("etEmail not found")
+            Log.d(TAG, "initializeLoginForm: Found etEmail")
+            
+            etPassword = findViewById(R.id.etPassword) ?: throw NullPointerException("etPassword not found")
+            Log.d(TAG, "initializeLoginForm: Found etPassword")
+            
+            btnTogglePasswordVisibility = findViewById(R.id.btnTogglePasswordVisibility) ?: throw NullPointerException("btnTogglePasswordVisibility not found")
+            Log.d(TAG, "initializeLoginForm: Found btnTogglePasswordVisibility")
+            
+            btnLogin = findViewById(R.id.btnLogin) ?: throw NullPointerException("btnLogin not found")
+            Log.d(TAG, "initializeLoginForm: Found btnLogin")
+            
+            tvRegister = findViewById(R.id.tvRegister) ?: throw NullPointerException("tvRegister not found")
+            Log.d(TAG, "initializeLoginForm: Found tvRegister")
+            
+            ivLoginIllustration = findViewById(R.id.ivLoginIllustration) ?: throw NullPointerException("ivLoginIllustration not found")
+            Log.d(TAG, "initializeLoginForm: Found ivLoginIllustration")
+            
+            tvWelcome = findViewById(R.id.tvWelcome) ?: throw NullPointerException("tvWelcome not found")
+            Log.d(TAG, "initializeLoginForm: Found tvWelcome")
+            
+            // Load login illustration with optimized bitmap loading
+            try {
+                ivLoginIllustration.post {
+                    try {
+                        val width = ivLoginIllustration.width
+                        val height = ivLoginIllustration.height
+                        
+                        if (width > 0 && height > 0) {
+                            Log.d(TAG, "Loading optimized login illustration at size ${width}x${height}")
+                            
+                            // Use the application's utility function
+                            val bitmap = TrashCashApplication.decodeSampledBitmapFromResource(
+                                this@MainActivity,
+                                R.drawable.login_illustration,
+                                width,
+                                height
+                            )
+                            
+                            if (bitmap != null) {
+                                ivLoginIllustration.setImageBitmap(bitmap)
+                            } else {
+                                // Fallback to vector icon if bitmap fails
+                                ivLoginIllustration.setImageResource(R.drawable.ic_recycling)
+                            }
+                        }
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Error in image loading: ${e.message}", e)
+                        // Fallback to vector icon
+                        ivLoginIllustration.setImageResource(R.drawable.ic_recycling)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error setting up image loading: ${e.message}", e)
+                // Fallback to vector icon
+                ivLoginIllustration.setImageResource(R.drawable.ic_recycling)
+            }
             
             // Set up listeners
+            Log.d(TAG, "initializeLoginForm: Setting up listeners")
             setupListeners()
             
             // Check backend connectivity
+            Log.d(TAG, "initializeLoginForm: Checking backend connection")
             checkBackendConnection()
             
             // Make sure views are visible but transparent for animation
+            Log.d(TAG, "initializeLoginForm: Setting initial visibility states")
             ivLoginIllustration.visibility = View.VISIBLE
             tvWelcome.visibility = View.VISIBLE
             loginLayout.visibility = View.VISIBLE
             
             // Animate the login form elements
+            Log.d(TAG, "initializeLoginForm: Starting animations")
             animateLoginElements()
+            Log.d(TAG, "initializeLoginForm: Login form initialization completed successfully")
         } catch (e: Exception) {
             Log.e(TAG, "Error in initializeLoginForm: ${e.message}", e)
             Toast.makeText(this, "Something went wrong. Please try again.", Toast.LENGTH_SHORT).show()
@@ -494,5 +575,69 @@ class MainActivity : AppCompatActivity() {
         // Switch to the navigation layout
         setContentView(R.layout.activity_main_with_navigation)
         initializeNavigation()
+    }
+    
+    private fun initViews() {
+        try {
+            Log.d(TAG, "initViews: Starting view initialization")
+            // Check if user is logged in or not - this will determine which layout to use
+            val prefs = getSharedPreferences("TrashCashPrefs", MODE_PRIVATE)
+            val isLoggedIn = prefs.getBoolean("isLoggedIn", false)
+            Log.d(TAG, "initViews: User login status - isLoggedIn: $isLoggedIn")
+            
+            if (isLoggedIn) {
+                // User is logged in - show the navigation layout
+                Log.d(TAG, "initViews: User is logged in, setting navigation layout")
+                setContentView(R.layout.activity_main_with_navigation)
+                initializeNavigation()
+            } else {
+                // User is not logged in - show login form
+                Log.d(TAG, "initViews: User is not logged in, initializing login form")
+                setContentView(R.layout.activity_main)
+                initializeLoginForm()
+            }
+            Log.d(TAG, "initViews: View initialization completed successfully")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error in initViews: ${e.message}", e)
+            // Fallback to login view
+            try {
+                Log.d(TAG, "initViews: Using fallback login view due to error")
+                setContentView(R.layout.activity_main)
+                initializeLoginForm()
+            } catch (ex: Exception) {
+                Log.e(TAG, "Critical error in initViews fallback: ${ex.message}", ex)
+            }
+        }
+    }
+    
+    private fun checkForExistingSession() {
+        try {
+            // Check if there's an existing Firebase Auth session
+            val currentUser = auth.currentUser
+            
+            if (currentUser != null && currentUser.isEmailVerified) {
+                // User is already logged in with Firebase
+                Log.d(TAG, "User already logged in: ${currentUser.email}")
+                
+                // Update shared preferences
+                val prefs = getSharedPreferences("TrashCashPrefs", MODE_PRIVATE)
+                with(prefs.edit()) {
+                    putString("userId", currentUser.uid)
+                    putString("email", currentUser.email)
+                    putBoolean("isLoggedIn", true)
+                    apply()
+                }
+                
+                // Set the navigation layout if not already set
+                if (findViewById<BottomNavigationView>(R.id.bottom_navigation) == null) {
+                    setContentView(R.layout.activity_main_with_navigation)
+                    initializeNavigation()
+                }
+            }
+            // If not logged in, the login form will be shown via initViews()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error checking existing session: ${e.message}", e)
+            // Continue with normal flow - the login form will be shown
+        }
     }
 }

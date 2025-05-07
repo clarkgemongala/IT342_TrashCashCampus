@@ -18,6 +18,8 @@ import android.widget.ImageView
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import com.example.trashcashcampus_mobile.LoginActivity
@@ -66,6 +68,17 @@ class DashboardFragment : Fragment() {
     // Backend retry parameters
     private val maxBackendRetries = 3
     private var backendRetryCount = 0
+
+    // Inside the class, add this property:
+    private val qrScannerLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == AppCompatActivity.RESULT_OK) {
+            // QR scan was successful, refresh points
+            Log.d(tag, "QR scan successful, refreshing points")
+            
+            // Force a refresh of user data
+            forceRefreshUserData()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -1070,21 +1083,11 @@ class DashboardFragment : Fragment() {
         requireActivity().finish() // This is important to finish the HomeActivity
     }
 
-    // Handle result from QR scanner
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        
-        if (requestCode == QR_SCANNER_REQUEST_CODE) {
-            Log.d(tag, "Returned from QR scanner with result: $resultCode")
-            
-            if (resultCode == android.app.Activity.RESULT_OK) {
-                // QR scan was successful, refresh points
-                Log.d(tag, "QR scan successful, refreshing points")
-                
-                // Force a refresh of user data
-                forceRefreshUserData()
-            }
-        }
+    // Replace the old openQRScanner method with this:
+    private fun openQRScanner() {
+        // Launch the QR scanner activity
+        val intent = Intent(requireContext(), QRScannerActivity::class.java)
+        qrScannerLauncher.launch(intent)
     }
     
     private fun forceRefreshUserData() {

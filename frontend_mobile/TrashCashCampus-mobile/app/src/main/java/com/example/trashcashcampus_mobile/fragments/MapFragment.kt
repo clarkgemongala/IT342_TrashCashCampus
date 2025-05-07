@@ -34,6 +34,7 @@ import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.infowindow.InfoWindow
 import android.app.AlertDialog
+import androidx.activity.result.contract.ActivityResultContracts
 
 class MapFragment : Fragment() {
     private val TAG = "MapFragment"
@@ -67,6 +68,68 @@ class MapFragment : Fragment() {
         MapPoint("Canteen", 10.296128268936334, 123.88038693566146),
         MapPoint("GLE Building", 10.295378787021845, 123.88130693334064)
     )
+
+    // Add this property for permission launcher
+    private val locationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        val locationGranted = permissions.entries.all { it.value }
+        if (locationGranted) {
+            initMap()
+        } else {
+            Toast.makeText(
+                requireContext(),
+                "Location permission is required to show your position on the map",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
+    // Add QR scanner launcher
+    private val qrScannerLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        // Handle QR scanner result
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            Log.d(TAG, "QR scan successful")
+            // You can handle successful scan results here if needed
+        }
+    }
+
+    // Add the missing initMap method
+    private fun initMap() {
+        try {
+            // Configure the map
+            mapView.setTileSource(TileSourceFactory.MAPNIK)
+            mapView.setMultiTouchControls(true)
+            
+            val mapController = mapView.controller
+            
+            // Set initial map position to the center of the campus coordinates
+            val centerLat = 10.295383 // Center of campus approximately
+            val centerLon = 123.880498
+            val startPoint = GeoPoint(centerLat, centerLon)
+            mapController.setCenter(startPoint)
+            mapController.setZoom(18.0) // Closer zoom level for campus
+            
+            // Enable user location on the map if permission is granted
+            val myLocationOverlay = org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay(
+                org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider(requireContext()),
+                mapView
+            )
+            myLocationOverlay.enableMyLocation()
+            mapView.overlays.add(myLocationOverlay)
+            
+            // Add markers for trash bins and collection points
+            addMapMarkers()
+            
+            // Refresh the map
+            mapView.invalidate()
+        } catch (e: Exception) {
+            Log.e(TAG, "Error initializing map: ${e.message}", e)
+            Toast.makeText(requireContext(), "Error initializing map", Toast.LENGTH_SHORT).show()
+        }
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
@@ -138,8 +201,17 @@ class MapFragment : Fragment() {
         // Request permissions if needed
         requestPermissionsIfNecessary()
         
-        // Initialize the map with basic configuration
-        initializeMapBase()
+        // If permission is already granted, initialize the map
+        if (ContextCompat.checkSelfPermission(
+                requireContext(),
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) == PackageManager.PERMISSION_GRANTED) {
+            // Initialize the map with full functionality
+            initMap()
+        } else {
+            // Initialize the map with basic configuration
+            initializeMapBase()
+        }
         
         // Set up tap listener on map to dismiss any open info windows
         mapView.setOnTouchListener { _, _ ->
@@ -304,21 +376,23 @@ class MapFragment : Fragment() {
     }
     
     private fun requestPermissionsIfNecessary() {
-        val permissions = arrayOf(
-            Manifest.permission.WRITE_EXTERNAL_STORAGE,
-            Manifest.permission.ACCESS_FINE_LOCATION
-        )
+        val permissions = mutableListOf<String>()
+        
+        // Only add storage permission for Android < 13
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.TIRAMISU) {
+            permissions.add(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        }
+        
+        // Always request location permissions
+        permissions.add(Manifest.permission.ACCESS_FINE_LOCATION)
+        permissions.add(Manifest.permission.ACCESS_COARSE_LOCATION)
         
         val permissionsToRequest = permissions.filter {
             ContextCompat.checkSelfPermission(requireContext(), it) != PackageManager.PERMISSION_GRANTED
         }.toTypedArray()
         
         if (permissionsToRequest.isNotEmpty()) {
-            ActivityCompat.requestPermissions(
-                requireActivity(),
-                permissionsToRequest,
-                REQUEST_PERMISSIONS_REQUEST_CODE
-            )
+            locationPermissionLauncher.launch(permissionsToRequest)
         }
     }
     
@@ -599,7 +673,7 @@ class MapFragment : Fragment() {
             // Add the location name
             intent.putExtra("LOCATION_NAME", locationName)
             intent.putExtra("BUILDING_NAME", locationName)
-            startActivityForResult(intent, QR_SCANNER_REQUEST_CODE)
+            qrScannerLauncher.launch(intent)
         } catch (e: Exception) {
             Log.e(TAG, "Error launching QR scanner", e)
             Toast.makeText(requireContext(), "Could not open QR scanner", Toast.LENGTH_SHORT).show()
