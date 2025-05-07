@@ -1,18 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../firebase';
-import { collection, query, where, getDocs, limit, orderBy, doc, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, limit, orderBy, doc, getDoc, Timestamp } from 'firebase/firestore';
 import Navigation from '../components/Navigation';
 import BackendStatus from '../components/BackendStatus';
 import './Dashboard.css';
 
 const Dashboard = () => {
   const { currentUser } = useAuth();
-  const [stats, setStats] = useState({
-    totalPoints: 0,
-    totalRecycled: 0,
-    rank: 'Beginner',
-    impactSaved: {
+  const [adminStats, setAdminStats] = useState({
+    totalUsers: 0,
+    totalBins: 0,
+    totalActivities: 0,
+    systemImpact: {
       trees: 0,
       water: 0,
       co2: 0
@@ -20,61 +20,59 @@ const Dashboard = () => {
   });
   const [recentActivities, setRecentActivities] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [binCount, setBinCount] = useState(0);
 
   useEffect(() => {
-    const fetchUserData = async () => {
+    const fetchAdminData = async () => {
       try {
-        if (!currentUser) return;
-
-        // Fetch user stats
-        const userRef = collection(db, 'users');
-        const userQuery = query(userRef, where('uid', '==', currentUser.uid));
-        const userSnapshot = await getDocs(userQuery);
-
-        if (!userSnapshot.empty) {
-          const userData = userSnapshot.docs[0].data();
-          
-          // Calculate environmental impact
-          const impactSaved = {
-            trees: (userData.totalRecycled || 0) * 0.1,
-            water: (userData.totalRecycled || 0) * 100,
-            co2: (userData.totalRecycled || 0) * 2.5
-          };
-          
-          // Determine rank based on points
-          let rank = 'Beginner';
-          const points = userData.totalPoints || 0;
-          
-          if (points >= 1000) rank = 'Recycling Master';
-          else if (points >= 500) rank = 'Eco Warrior';
-          else if (points >= 200) rank = 'Green Champion';
-          else if (points >= 100) rank = 'Recycling Enthusiast';
-          
-          setStats({
-            totalPoints: userData.totalPoints || 0,
-            totalRecycled: userData.totalRecycled || 0,
-            rank,
-            impactSaved
-          });
-        }
+        // Fetch total users
+        const usersRef = collection(db, 'users');
+        const usersSnapshot = await getDocs(usersRef);
+        const totalUsers = usersSnapshot.size;
 
         // Count total bins
         const binsRef = collection(db, 'bins');
         const binsSnapshot = await getDocs(binsRef);
-        setBinCount(binsSnapshot.size);
+        const totalBins = binsSnapshot.size;
+
+        // Check if binLogs collection exists and use it preferentially
+        let targetCollection = 'binLogs';
+        const testBinLogsRef = collection(db, 'binLogs');
+        const testBinLogs = await getDocs(query(testBinLogsRef, limit(1)));
+        
+        if (testBinLogs.empty) {
+          targetCollection = 'recyclingActivities';
+        }
+
+        // Count total activities
+        const activitiesRef = collection(db, targetCollection);
+        const activitiesSnapshot = await getDocs(activitiesRef);
+        const totalActivities = activitiesSnapshot.size;
+
+        // Calculate system-wide environmental impact
+        let totalItemsRecycled = 0;
+        
+        activitiesSnapshot.docs.forEach(doc => {
+          const data = doc.data();
+          // Count each logged activity as at least 1 item recycled
+          totalItemsRecycled++;
+        });
+
+        // Calculate impact metrics
+        const systemImpact = {
+          trees: totalItemsRecycled * 0.1,
+          water: totalItemsRecycled * 100,
+          co2: totalItemsRecycled * 2.5
+        };
+
+        setAdminStats({
+          totalUsers,
+          totalBins,
+          totalActivities,
+          systemImpact
+        });
 
         // Fetch recent recycling activities
         try {
-          // Check if binLogs collection exists and use it preferentially
-          let targetCollection = 'binLogs';
-          const testBinLogsRef = collection(db, 'binLogs');
-          const testBinLogs = await getDocs(query(testBinLogsRef, limit(1)));
-          
-          if (testBinLogs.empty) {
-            targetCollection = 'recyclingActivities';
-          }
-          
           const activitiesQuery = query(
             collection(db, targetCollection),
             orderBy('timestamp', 'desc'),
@@ -129,8 +127,8 @@ const Dashboard = () => {
       }
     };
 
-    fetchUserData();
-  }, [currentUser]);
+    fetchAdminData();
+  }, []);
 
   // Format timestamp to readable date
   const formatDate = (timestamp) => {
@@ -193,61 +191,54 @@ const Dashboard = () => {
       
       <main className="dashboard-content">
         <div className="dashboard-header">
-          <h1 className="dashboard-title">Dashboard</h1>
+          <h1 className="dashboard-title">Admin Dashboard</h1>
           <BackendStatus />
         </div>
         
         {loading ? (
-          <div className="loading">Loading your recycling data...</div>
+          <div className="loading">Loading system data...</div>
         ) : (
           <>
-            {/* User stats section */}
+            {/* Admin stats section */}
             <section className="stats-section">
               <div className="stat-card">
-                <h3>Total Points</h3>
-                <div className="stat-value">{stats.totalPoints}</div>
+                <h3>Total Users</h3>
+                <div className="stat-value">{adminStats.totalUsers}</div>
               </div>
               
               <div className="stat-card">
-                <h3>Items Recycled</h3>
-                <div className="stat-value">{stats.totalRecycled}</div>
+                <h3>QR Bins Deployed</h3>
+                <div className="stat-value">{adminStats.totalBins}</div>
               </div>
               
               <div className="stat-card">
-                <h3>Your Rank</h3>
-                <div className="stat-value">{stats.rank}</div>
+                <h3>Total Activities</h3>
+                <div className="stat-value">{adminStats.totalActivities}</div>
               </div>
             </section>
             
-            {/* Environmental impact section */}
+            {/* System impact section */}
             <section className="impact-section">
-              <h2>Your Environmental Impact</h2>
+              <h2>System Environmental Impact</h2>
               <div className="impact-cards">
                 <div className="impact-card">
                   <div className="impact-icon">🌳</div>
-                  <div className="impact-value">{stats.impactSaved.trees.toFixed(1)}</div>
+                  <div className="impact-value">{adminStats.systemImpact.trees.toFixed(1)}</div>
                   <div className="impact-label">Trees Saved</div>
                 </div>
               
                 <div className="impact-card">
                   <div className="impact-icon">💧</div>
-                  <div className="impact-value">{stats.impactSaved.water.toFixed(0)}</div>
+                  <div className="impact-value">{adminStats.systemImpact.water.toFixed(0)}</div>
                   <div className="impact-label">Liters of Water Conserved</div>
                 </div>
               
                 <div className="impact-card">
                   <div className="impact-icon">☁️</div>
-                  <div className="impact-value">{stats.impactSaved.co2.toFixed(1)}</div>
+                  <div className="impact-value">{adminStats.systemImpact.co2.toFixed(1)}</div>
                   <div className="impact-label">kg of CO2 Emissions Reduced</div>
                 </div>
               </div>
-            </section>
-            
-            {/* Bin count section */}
-            <section className="bin-count-section">
-              <h2>QR Bins Available</h2>
-              <div className="bin-count-value">{binCount}</div>
-              <div className="bin-count-label">Scan QR codes at these bins to earn points!</div>
             </section>
             
             {/* Recent activities section */}
@@ -257,7 +248,7 @@ const Dashboard = () => {
               {recentActivities.length === 0 ? (
                 <div className="no-activities">
                   <p>No recent recycling activities found!</p>
-                  <p>Start recycling to earn points and see activities here.</p>
+                  <p>Users haven't submitted any recycling activities yet.</p>
                 </div>
               ) : (
                 <div className="activities-list">

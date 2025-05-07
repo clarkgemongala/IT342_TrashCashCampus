@@ -23,8 +23,9 @@
 
 .dashboard-title {
   margin-bottom: 0;
-  color: #333;
+  color: #1e3a1f;
   font-size: 2rem;
+  font-weight: 600;
 }
 
 /* Loading state */
@@ -81,6 +82,8 @@
   margin-bottom: 1.5rem;
   color: #333;
   font-size: 1.5rem;
+  font-weight: 600;
+  text-align: center;
 }
 
 .impact-cards {
@@ -113,37 +116,6 @@
   color: #666;
 }
 
-/* Bin Count Section */
-.bin-count-section {
-  background-color: #ffffff;
-  border-radius: 8px;
-  padding: 20px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-  margin-bottom: 30px;
-}
-
-.bin-count-section h2 {
-  color: #1e3a1f;
-  font-size: 1.2rem;
-  margin-bottom: 15px;
-  font-weight: 600;
-  text-align: center;
-}
-
-.bin-count-value {
-  font-size: 3rem;
-  font-weight: 700;
-  color: #1e3a1f;
-  margin-bottom: 5px;
-  text-align: center;
-}
-
-.bin-count-label {
-  color: #6b7280;
-  font-size: 0.9rem;
-  text-align: center;
-}
-
 /* Activities Section */
 .activities-section {
   background-color: white;
@@ -158,6 +130,8 @@
   margin-bottom: 1.5rem;
   color: #333;
   font-size: 1.5rem;
+  font-weight: 600;
+  text-align: center;
 }
 
 .no-activities {
