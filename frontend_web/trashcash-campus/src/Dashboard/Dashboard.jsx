@@ -210,6 +210,47 @@ const Dashboard = () => {
     }
   };
 
+  // Generate page numbers for pagination
+  const getPageNumbers = () => {
+    const pageNumbers = [];
+    const maxVisiblePages = 5;
+    
+    if (totalPages <= maxVisiblePages) {
+      // Show all page numbers if there are fewer than maxVisiblePages
+      for (let i = 1; i <= totalPages; i++) {
+        pageNumbers.push(i);
+      }
+    } else {
+      // Calculate the range of page numbers to show
+      let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+      let endPage = startPage + maxVisiblePages - 1;
+      
+      if (endPage > totalPages) {
+        endPage = totalPages;
+        startPage = Math.max(1, endPage - maxVisiblePages + 1);
+      }
+      
+      // Add first page if not included
+      if (startPage > 1) {
+        pageNumbers.push(1);
+        if (startPage > 2) pageNumbers.push('...');
+      }
+      
+      // Add visible page numbers
+      for (let i = startPage; i <= endPage; i++) {
+        pageNumbers.push(i);
+      }
+      
+      // Add last page if not included
+      if (endPage < totalPages) {
+        if (endPage < totalPages - 1) pageNumbers.push('...');
+        pageNumbers.push(totalPages);
+      }
+    }
+    
+    return pageNumbers;
+  };
+
   return (
     <div className="dashboard-container">
       <Navigation />
@@ -318,8 +359,20 @@ const Dashboard = () => {
                         &laquo; Previous
                       </button>
                       
-                      <div className="pagination-info">
-                        Page {currentPage} of {totalPages}
+                      <div className="pagination-pages">
+                        {getPageNumbers().map((page, index) => (
+                          page === '...' ? (
+                            <span key={`ellipsis-${index}`} className="pagination-ellipsis">...</span>
+                          ) : (
+                            <button 
+                              key={page}
+                              className={`pagination-page-button ${currentPage === page ? 'active' : ''}`}
+                              onClick={() => paginate(page)}
+                            >
+                              {page}
+                            </button>
+                          )
+                        ))}
                       </div>
                       
                       <button 
