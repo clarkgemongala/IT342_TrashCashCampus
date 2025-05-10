@@ -1,0 +1,616 @@
+.rewards-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: #f8f9fa;
+}
+
+.rewards-content {
+  flex: 1;
+  padding: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.rewards-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.rewards-title {
+  color: #333;
+  margin: 0;
+  font-size: 2rem;
+}
+
+.add-reward-button {
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  padding: 0.6rem 1.2rem;
+  border-radius: 5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.95rem;
+}
+
+.add-reward-button:hover {
+  background-color: #45a049;
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 2rem;
+  font-size: 1.2rem;
+  color: #666;
+}
+
+/* Search Container */
+.search-container {
+  margin-bottom: 1.5rem;
+  width: 100%;
+}
+
+.search-input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 1rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #4CAF50;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+/* Access Denied */
+.access-denied {
+  background-color: #fff;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  padding: 2rem;
+  text-align: center;
+}
+
+.access-denied h2 {
+  color: #EA4335;
+  margin-bottom: 1rem;
+}
+
+/* Admin View Specific */
+.admin-view .section-title {
+  margin: 2rem 0 1rem;
+}
+
+.admin-view .section-title h2 {
+  font-size: 1.5rem;
+  color: #333;
+  border-bottom: 2px solid #eee;
+  padding-bottom: 0.5rem;
+}
+
+/* User points display */
+.user-points-display {
+  background-color: #1a5336;
+  color: white;
+  border-radius: 8px;
+  padding: 1.5rem;
+  text-align: center;
+  margin-bottom: 2rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.points-value {
+  font-size: 3rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.points-label {
+  font-size: 1.2rem;
+  opacity: 0.9;
+}
+
+/* Categories tabs */
+.categories-tabs {
+  display: flex;
+  overflow-x: auto;
+  gap: 0.5rem;
+  margin-bottom: 2rem;
+  padding-bottom: 0.5rem;
+}
+
+.category-tab {
+  background-color: white;
+  border: 1px solid #ddd;
+  border-radius: 20px;
+  padding: 0.5rem 1rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.3s;
+}
+
+.category-tab:hover {
+  background-color: #f0f0f0;
+}
+
+.category-tab.active {
+  background-color: #1a5336;
+  color: white;
+  border-color: #1a5336;
+}
+
+/* Rewards grid */
+.rewards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.5rem;
+  margin-bottom: 3rem;
+}
+
+.reward-card {
+  background-color: white;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.reward-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+}
+
+.reward-image {
+  height: 150px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.reward-icon {
+  font-size: 4rem;
+}
+
+.reward-content {
+  padding: 1.5rem;
+}
+
+.reward-title {
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+  color: #333;
+  font-size: 1.2rem;
+}
+
+.reward-description {
+  color: #666;
+  margin-bottom: 1.5rem;
+  min-height: 60px;
+}
+
+.reward-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.reward-points {
+  font-weight: 700;
+  font-size: 1.2rem;
+  color: #1a5336;
+}
+
+.redeem-button {
+  background-color: #1a5336;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.redeem-button:hover {
+  background-color: #153f29;
+}
+
+.redeem-button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+.no-rewards {
+  text-align: center;
+  color: #888;
+  padding: 2rem 1rem;
+}
+
+/* Rewards Table */
+.rewards-table-container {
+  background-color: white;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+  overflow-x: auto;
+}
+
+.rewards-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.rewards-table th,
+.rewards-table td {
+  padding: 1rem;
+  text-align: left;
+  border-bottom: 1px solid #eee;
+}
+
+.rewards-table th {
+  background-color: #f8f9fa;
+  font-weight: 600;
+  color: #555;
+}
+
+.rewards-table thead tr {
+  border-bottom: 2px solid #eee;
+}
+
+.rewards-table tbody tr:hover {
+  background-color: #f8f9fa;
+}
+
+.reward-icon-cell {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+}
+
+.description-cell {
+  max-width: 300px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.actions-cell {
+  white-space: nowrap;
+  display: flex;
+  gap: 8px;
+}
+
+.action-button {
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  transition: background-color 0.2s;
+}
+
+.edit-button {
+  background-color: #4285F4;
+  color: white;
+}
+
+.edit-button:hover {
+  background-color: #3367d6;
+}
+
+.delete-button {
+  background-color: #EA4335;
+  color: white;
+}
+
+.delete-button:hover {
+  background-color: #d33426;
+}
+
+.update-button {
+  background-color: #34A853;
+  color: white;
+}
+
+.update-button:hover {
+  background-color: #2a8a44;
+}
+
+.cancel-button {
+  background-color: #FBBC05;
+  color: #333;
+}
+
+.cancel-button:hover {
+  background-color: #e5a500;
+}
+
+.edit-button:disabled, 
+.delete-button:disabled,
+.update-button:disabled,
+.cancel-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Redemption History */
+.redemption-history {
+  background-color: white;
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  padding: 1.5rem;
+  overflow-x: auto;
+}
+
+.history-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.history-table th,
+.history-table td {
+  padding: 1rem;
+  text-align: left;
+  border-bottom: 1px solid #eee;
+}
+
+.history-table th {
+  background-color: #f8f9fa;
+  font-weight: 600;
+  color: #555;
+}
+
+.history-table thead tr {
+  border-bottom: 2px solid #eee;
+}
+
+.history-table tbody tr:hover {
+  background-color: #f8f9fa;
+}
+
+.no-history {
+  text-align: center;
+  color: #888;
+  padding: 2rem 1rem;
+}
+
+/* Status badges */
+.status-pending {
+  background-color: #FFC107;
+  color: #000;
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  display: inline-block;
+}
+
+.status-completed {
+  background-color: #4CAF50;
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  display: inline-block;
+}
+
+.status-cancelled {
+  background-color: #F44336;
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  display: inline-block;
+}
+
+/* Modal styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  width: 100%;
+  max-width: 800px;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.modal-content h2 {
+  margin: 0;
+  color: #333;
+  font-size: 1.4rem;
+  font-weight: 600;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e0e0e0;
+  background-color: #f9f9f9;
+}
+
+.form-group {
+  margin-bottom: 20px;
+  padding: 0 20px;
+}
+
+.form-group:first-of-type {
+  margin-top: 20px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: #333;
+  font-size: 0.95rem;
+}
+
+.form-group input,
+.form-group textarea,
+.form-group select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 1rem;
+  background-color: #fff;
+  box-sizing: border-box;
+}
+
+.form-group input:focus,
+.form-group textarea:focus,
+.form-group select:focus {
+  outline: none;
+  border-color: #4285F4;
+  box-shadow: 0 0 0 1px rgba(66, 133, 244, 0.2);
+}
+
+.form-group textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+.form-group input[type="color"] {
+  height: 40px;
+  cursor: pointer;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 16px 20px;
+  background-color: #f9f9f9;
+  border-top: 1px solid #e0e0e0;
+  gap: 10px;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.modal-actions button {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 0.95rem;
+  transition: background-color 0.2s;
+  box-sizing: border-box;
+}
+
+.modal-actions button:first-child {
+  background-color: #f2f2f2;
+  color: #333;
+  box-sizing: border-box;
+}
+
+.modal-actions button:first-child:hover {
+  background-color: #e6e6e6;
+}
+
+.modal-actions .save-button {
+  background-color: #4285F4;
+  color: white;
+}
+
+.modal-actions .save-button:hover {
+  background-color: #3367d6;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .rewards-content {
+    padding: 1rem;
+  }
+  
+  .rewards-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .add-reward-button {
+    margin-top: 1rem;
+  }
+  
+  .rewards-stats {
+    flex-wrap: wrap;
+  }
+  
+  .stat-box {
+    flex: 1 1 40%;
+  }
+  
+  .rewards-table th,
+  .rewards-table td {
+    padding: 0.75rem 0.5rem;
+  }
+  
+  .description-cell {
+    max-width: 150px;
+  }
+  
+  .modal-content {
+    width: 95%;
+    padding: 1.5rem;
+  }
+}
+
+.rewards-stats {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 1.5rem;
+}
+
+.stat-box {
+  background-color: white;
+  border-radius: 8px;
+  padding: 1rem 1.5rem;
+  flex: 1;
+  text-align: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.stat-value {
+  display: block;
+  font-size: 2rem;
+  font-weight: 700;
+  color: #1a5336;
+  margin-bottom: 0.25rem;
+}
+
+.stat-label {
+  font-size: 0.9rem;
+  color: #666;
+} 

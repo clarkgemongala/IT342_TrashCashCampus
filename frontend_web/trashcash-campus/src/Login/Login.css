@@ -1,0 +1,1289 @@
+/* Ensure proper page rendering after navigation */
+body {
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  background-color: #f8f9fa;
+  font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
+}
+
+.login-container {
+  display: flex;
+  width: 100%;
+  height: 100vh;
+  overflow: hidden;
+  position: relative;
+  font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', sans-serif;
+  background-color: #f8f9fa;
+  opacity: 1 !important; /* Ensure visibility */
+}
+
+.login-image-section {
+  flex: 1;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  overflow: hidden;
+  border-radius: 0 30px 30px 0;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  z-index: 2;
+  margin-right: -30px;
+  clip-path: none;
+}
+
+/* Style for the video element */
+.background-video {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 1;
+  transform: scale(1.05);
+  transition: transform 8s ease-in-out;
+}
+
+/* Overlay for the video to make text more readable */
+.video-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.6) 100%);
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+
+.overlay-content {
+  max-width: 500px;
+  text-align: center;
+  padding: 2rem;
+  border-radius: 0;
+  background-color: transparent;
+  backdrop-filter: none;
+  box-shadow: none;
+}
+
+.overlay-title {
+  font-size: 2.5rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  letter-spacing: 0.5px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  background: linear-gradient(45deg, #fff, #d0d0d0);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.overlay-tagline {
+  font-size: 1.5rem;
+  font-weight: 300;
+  margin-bottom: 2rem;
+  color: #e0e0e0;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.overlay-description {
+  font-size: 1rem;
+  line-height: 1.6;
+  color: #f0f0f0;
+  font-weight: 300;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.login-form-section {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f8f9fa;
+  padding: 2rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.login-form-section::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -50%;
+  width: 100%;
+  height: 200%;
+  background: linear-gradient(135deg, rgba(26, 83, 54, 0.03) 0%, rgba(26, 83, 54, 0.07) 100%);
+  transform: rotate(30deg);
+  z-index: 0;
+}
+
+.login-form-container {
+  width: 100%;
+  max-width: 320px;
+  background-color: white;
+  border-radius: 16px;
+  padding: 1.5rem;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+  position: relative;
+  z-index: 1;
+  transition: all 0.3s ease;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.login-form-container:hover {
+  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.12);
+  transform: translateY(-5px);
+}
+
+.form-header {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.form-logo {
+  width: 140px;
+  height: auto;
+  margin-bottom: 1.5rem;
+}
+
+.form-title {
+  font-size: 1.8rem;
+  margin: 0;
+  color: #333;
+  font-weight: 600;
+}
+
+.form-subtitle {
+  font-size: 1rem;
+  margin: 0.5rem 0 0;
+  color: #666;
+  font-weight: 400;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.form-group {
+  width: 100%;
+  margin-bottom: 0.8rem;
+}
+
+.input-label {
+  display: block;
+  margin-bottom: 0.3rem;
+  font-size: 0.85rem;
+  color: #555;
+  font-weight: 500;
+}
+
+.input-container {
+  position: relative;
+  width: 100%;
+  margin-bottom: 0.5rem;
+}
+
+.input-wrapper {
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+input {
+  width: 100%;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  outline: none;
+  box-sizing: border-box;
+  transition: all 0.3s ease;
+  background-color: #f9f9f9;
+  color: #333;
+  -webkit-text-fill-color: #333;
+}
+
+input:focus {
+  border-color: #1a5336;
+  background-color: #fff;
+  box-shadow: 0 0 0 3px rgba(26, 83, 54, 0.2);
+  color: #333;
+  -webkit-text-fill-color: #333;
+}
+
+input.input-error {
+  border-color: #dc3545;
+  background-color: rgba(220, 53, 69, 0.05);
+}
+
+input.input-error:focus {
+  box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.25);
+}
+
+/* Remove input icon styles */
+.input-icon {
+  display: none;
+}
+
+.password-input-wrapper {
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.login-button {
+  width: 100%;
+  padding: 0.7rem;
+  background: linear-gradient(45deg, #1a5336, #2a7349);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 4px 15px rgba(26, 83, 54, 0.25);
+}
+
+.login-button:hover:not(:disabled) {
+  background: linear-gradient(45deg, #153f29, #236240);
+  box-shadow: 0 6px 20px rgba(26, 83, 54, 0.35);
+  transform: translateY(-2px);
+}
+
+.login-button:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: 0 2px 10px rgba(26, 83, 54, 0.2);
+}
+
+.login-button::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    to right,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.2) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  transform: rotate(45deg);
+  transition: all 0.5s ease;
+  opacity: 0;
+}
+
+.login-button:hover::after {
+  animation: shine 1.5s infinite;
+}
+
+@keyframes shine {
+  0% {
+    left: -100%;
+    opacity: 0.5;
+  }
+  50% {
+    left: 100%;
+    opacity: 0.3;
+  }
+  100% {
+    left: 100%;
+    opacity: 0;
+  }
+}
+
+.login-button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.spinner-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: white;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-text {
+  color: white;
+  font-size: 0.9rem;
+}
+
+.additional-options {
+  display: flex;
+  justify-content: center;
+  margin-top: 0.8rem;
+}
+
+.forgot-password {
+  background: none;
+  border: none;
+  color: #1a5336;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+}
+
+.forgot-password:hover {
+  color: #0f3020;
+  background-color: rgba(26, 83, 54, 0.08);
+}
+
+.credential-request {
+  margin-top: 1.2rem;
+  text-align: center;
+  padding-top: 1rem;
+  border-top: 1px solid #e0e0e0;
+}
+
+.credential-request p {
+  color: #666;
+  margin-bottom: 0.4rem;
+  font-size: 0.8rem;
+}
+
+.request-button {
+  background: none;
+  border: 1.5px solid #1a5336;
+  color: #1a5336;
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 0.8rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.request-button:hover {
+  background-color: rgba(26, 83, 54, 0.08);
+  transform: translateY(-2px);
+}
+
+.shine-button {
+  position: relative;
+  overflow: hidden;
+}
+
+.shine-button::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -100%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    to right,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.3) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  transform: rotate(45deg);
+  transition: all 0.5s ease;
+}
+
+.shine-button:hover::after {
+  animation: shine 1.5s infinite;
+}
+
+.login-logo {
+  display: block;
+  width: 70px;
+  height: auto;
+  margin: 0 auto 1rem;
+  transform-origin: center;
+  transition: transform 0.3s ease;
+}
+
+.login-logo:hover {
+  transform: scale(1.05);
+}
+
+.login-title {
+  text-align: center;
+  font-size: 1.4rem;
+  color: #333;
+  margin-bottom: 1.5rem;
+  font-weight: 600;
+}
+
+@media (max-width: 992px) {
+  .login-container {
+    flex-direction: column;
+    height: auto;
+  }
+  
+  .login-image-section {
+    margin-right: 0;
+    border-radius: 0 0 30px 30px;
+    clip-path: none;
+    height: 40vh;
+    min-height: 300px;
+  }
+  
+  .login-form-section {
+    padding: 2rem 1rem;
+  }
+  
+  .login-form-container {
+    padding: 1.8rem;
+    max-width: 380px;
+  }
+}
+
+@media (max-width: 576px) {
+  .login-image-section {
+    height: 35vh;
+    min-height: 250px;
+  }
+  
+  .login-form-section {
+    padding: 1.5rem 1rem;
+  }
+  
+  .login-form-container {
+    padding: 1.5rem;
+    max-width: 340px;
+  }
+  
+  .overlay-title {
+    font-size: 2rem;
+  }
+  
+  .overlay-tagline {
+    font-size: 1.2rem;
+  }
+}
+
+.error-message {
+  color: #dc3545;
+  font-size: 0.75rem;
+  margin-top: 0.3rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.error-icon {
+  font-style: normal;
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.3s ease;
+}
+
+.modal-content {
+  position: relative;
+  width: 90%;
+  max-width: 500px;
+  background-color: white;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+  animation: modalSlide 0.4s ease;
+  z-index: 1001;
+}
+
+@keyframes modalSlide {
+  from { opacity: 0; transform: translateY(-30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.2rem 1.5rem;
+  background-color: #f9f9f9;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 1.4rem;
+  color: #333;
+  font-weight: 600;
+}
+
+.modal-body {
+  padding: 1.5rem;
+}
+
+.modal-instruction {
+  margin-bottom: 1.5rem;
+  color: #555;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.close-button {
+  background: none;
+  border: none;
+  color: #777;
+  font-size: 1.5rem;
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.close-button:hover {
+  background-color: rgba(0, 0, 0, 0.1);
+  color: #333;
+}
+
+.submit-button {
+  background: linear-gradient(45deg, #1a5336, #2a7349);
+  color: white;
+  border: none;
+  padding: 0.8rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  width: 100%;
+  margin-top: 1rem;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(26, 83, 54, 0.2);
+}
+
+.submit-button:hover {
+  background: linear-gradient(45deg, #153f29, #236240);
+  box-shadow: 0 6px 15px rgba(26, 83, 54, 0.3);
+  transform: translateY(-2px);
+}
+
+.confirmation {
+  text-align: center;
+  padding: 2rem 1.5rem;
+}
+
+.confirmation-icon {
+  margin-bottom: 1.5rem;
+  animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes popIn {
+  from { transform: scale(0.5); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.confirmation-message {
+  color: #555;
+  line-height: 1.6;
+  margin-bottom: 1.5rem;
+  font-size: 0.95rem;
+}
+
+.close-button-centered {
+  background: linear-gradient(45deg, #1a5336, #2a7349);
+  color: white;
+  border: none;
+  padding: 0.8rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  margin: 0 auto;
+  display: block;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(26, 83, 54, 0.2);
+}
+
+.close-button-centered:hover {
+  background: linear-gradient(45deg, #153f29, #236240);
+  box-shadow: 0 6px 15px rgba(26, 83, 54, 0.3);
+  transform: translateY(-2px);
+}
+
+.session-notice {
+  background-color: #f8f9fa;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  text-align: center;
+  animation: fadeIn 0.5s ease;
+}
+
+.session-notice p {
+  margin-bottom: 1.2rem;
+  color: #555;
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.session-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+}
+
+.continue-button {
+  background: linear-gradient(45deg, #1a5336, #2a7349);
+  color: white;
+  border: none;
+  padding: 0.8rem 1.2rem;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  flex: 1;
+  max-width: 180px;
+  box-shadow: 0 4px 12px rgba(26, 83, 54, 0.2);
+}
+
+.continue-button:hover {
+  background: linear-gradient(45deg, #153f29, #236240);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 15px rgba(26, 83, 54, 0.3);
+}
+
+.signout-button {
+  background: transparent;
+  color: #dc3545;
+  border: 1px solid #dc3545;
+  padding: 0.8rem 1.2rem;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  flex: 1;
+  max-width: 180px;
+}
+
+.signout-button:hover {
+  background-color: rgba(220, 53, 69, 0.1);
+  transform: translateY(-2px);
+}
+
+button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.auth-error {
+  background-color: rgba(220, 53, 69, 0.1);
+  color: #dc3545;
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-left: 4px solid #dc3545;
+  animation: fadeIn 0.5s ease;
+}
+
+.toggle-password {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #666;
+  transition: all 0.2s ease;
+  z-index: 2;
+}
+
+.toggle-password:hover {
+  color: #333;
+}
+
+.toggle-password:focus {
+  outline: none;
+}
+
+/* Glow Button Animation */
+.glow-button {
+  position: relative;
+}
+
+.glow-button::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  background: linear-gradient(45deg, #1a5336, #2a7349, #3c9058, #1a5336);
+  z-index: -1;
+  border-radius: 10px;
+  background-size: 400%;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.glow-button:hover::before {
+  opacity: 1;
+  animation: glowing 3s linear infinite;
+}
+
+@keyframes glowing {
+  0% { background-position: 0 0; }
+  50% { background-position: 400% 0; }
+  100% { background-position: 0 0; }
+}
+
+/* Pulse Button Animation */
+.pulse-button {
+  position: relative;
+}
+
+.pulse-button:hover {
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+/* Add floating effect to the form container */
+@keyframes float {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-5px); }
+  100% { transform: translateY(0px); }
+}
+
+.login-form-container {
+  animation: float 5s ease-in-out infinite;
+}
+
+/* Custom alert notification */
+.alert-notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  padding: 0.85rem 1.25rem;
+  margin-bottom: 1rem;
+  border-radius: 4px;
+  background-color: #f8d7da;
+  color: #721c24;
+  border-left: 4px solid #f5c6cb;
+  display: flex;
+  align-items: center;
+  animation: fadeInAlert 0.3s ease;
+  z-index: 2000;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  min-width: 300px;
+  max-width: 380px;
+  font-size: 0.9rem;
+}
+
+.alert-notification .alert-icon {
+  margin-right: 10px;
+  color: #721c24;
+  display: flex;
+  align-items: center;
+}
+
+.alert-notification .alert-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.alert-notification .alert-close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 6px;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-size: 1.1rem;
+  line-height: 1;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+.alert-notification .alert-close:hover {
+  opacity: 1;
+}
+
+@keyframes fadeInAlert {
+  from { opacity: 0; transform: translateX(20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+/* Mobile App Notice Styles */
+.mobile-app-notice {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  background-color: rgba(255, 255, 255, 0.95);
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  text-align: center;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.mobile-app-notice h3 {
+  font-size: 1.8rem;
+  margin-bottom: 1rem;
+  color: #1a5336;
+  font-weight: 600;
+}
+
+.mobile-app-notice p {
+  font-size: 1.1rem;
+  line-height: 1.5;
+  margin-bottom: 1.5rem;
+  color: #333;
+}
+
+.qr-code-container {
+  background-color: white;
+  padding: 1rem;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  margin: 1rem 0;
+  display: flex;
+  justify-content: center;
+}
+
+.qr-code-instruction {
+  font-size: 0.95rem;
+  color: #666;
+  margin-top: 1rem;
+  font-style: italic;
+}
+
+/* Animation for QR code on hover */
+.qr-code-container:hover {
+  transform: scale(1.03);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s ease;
+}
+
+/* Media queries for mobile */
+@media (max-width: 768px) {
+  .mobile-app-notice {
+    padding: 1.5rem;
+    max-width: 90%;
+  }
+  
+  .mobile-app-notice h3 {
+    font-size: 1.5rem;
+  }
+  
+  .mobile-app-notice p {
+    font-size: 1rem;
+  }
+  
+  .qr-code-container {
+    padding: 0.75rem;
+  }
+  
+  .qr-code-container svg {
+    width: 160px !important;
+    height: 160px !important;
+  }
+}
+
+/* Login Options Styles */
+.login-options {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.button-container {
+  margin-top: 1.5rem;
+  width: 100%;
+  display: flex;
+  gap: 1rem;
+  flex-direction: column;
+}
+
+.admin-login-button {
+  padding: 0.8rem 1.5rem;
+  background: linear-gradient(45deg, #1a5336, #2a7349);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(26, 83, 54, 0.2);
+  width: 100%;
+}
+
+.admin-login-button:hover {
+  background: linear-gradient(45deg, #153f29, #236240);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 15px rgba(26, 83, 54, 0.3);
+}
+
+.admin-login-button:active {
+  transform: translateY(1px);
+  box-shadow: 0 2px 8px rgba(26, 83, 54, 0.2);
+}
+
+.mobile-app-button {
+  padding: 0.8rem 1.5rem;
+  background: white;
+  color: #1a5336;
+  border: 2px solid #1a5336;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  width: 100%;
+}
+
+.mobile-app-button:hover {
+  background-color: rgba(26, 83, 54, 0.1);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(26, 83, 54, 0.15);
+}
+
+.mobile-app-button:active {
+  transform: translateY(1px);
+  box-shadow: none;
+}
+
+/* Admin Login Modal Styles - More Professional Look */
+.admin-login-modal {
+  max-width: 450px;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+}
+
+.admin-login-modal .modal-header {
+  background-color: #f8f9fa;
+  border-bottom: 1px solid #e9ecef;
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.admin-login-modal .modal-header h2 {
+  font-size: 1.25rem;
+  color: #222;
+  font-weight: 600;
+  margin: 0;
+}
+
+.admin-login-modal .modal-body {
+  padding: 1.75rem;
+}
+
+.admin-login-modal .form-group {
+  margin-bottom: 1.5rem;
+}
+
+.admin-login-modal label {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: #333;
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.admin-login-modal input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  background-color: #f9fafb;
+  transition: all 0.2s ease;
+  color: #333;
+  -webkit-text-fill-color: #333;
+}
+
+.admin-login-modal input:focus {
+  border-color: #1a5336;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(26, 83, 54, 0.1);
+  background-color: #fff;
+  color: #333;
+  -webkit-text-fill-color: #333;
+}
+
+.admin-login-modal .login-button {
+  width: 100%;
+  padding: 0.85rem;
+  background-color: #1a5336;
+  border: none;
+  border-radius: 6px;
+  color: white;
+  font-weight: 500;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.admin-login-modal .login-button:hover {
+  background-color: #134025;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  transform: translateY(-1px);
+}
+
+.admin-login-modal .login-button:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.admin-login-modal .credential-request {
+  margin-top: 1.75rem;
+  text-align: center;
+  border-top: 1px solid #eee;
+  padding-top: 1.5rem;
+}
+
+.admin-login-modal .credential-request p {
+  margin-bottom: 0.75rem;
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.admin-login-modal .request-button {
+  background: transparent;
+  border: 1px solid #1a5336;
+  color: #1a5336;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.admin-login-modal .request-button:hover {
+  background-color: rgba(26, 83, 54, 0.05);
+  transform: translateY(-1px);
+}
+
+.admin-login-modal .close-button {
+  color: #666;
+  font-size: 1.25rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.admin-login-modal .close-button:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+  color: #333;
+}
+
+/* QR Code Modal Styles */
+.modal-content .mobile-app-notice {
+  padding: 0;
+  box-shadow: none;
+  background: transparent;
+  margin: 0;
+  max-width: 100%;
+}
+
+.modal-content .mobile-app-notice h3 {
+  color: #1a5336;
+  font-size: 1.6rem;
+  margin-bottom: 1rem;
+}
+
+/* Responsive styles for modals */
+@media (max-width: 768px) {
+  .admin-login-modal {
+    width: 90%;
+  }
+  
+  .admin-login-modal .modal-body {
+    padding: 1.2rem;
+  }
+  
+  .admin-login-modal .form-group {
+    margin-bottom: 1rem;
+  }
+}
+
+/* When modals are open, prevent background scrolling */
+body.modal-open {
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
+  height: 100%;
+}
+
+/* Add styles for the autocomplete dropdown visible in the screenshot */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 30px white inset !important;
+  -webkit-text-fill-color: #333 !important;
+}
+
+/* Style for autocomplete dropdown */
+datalist,
+datalist option,
+input[list]::-webkit-calendar-picker-indicator {
+  color: #333;
+}
+
+/* Ensure placeholder text is visible */
+::placeholder {
+  color: #aaa;
+  opacity: 1;
+}
+
+/* Autocomplete dropdown styling */
+input:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 30px white inset !important;
+}
+
+/* Firefox */
+input:-moz-autofill {
+  background-color: white !important;
+}
+
+/* Style for autocomplete dropdown in Chrome/Safari */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px white inset !important;
+  -webkit-text-fill-color: #333 !important;
+  background-color: white !important;
+  transition: background-color 5000s ease-in-out 0s; /* Prevent the background from flashing */
+}
+
+/* Chrome, Edge, Safari specific styles for dropdown */
+input::-webkit-contacts-auto-fill-button,
+input::-webkit-credentials-auto-fill-button {
+  visibility: hidden;
+  position: absolute;
+  right: 0;
+}
+
+/* Microsoft Edge specific styles */
+::-ms-clear,
+::-ms-reveal {
+  display: none;
+}
+
+/* Force the autocomplete dropdown text to be visible */
+option {
+  background-color: white;
+  color: #333;
+}
+
+/* Custom autocomplete dropdown styling - this tries to mimic the browser dropdown */
+.autocomplete-dropdown {
+  position: absolute;
+  width: 100%;
+  max-height: 200px;
+  overflow-y: auto;
+  background-color: white;
+  border: 1px solid #d1d5db;
+  border-top: none;
+  border-radius: 0 0 6px 6px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+}
+
+.autocomplete-dropdown-item {
+  padding: 10px;
+  cursor: pointer;
+  color: #333;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.autocomplete-dropdown-item:hover {
+  background-color: #f9fafb;
+}

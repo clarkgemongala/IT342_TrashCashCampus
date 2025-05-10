@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "761747053026",
+    "project_id": "trashcashcampusmobile",
+    "storage_bucket": "trashcashcampusmobile.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:761747053026:android:a576ea28dfdbd1b3a101bb",
+        "android_client_info": {
+          "package_name": "com.example.trashcashcampus_mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD4KSCSLvJvE6-PZp5EoPH7nGfDpftKTck"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:761747053026:android:5090adda24626bb8a101bb",
+        "android_client_info": {
+          "package_name": "com.trashcashcampus.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD4KSCSLvJvE6-PZp5EoPH7nGfDpftKTck"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

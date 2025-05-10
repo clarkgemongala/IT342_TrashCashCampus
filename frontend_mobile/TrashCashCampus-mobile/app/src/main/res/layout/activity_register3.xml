@@ -1,0 +1,262 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true"
+    android:background="@color/white">
+
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingHorizontal="24dp"
+        android:paddingBottom="32dp">
+
+        <ImageButton
+            android:id="@+id/btnBack"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="@null"
+            android:contentDescription="Back button"
+            android:src="@drawable/ic_back"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <ImageView
+            android:id="@+id/ivRegisterIllustration"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:adjustViewBounds="true"
+            android:contentDescription="Recycling illustration"
+            android:src="@drawable/birth_logo"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/btnBack"
+            app:layout_constraintWidth_percent="0.8" />
+
+        <TextView
+            android:id="@+id/tvCreateAccount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="Create account"
+            android:textColor="#333333"
+            android:textSize="30sp"
+            android:textStyle="bold"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/ivRegisterIllustration" />
+
+        <!-- Progress indicator with completed email and name steps -->
+        <androidx.constraintlayout.widget.ConstraintLayout
+            android:id="@+id/clProgressIndicator"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="40dp"
+            app:layout_constraintTop_toBottomOf="@+id/tvCreateAccount">
+
+            <!-- Text labels -->
+            <TextView
+                android:id="@+id/tvEmailStep"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Email"
+                android:textColor="#FF7143"
+                android:textSize="14sp"
+                app:layout_constraintStart_toStartOf="@+id/vCircleEmail"
+                app:layout_constraintEnd_toEndOf="@+id/vCircleEmail"
+                app:layout_constraintTop_toTopOf="parent" />
+
+            <TextView
+                android:id="@+id/tvNameStep"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Name"
+                android:textColor="#FF7143"
+                android:textSize="14sp"
+                app:layout_constraintStart_toStartOf="@+id/vCircleName"
+                app:layout_constraintEnd_toEndOf="@+id/vCircleName"
+                app:layout_constraintTop_toTopOf="parent" />
+
+            <TextView
+                android:id="@+id/tvBirthdayStep"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Birthday"
+                android:textColor="#333333"
+                android:textSize="14sp"
+                app:layout_constraintStart_toStartOf="@+id/vCircleBirthday"
+                app:layout_constraintEnd_toEndOf="@+id/vCircleBirthday"
+                app:layout_constraintTop_toTopOf="parent" />
+
+            <!-- Connector lines positioned behind the circles -->
+            <TextView
+                android:id="@+id/tvGenderStep"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Gender"
+                android:textColor="#BBBBBB"
+                android:textSize="14sp"
+                app:layout_constraintEnd_toEndOf="@+id/vCircleGender"
+                app:layout_constraintHorizontal_bias="1.0"
+                app:layout_constraintStart_toStartOf="@+id/vCircleGender"
+                app:layout_constraintTop_toTopOf="parent" />
+
+            <View
+                android:id="@+id/vConnectorLineBackground"
+                android:layout_width="0dp"
+                android:layout_height="3dp"
+                android:background="#DDDDDD"
+                app:layout_constraintStart_toStartOf="@+id/vCircleEmail"
+                app:layout_constraintEnd_toEndOf="@+id/vCircleGender"
+                app:layout_constraintTop_toTopOf="@+id/vCircleEmail"
+                app:layout_constraintBottom_toBottomOf="@+id/vCircleEmail" />
+
+            <!-- Progress connector line for Email to Name (already completed) -->
+            <View
+                android:id="@+id/vConnectorLineProgress"
+                android:layout_width="0dp"
+                android:layout_height="3dp"
+                android:background="@color/orange_progress"
+                app:layout_constraintStart_toStartOf="@+id/vCircleEmail"
+                app:layout_constraintEnd_toEndOf="@+id/vCircleName"
+                app:layout_constraintTop_toTopOf="@+id/vCircleEmail"
+                app:layout_constraintBottom_toBottomOf="@+id/vCircleEmail" />
+
+            <!-- Progress connector line for Name to Birthday (to be animated) -->
+            <View
+                android:id="@+id/vConnectorLineProgress2"
+                android:layout_width="0dp"
+                android:layout_height="3dp"
+                android:background="@color/orange_progress"
+                android:scaleX="0"
+                android:pivotX="0"
+                app:layout_constraintStart_toStartOf="@+id/vCircleName"
+                app:layout_constraintEnd_toStartOf="@+id/vCircleBirthday"
+                app:layout_constraintTop_toTopOf="@+id/vCircleName"
+                app:layout_constraintBottom_toBottomOf="@+id/vCircleName" />
+
+            <!-- Circles positioned to be evenly spaced -->
+            <ImageView
+                android:id="@+id/vCircleEmail"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_marginTop="20dp"
+                android:background="@drawable/circle_selected"
+                android:src="@drawable/ic_check"
+                android:padding="8dp"
+                app:layout_constraintStart_toStartOf="parent"
+                app:layout_constraintEnd_toStartOf="@+id/vCircleName"
+                app:layout_constraintTop_toBottomOf="@+id/tvEmailStep"
+                app:layout_constraintHorizontal_chainStyle="spread_inside" />
+
+            <ImageView
+                android:id="@+id/vCircleName"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:background="@drawable/circle_selected"
+                android:src="@drawable/ic_check"
+                android:padding="8dp"
+                app:layout_constraintStart_toEndOf="@+id/vCircleEmail"
+                app:layout_constraintEnd_toStartOf="@+id/vCircleBirthday"
+                app:layout_constraintTop_toTopOf="@+id/vCircleEmail" />
+
+            <View
+                android:id="@+id/vCircleBirthday"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:background="@drawable/circle_unselected"
+                app:layout_constraintStart_toEndOf="@+id/vCircleName"
+                app:layout_constraintEnd_toStartOf="@+id/vCircleGender"
+                app:layout_constraintTop_toTopOf="@+id/vCircleEmail" />
+
+            <View
+                android:id="@+id/vCircleGender"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:background="@drawable/circle_unselected"
+                app:layout_constraintStart_toEndOf="@+id/vCircleBirthday"
+                app:layout_constraintEnd_toEndOf="parent"
+                app:layout_constraintTop_toTopOf="@+id/vCircleEmail" />
+        </androidx.constraintlayout.widget.ConstraintLayout>
+
+        <TextView
+            android:id="@+id/tvBirthdayLabel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="32dp"
+            android:text="Date of birth"
+            android:textColor="#333333"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/clProgressIndicator" />
+
+        <!-- Changed from EditText to RelativeLayout with TextView for date picker -->
+        <RelativeLayout
+            android:id="@+id/datePickerContainer"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:background="@drawable/bg_input_field_animated"
+            android:padding="16dp"
+            android:clickable="true"
+            android:focusable="true"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/tvBirthdayLabel">
+
+            <TextView
+                android:id="@+id/tvSelectedDate"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_centerVertical="true"
+                android:layout_toStartOf="@+id/ivCalendar"
+                android:text="DD/MM/YYYY"
+                android:textColor="#757575"
+                android:textSize="14sp"
+                android:clickable="false"
+                android:focusable="false" />
+
+            <ImageView
+                android:id="@+id/ivCalendar"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_alignParentEnd="true"
+                android:layout_centerVertical="true"
+                android:src="@drawable/ic_calendar"
+                android:contentDescription="Calendar" />
+        </RelativeLayout>
+
+        <androidx.appcompat.widget.AppCompatButton
+            android:id="@+id/btnContinue"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="32dp"
+            android:background="@drawable/bg_button_green_consistent"
+            android:padding="16dp"
+            android:text="Continue"
+            android:textAlignment="center"
+            android:textAllCaps="false"
+            android:textColor="#FFFFFF"
+            android:textStyle="bold"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/datePickerContainer" />
+
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:gravity="center"
+            android:orientation="horizontal"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/btnContinue">
+        </LinearLayout>
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+</ScrollView>
